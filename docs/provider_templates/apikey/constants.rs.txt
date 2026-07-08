@@ -1,0 +1,65 @@
+pub const PROVIDER_ID: &str = "xxx";
+pub const PROVIDER_NAME: &str = "Provider Name";
+pub const PROVIDER_FULL_NAME: &str = "provider-name";
+
+pub const BASE_URL: &str = "https://api.provider.com";
+pub const VALIDATE_URL: &str = "https://api.provider.com/v1/models";
+
+pub const COMPATIBLE_API: &str = "openai";
+pub const CATEGORY: &str = "apikey";
+pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
+
+pub const SUPPORTS_STREAMING: bool = true;
+pub const SUPPORTS_TOOLS: bool = true;
+pub const SUPPORTS_VISION: bool = false;
+
+pub const COLOR: &str = "#7c3aed";
+pub const ICON: &str = "router";
+pub const ICON_URL: &str = "/public/providers/xxx.png";
+pub const WEBSITE: &str = "https://provider.com";
+pub const API_KEY_URL: &str = "https://provider.com/api-keys";
+pub const USER_AGENT: &str = "AxumRouter/0.1.0";
+
+pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
+    crate::providers::spec::ProviderSpec {
+        id: PROVIDER_ID,
+        name: PROVIDER_NAME,
+        full_name: PROVIDER_FULL_NAME,
+        category: CATEGORY,
+        base_url: BASE_URL,
+        validate_url: VALIDATE_URL,
+        compatible_api: COMPATIBLE_API,
+        supports_streaming: SUPPORTS_STREAMING,
+        supports_tools: SUPPORTS_TOOLS,
+        supports_vision: SUPPORTS_VISION,
+        color: COLOR,
+        icon_url: ICON_URL,
+        quirks: crate::providers::spec::ProviderQuirks {
+            drop_stream_options: false,
+            drop_tools: false,
+            drop_tool_choice: false,
+            supports_stream_usage: true,
+            auth_header: crate::providers::spec::AuthHeader::Bearer,
+            max_tokens_field: crate::providers::spec::MaxTokensField::MaxTokens,
+        },
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ModelDef {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub max_tokens: u32,
+    pub supports_vision: bool,
+    pub supports_tools: bool,
+}
+
+pub const MODELS: &[ModelDef] = &[
+    ModelDef {
+        id: "model-id",
+        name: "Model Name",
+        max_tokens: 128000,
+        supports_vision: false,
+        supports_tools: true,
+    },
+];

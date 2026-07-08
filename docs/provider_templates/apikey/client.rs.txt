@@ -1,0 +1,142 @@
+use crate::error::GatewayError;
+use crate::providers::spec::AuthHeader;
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use reqwest::Client;
+
+use super::auth::ProviderAuth;
+use super::constants;
+use super::request::ProviderChatRequest;
+use super::response::ProviderChatResponse;
+
+pub struct ProviderClient {
+    http: Client,
+    base_url: String,
+}
+
+impl ProviderClient {
+    fn apply_auth(builder: reqwest::RequestBuilder, auth: &ProviderAuth) -> reqwest::RequestBuilder {
+        match constants::provider_spec().quirks.auth_header {
+            AuthHeader::Bearer => builder.header("Authorization", auth.bearer_token()),
+            AuthHeader::XApiKey => builder.header("x-api-key", auth.api_key()),
+        }
+    }
+
+    pub fn new(base_url: String, timeout_secs: u64) -> Self {
+        Self {
+            http: Client::builder()
+                // no total timeout for streaming; connect timeout only
+                .connect_timeout(std::time::Duration::from_secs(timeout_secs))
+                .build()
+                .expect("Failed to build HTTP client"),
+            base_url,
+        }
+    }
+
+    pub async fn send_chat(
+        &self,
+        request: &ProviderChatRequest,
+        auth: &ProviderAuth,
+    ) -> Result<ProviderChatResponse, GatewayError> {
+        let url = format!("{}/v1/chat/completions", self.base_url);
+        let response = Self::apply_auth(
+            self.http
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .header("User-Agent", constants::USER_AGENT),
+            auth,
+        )
+        .json(request)
+        .send()
+        .await
+        .map_err(|e| GatewayError::ProviderError(format!("HTTP error: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(GatewayError::ProviderHttpError {
+                status,
+                body,
+                provider: constants::PROVIDER_ID.to_string(),
+            });
+        }
+
+        response
+            .json::<ProviderChatResponse>()
+            .await
+            .map_err(|e| GatewayError::ProviderError(format!("Parse error: {}", e)))
+    }
+
+    pub async fn send_chat_stream(
+        &self,
+        request: &ProviderChatRequest,
+        auth: &ProviderAuth,
+    ) -> Result<BoxStream<'static, Result<crate::types::chat::ChatCompletionChunk, GatewayError>>, GatewayError> {
+        let url = format!("{}/v1/chat/completions", self.base_url);
+        let mut req_builder = Self::apply_auth(
+            self.http
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .header("User-Agent", constants::USER_AGENT),
+            auth,
+        );
+
+        let mut stream_req = request.clone();
+        stream_req.stream = true;
+        let quirks = constants::provider_spec().quirks;
+        if quirks.drop_stream_options || !quirks.supports_stream_usage {
+            stream_req.stream_options = None;
+        } else if stream_req.stream_options.is_none() {
+            stream_req.stream_options = Some(serde_json::json!({ "include_usage": true }));
+        }
+
+        req_builder = req_builder.json(&stream_req);
+        let response = req_builder
+            .send()
+            .await
+            .map_err(|e| GatewayError::ProviderError(format!("Stream HTTP error: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(GatewayError::ProviderHttpError {
+                status,
+                body,
+                provider: constants::PROVIDER_ID.to_string(),
+            });
+        }
+
+        let mut upstream = response.bytes_stream();
+        let parsed = async_stream::try_stream! {
+            let mut buffer = String::new();
+            while let Some(chunk_result) = upstream.next().await {
+                let bytes = chunk_result
+                    .map_err(|e| GatewayError::ProviderError(format!("Stream read error: {}", e)))?;
+                buffer.push_str(&String::from_utf8_lossy(&bytes));
+
+                while let Some(frame_end) = buffer.find("\n\n") {
+                    let frame = buffer[..frame_end].to_string();
+                    buffer = buffer[frame_end + 2..].to_string();
+                    for line in frame.lines() {
+                        let Some(data) = line.trim().strip_prefix("data:") else { continue; };
+                        let data = data.trim();
+                        if data.is_empty() || data == "[DONE]" { continue; }
+                        match serde_json::from_str::<crate::types::chat::ChatCompletionChunk>(data) {
+                            Ok(chunk) => yield chunk,
+                            Err(e) => tracing::debug!("Failed to parse SSE frame: {}", e),
+                        }
+                    }
+                }
+            }
+        };
+        Ok(parsed.boxed())
+    }
+
+    pub async fn health_check(&self, auth: &ProviderAuth) -> Result<bool, GatewayError> {
+        let response = Self::apply_auth(self.http.get(constants::VALIDATE_URL), auth)
+            .send()
+            .await
+            .map_err(|e| GatewayError::ProviderError(e.to_string()))?;
+        Ok(response.status().is_success())
+    }
+}

@@ -1,0 +1,148 @@
+use async_trait::async_trait;
+
+use crate::db::models::ApiKey;
+use crate::error::GatewayError;
+use crate::providers::error_classifier::classify_provider_error;
+use crate::providers::key_manager::KeyManager;
+use crate::providers::result::{ChatResult, ChatStreamResult};
+use crate::providers::traits::Provider;
+use crate::types::chat::ChatCompletionRequest;
+use crate::types::model::Model;
+use crate::types::provider::ProviderMetadata;
+
+use super::auth::ProviderAuth;
+use super::client::ProviderClient;
+use super::constants;
+use super::mapper::ProviderMapper;
+
+pub struct ApiKeyProvider {
+    metadata: ProviderMetadata,
+    keys: KeyManager,
+    client: ProviderClient,
+    mapper: ProviderMapper,
+}
+
+impl ApiKeyProvider {
+    pub fn new_with_keys(keys: Vec<ApiKey>) -> Self {
+        Self {
+            metadata: ProviderMetadata {
+                name: constants::PROVIDER_ID.to_string(),
+                display_name: constants::PROVIDER_NAME.to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                capabilities: vec!["chat".into(), "models".into(), "streaming".into(), "tools".into()],
+                icon_path: constants::ICON_URL.to_string(),
+                category: constants::CATEGORY.to_string(),
+                icon_url: constants::ICON_URL.to_string(),
+                color: constants::COLOR.to_string(),
+            },
+            keys: KeyManager::new(keys),
+            client: ProviderClient::new(constants::BASE_URL.to_string(), constants::DEFAULT_TIMEOUT_SECS),
+            mapper: ProviderMapper::new(),
+        }
+    }
+
+    fn exhausted_error(&self) -> GatewayError {
+        let lock_summary = self.keys.locked_keys()
+            .into_iter()
+            .map(|(id, remaining, reason)| format!("{} locked {}s: {}", id, remaining, reason))
+            .collect::<Vec<_>>()
+            .join("; ");
+        if lock_summary.is_empty() {
+            GatewayError::no_available_keys("All API keys exhausted — try again later or add new keys".to_string())
+        } else {
+            GatewayError::no_available_keys(format!("All API keys exhausted — {}", lock_summary))
+        }
+    }
+
+    pub fn list_models_static(&self) -> Vec<Model> {
+        constants::MODELS.iter().map(|m| Model {
+            id: format!("{}/{}", constants::PROVIDER_ID, m.id),
+            object: "model".to_string(),
+            owned_by: constants::PROVIDER_ID.to_string(),
+        }).collect()
+    }
+}
+
+#[async_trait]
+impl Provider for ApiKeyProvider {
+    fn metadata(&self) -> ProviderMetadata { self.metadata.clone() }
+
+    async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatResult, GatewayError> {
+        let provider_request = self.mapper.to_provider_request(request);
+        let total_keys = self.keys.total_count();
+        let mut failed = Vec::new();
+
+        for attempt in 0..total_keys.max(1) {
+            let key = match self.keys.next() { Ok(k) => k, Err(_) => break };
+            let key_id = key.id.clone();
+            let auth = ProviderAuth::new(key.key_value.clone());
+            match self.client.send_chat(&provider_request, &auth).await {
+                Ok(provider_response) => {
+                    self.keys.unlock(&key_id);
+                    return Ok(ChatResult {
+                        response: self.mapper.to_gateway_response(provider_response)?,
+                        used_key_id: Some(key_id),
+                        failed_keys: failed,
+                    });
+                }
+                Err(e) => {
+                    let classified = classify_provider_error(&e);
+                    if classified.retryable {
+                        let lock_status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
+                        self.keys.lock_key(&key.id, lock_status, e.to_string());
+                        failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
+                        continue;
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        Err(self.exhausted_error())
+    }
+
+    async fn chat_completion_stream(&self, request: ChatCompletionRequest) -> Result<ChatStreamResult, GatewayError> {
+        let provider_request = self.mapper.to_provider_request(request);
+        let total_keys = self.keys.total_count();
+        let mut failed = Vec::new();
+
+        for attempt in 0..total_keys.max(1) {
+            let key = match self.keys.next() { Ok(k) => k, Err(_) => break };
+            let key_id = key.id.clone();
+            let auth = ProviderAuth::new(key.key_value.clone());
+            match self.client.send_chat_stream(&provider_request, &auth).await {
+                Ok(stream) => {
+                    self.keys.unlock(&key_id);
+                    return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed });
+                }
+                Err(e) => {
+                    let classified = classify_provider_error(&e);
+                    if classified.retryable {
+                        let lock_status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
+                        self.keys.lock_key(&key.id, lock_status, e.to_string());
+                        failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
+                        continue;
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        Err(self.exhausted_error())
+    }
+
+    async fn list_models(&self) -> Result<Vec<Model>, GatewayError> { Ok(self.list_models_static()) }
+
+    async fn health_check(&self) -> Result<bool, GatewayError> {
+        let key = self.keys.next()?;
+        let auth = ProviderAuth::new(key.key_value.clone());
+        self.client.health_check(&auth).await
+    }
+
+    async fn authenticate(&self) -> Result<(), GatewayError> {
+        let key = self.keys.next()?;
+        ProviderAuth::new(key.key_value.clone()).validate()
+    }
+
+    fn locked_keys(&self) -> Vec<(String, u64, String)> { self.keys.locked_keys() }
+    fn total_keys(&self) -> usize { self.keys.total_count() }
+    fn active_keys(&self) -> usize { self.keys.active_count() }
+}

@@ -1,0 +1,67 @@
+use crate::error::GatewayError;
+use crate::providers::spec::MaxTokensField;
+use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Choice, Message};
+
+use super::constants;
+use super::request::ProviderChatRequest;
+use super::response::ProviderChatResponse;
+
+pub struct ProviderMapper;
+
+impl ProviderMapper {
+    pub fn new() -> Self { Self }
+
+    pub fn to_provider_request(&self, gateway_req: ChatCompletionRequest) -> ProviderChatRequest {
+        let model = gateway_req
+            .model
+            .split_once('/')
+            .map(|(_, model)| model)
+            .unwrap_or(&gateway_req.model)
+            .to_string();
+
+        let quirks = constants::provider_spec().quirks;
+        let (max_tokens, max_completion_tokens) = match quirks.max_tokens_field {
+            MaxTokensField::MaxTokens => (gateway_req.max_tokens, None),
+            MaxTokensField::MaxCompletionTokens => (None, gateway_req.max_tokens),
+        };
+
+        ProviderChatRequest {
+            model,
+            messages: gateway_req.messages,
+            temperature: gateway_req.temperature,
+            max_tokens,
+            max_completion_tokens,
+            top_p: gateway_req.top_p,
+            stream: gateway_req.stream.unwrap_or(false),
+            stream_options: if quirks.drop_stream_options { None } else { gateway_req.stream_options },
+            tools: if quirks.drop_tools { None } else { gateway_req.tools },
+            tool_choice: if quirks.drop_tool_choice { None } else { gateway_req.tool_choice },
+        }
+    }
+
+    pub fn to_gateway_response(
+        &self,
+        provider_resp: ProviderChatResponse,
+    ) -> Result<ChatCompletionResponse, GatewayError> {
+        let choices = provider_resp.choices.into_iter().map(|c| Choice {
+            index: c.index,
+            message: Message {
+                role: c.message.role,
+                content: c.message.content.filter(|s| !s.is_empty()),
+                tool_calls: c.message.tool_calls,
+                tool_call_id: None,
+                name: None,
+            },
+            finish_reason: c.finish_reason,
+        }).collect();
+
+        Ok(ChatCompletionResponse {
+            id: provider_resp.id,
+            object: provider_resp.object,
+            created: provider_resp.created,
+            model: format!("{}/{}", constants::PROVIDER_ID, provider_resp.model),
+            choices,
+            usage: provider_resp.usage,
+        })
+    }
+}

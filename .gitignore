@@ -1,0 +1,39 @@
+# AxumRouter Backend — .gitignore
+
+# Build output
+target/
+debug/
+public/admin/
+
+# Database
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/backups/
+
+# Environment
+.env
+
+# Logs
+*.log
+freebuff.log
+
+# Config (local overrides)
+config/config.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Rust
+**/*.rs.bk
+
+# Temp
+backups/

@@ -1,0 +1,27 @@
+use crate::error::GatewayError;
+
+#[derive(Debug, Clone)]
+pub struct ProviderAuth {
+    api_key: String,
+}
+
+impl ProviderAuth {
+    pub fn new(api_key: String) -> Self {
+        Self { api_key }
+    }
+
+    pub fn bearer_token(&self) -> String {
+        format!("Bearer {}", self.api_key)
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    pub fn validate(&self) -> Result<(), GatewayError> {
+        if self.api_key.trim().is_empty() {
+            return Err(GatewayError::InvalidApiKey);
+        }
+        Ok(())
+    }
+}
