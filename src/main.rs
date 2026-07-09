@@ -3,6 +3,7 @@ mod api;
 mod app;
 mod config;
 mod db;
+mod engine;
 mod error;
 mod middleware;
 mod providers;

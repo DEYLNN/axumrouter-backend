@@ -1,4 +1,4 @@
-use crate::providers::openai_compat::config::ModelDef;
+use crate::engine::openai_compat::config::ModelDef;
 use crate::providers::spec::ProviderQuirks;
 
 pub const PROVIDER_ID: &str = "mst";
@@ -21,8 +21,8 @@ pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "mistral-embed", name: "Mistral Embed", max_tokens: 8000, supports_vision: false, supports_tools: false },
 ];
 
-pub fn config() -> crate::providers::openai_compat::config::OpenAIConfig {
-    crate::providers::openai_compat::config::OpenAIConfig {
+pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
+    crate::engine::openai_compat::config::OpenAIConfig {
         provider_id: PROVIDER_ID,
         provider_name: PROVIDER_NAME,
         model_prefix: MODEL_PREFIX,

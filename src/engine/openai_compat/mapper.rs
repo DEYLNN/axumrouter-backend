@@ -1,7 +1,7 @@
 use crate::error::GatewayError;
 use crate::providers::spec::MaxTokensField;
-use crate::providers::openai_compat::config::{OpenAIConfig, ModelDef};
-use crate::providers::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
+use crate::engine::openai_compat::config::{OpenAIConfig, ModelDef};
+use crate::engine::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Choice, Message, Usage, ToolCall};
 use crate::types::model::Model;
 use std::sync::Arc;
@@ -120,7 +120,7 @@ impl Mapper {
             .choices
             .first()
             .map(|c| c.delta.clone())
-            .unwrap_or_else(|| crate::providers::openai_compat::types::StreamDelta {
+            .unwrap_or_else(|| crate::engine::openai_compat::types::StreamDelta {
                 role: None,
                 content: None,
                 tool_calls: None,

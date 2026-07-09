@@ -47,6 +47,8 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
 pub struct ModelDef { pub id: &'static str, pub name: &'static str }
 
 pub const MODELS: &[ModelDef] = &[
+    ModelDef { id: "grok-4.5", name: "Grok 4.5" },
+    ModelDef { id: "grok-4.5-fast-reasoning", name: "Grok 4.5 Fast Reasoning" },
     ModelDef { id: "grok-4", name: "Grok 4" },
     ModelDef { id: "grok-4-fast-reasoning", name: "Grok 4 Fast Reasoning" },
     ModelDef { id: "grok-code-fast-1", name: "Grok Code Fast" },

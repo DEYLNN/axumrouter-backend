@@ -1,4 +1,4 @@
-use crate::providers::openai_compat::config::ModelDef;
+use crate::engine::openai_compat::config::ModelDef;
 use crate::providers::spec::ProviderQuirks;
 
 pub const PROVIDER_ID: &str = "ocg";
@@ -25,8 +25,8 @@ pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "qwq-plus", name: "QwQ Plus", max_tokens: 128000, supports_vision: false, supports_tools: true },
 ];
 
-pub fn config() -> crate::providers::openai_compat::config::OpenAIConfig {
-    crate::providers::openai_compat::config::OpenAIConfig {
+pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
+    crate::engine::openai_compat::config::OpenAIConfig {
         provider_id: PROVIDER_ID,
         provider_name: PROVIDER_NAME,
         model_prefix: MODEL_PREFIX,

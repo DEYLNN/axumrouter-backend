@@ -6,15 +6,14 @@ pub mod result;
 pub mod spec;
 pub mod traits;
 
-pub mod openai_compat;
-
-// Provider modules
-pub mod mistral;
-pub mod opencode_free;
+pub mod cline;
+pub mod cloudflare;
 pub mod freebuff;
-pub mod opencode_go;
+pub mod mistral;
 pub mod openai_codex;
+pub mod opencode_free;
+pub mod opencode_go;
+pub mod tokenbay;
 pub mod xai;
-pub mod tbay;
-pub mod cl;
+pub mod xai_api_key;
 

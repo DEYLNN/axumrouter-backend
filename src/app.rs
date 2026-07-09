@@ -18,9 +18,10 @@ pub fn build(state: AppState) -> Router {
     // Public OpenAI-compatible API  (/v1/*)
     let api = crate::api::routes(shared.clone());
 
-    // Admin dashboard JSON API + auth_files (still legacy, slated for Phase 2 migration)
+    // Admin dashboard JSON API + auth_files
     let admin = crate::admin::api::admin_routes(shared.clone())
-        .merge(crate::admin::auth_files::routes(shared.clone()));
+        .merge(crate::admin::auth_files::routes(shared.clone()))
+        .merge(crate::admin::oauth::routes(shared.clone()));
 
     // Static assets and SPA fallback
     let static_assets = axum::Router::new()

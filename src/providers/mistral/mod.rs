@@ -1,7 +1,7 @@
 pub mod constants;
 
 use crate::db::models::ApiKey;
-use crate::providers::openai_compat::provider::OpenAICompatibleProvider;
+use crate::engine::openai_compat::provider::OpenAICompatibleProvider;
 
 /// Thin constructor wrapping generic OpenAI-compatible provider.
 /// All config at src/providers/mistral/constants.rs.

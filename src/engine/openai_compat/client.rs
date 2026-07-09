@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use crate::error::GatewayError;
 use crate::providers::spec::AuthHeader;
-use crate::providers::openai_compat::auth::ApiKeyAuth;
-use crate::providers::openai_compat::config::OpenAIConfig;
-use crate::providers::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
+use crate::engine::openai_compat::auth::ApiKeyAuth;
+use crate::engine::openai_compat::config::OpenAIConfig;
+use crate::engine::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
 
 /// Generic HTTP client for OpenAI-compatible providers.
 pub struct Client {

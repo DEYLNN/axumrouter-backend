@@ -25,13 +25,16 @@ impl ProviderRegistry {
             Ok(Box::new(crate::providers::opencode_free::new_with_keys(keys)))
         });
         registry.register("tbay", |keys| {
-            Ok(Box::new(crate::providers::tbay::new_with_keys(keys)))
+            Ok(Box::new(crate::providers::tokenbay::new_with_keys(keys)))
         });
         registry.register("cl", |keys| {
-            Ok(Box::new(crate::providers::cl::new_with_keys(keys)))
+            Ok(Box::new(crate::providers::cline::new_with_keys(keys)))
         });
-
+        
         // Custom providers:
+        registry.register("cf", |keys| {
+            Ok(Box::new(crate::providers::cloudflare::provider::CfProvider::new_with_keys(keys)))
+        });
         registry.register("fb", |keys| {
             Ok(Box::new(crate::providers::freebuff::provider::FbProvider::new_with_keys(keys)))
         });
@@ -40,6 +43,10 @@ impl ProviderRegistry {
         });
         registry.register("xai", |keys| {
             Ok(Box::new(crate::providers::xai::provider::XaiProvider::new_with_keys(keys)))
+        });
+        // API-key providers (openai_compat):
+        registry.register("xak", |keys| {
+            Ok(Box::new(crate::providers::xai_api_key::new_with_keys(keys)))
         });
 
         registry
