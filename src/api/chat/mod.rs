@@ -12,6 +12,8 @@ use std::time::Instant;
 
 use crate::error::GatewayError;
 use crate::middleware::auth::GatewayKeyInfo;
+use crate::services::caveman;
+use crate::services::rtk;
 use crate::services::tool_normalizer::normalize_tool_messages;
 use crate::state::AppState;
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse};
@@ -114,22 +116,10 @@ async fn chat_completions(
     provider_request.stream = Some(is_streaming);
     normalize_tool_messages(&mut provider_request.messages);
 
-    // Caveman injection
-    let caveman_level: String = sqlx::query_scalar("SELECT value FROM settings WHERE key = 'caveman_enabled'")
-        .fetch_one(&state.db)
-        .await
-        .unwrap_or_else(|_| "off".to_string());
-    if caveman_level != "off" {
-        let prompt = match caveman_level.as_str() {
-            "lite" => "Be concise. Remove filler words but keep proper grammar. Answer directly.",
-            "ultra" => "Respond in ultra-terse telegraphic style. No articles, no pronouns, no verbs when possible. Max compression. Only key information.",
-            _ => "Respond concisely and directly. No pleasantries, no explanations, no fluff. Drop articles, use fragments. Get straight to the point with minimal words.",
-        };
-        provider_request.messages.insert(0, crate::types::chat::Message {
-            role: "system".to_string(), content: Some(prompt.to_string()),
-            tool_calls: None, tool_call_id: None, name: None,
-        });
-    }
+    // RTK: compress tool_result content before routing
+    rtk::compress(&state.db, &mut provider_request.messages).await;
+    // Caveman: inject terse system prompt
+    caveman::inject(&state.db, &mut provider_request.messages).await;
 
     // ── Route to handler ──
 
