@@ -81,7 +81,15 @@ pub async fn exchange_code(
 pub async fn save_token(state: &Arc<AppState>, token: &serde_json::Value) -> Result<(), String> {
     let kid = format!("key_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
     let now = chrono::Utc::now().to_rfc3339();
-    let kv = serde_json::to_string(token).map_err(|e| format!("Serialize: {}", e))?;
+    // Convert expires_in (seconds) to absolute expires_at ISO string
+    let mut enriched = token.clone();
+    if let Some(exp_in) = token.get("expires_in").and_then(|v| v.as_u64()) {
+        let exp_at = chrono::Utc::now() + chrono::Duration::seconds(exp_in as i64);
+        enriched.as_object_mut().map(|obj| {
+            obj.insert("expires_at".into(), serde_json::Value::String(exp_at.to_rfc3339()));
+        });
+    }
+    let kv = serde_json::to_string(&enriched).map_err(|e| format!("Serialize: {}", e))?;
     
     // Extract email from id_token for label
     let label = token.get("id_token").and_then(|t| {
