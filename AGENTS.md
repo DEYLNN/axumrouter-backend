@@ -2,165 +2,121 @@
 
 ## Project
 AxumRouter — OpenAI-compatible API Gateway di Rust (Axum).
-Multi-provider router dengan OAuth, API Key, device code flow.
+Multi-provider router. 15 providers (API Key, OAuth auth_code, OAuth device_code).
 
 ## Workspace
-- Root: `/root/.hermes/projects/axumrouter-backend`
+- Backend: `axumrouter-backend/` (Rust, Axum 0.7, port 3000)
+- Frontend: `axumrouter-frontend/` (React/TypeScript, Vite, port 5173)
 - DB: `data/axumrouter.db` (SQLite)
 - Binary: `target/release/axumrouter`
-- Port: 3000
 
 ## Build & Run
 ```bash
-cargo build --release
-strip target/release/axumrouter
-./target/release/axumrouter
-kill $(pgrep -f "axumrouter$")
-```
+# BE
+cargo build --release && ./target/release/axumrouter
 
-## DB safety
-- `data/axumrouter.db` jangan pernah di-rm atau di-drop
-- Ada auto-backup di `data/backups/` tiap startup
-- Reset: matikan server, hapus file, start ulang (auto-bikin baru)
+# FE (dev)
+npm run dev
+
+# FE (build)
+npx vite build
+```
 
 ## Architecture
 
-### Backend (Rust/Axum)
+### Backend
 ```
 src/
-├── main.rs                # entry, startup
-├── app.rs                 # Axum Router builder
-├── state.rs               # AppState (db, provider_manager)
-├── error.rs               # GatewayError enum
-├── config/                # App config (loader, models)
-├── db/                    # SQLite (migrations, models, queries)
-├── types/                 # Shared structs (chat, model, provider)
-├── utils/                 # Helpers
-├── middleware/             # Auth + logging
-│
-├── api/                   # /v1/* endpoints
-│   ├── mod.rs             # routes
-│   ├── models.rs          # /v1/models
-│   ├── responses.rs       # response helpers
-│   └── chat/              # /v1/chat/completions
-│       ├── mod.rs         # pipeline: normalize → RTK → caveman → route
-│       ├── combo.rs       # multi-model routing
-│       ├── non_streaming.rs
-│       └── streaming.rs
-│
-├── engine/                # Generic provider engines
-│   └── openai_compat/     # OpenAI-compatible provider engine
-│       ├── mod.rs, provider.rs, client.rs, auth.rs
-│       ├── config.rs, mapper.rs, types.rs
-│
-├── admin/                 # Admin dashboard API
-│   ├── mod.rs
-│   ├── api.rs             # thin router → delegates to routes/
-│   ├── auth_files.rs      # auth files CRUD
-│   ├── routes/            # route handlers
-│   │   ├── mod.rs, combos.rs, database.rs, gateway_keys.rs
-│   │   ├── keys.rs, logs.rs, models.rs, providers.rs
-│   │   ├── quota.rs, settings.rs, usage.rs
-│   └── oauth/             # OAuth per-provider handlers
-│       ├── mod.rs         # router
-│       ├── cx.rs, xai.rs, fb.rs, np.rs
-│
-├── providers/             # All provider implementations
-│   ├── mod.rs, registry.rs, manager.rs, traits.rs
-│   ├── key_manager.rs, result.rs, spec.rs
-│   ├── error_classifier.rs
-│   │
-│   ├── mistral/           # API key (openai_compat)
-│   ├── opencode_free/     # API key (openai_compat)
-│   ├── opencode_go/       # API key (openai_compat)
-│   ├── tokenbay/          # API key (openai_compat)
-│   ├── xai_api_key/       # API key (openai_compat)
-│   ├── nous_api_key/      # API key (openai_compat)
-│   ├── cline/             # API key (openai_compat)
-│   │
-│   ├── mimo_code_free/    # JWT bootstrap, custom auth
-│   ├── cloudflare/        # Multi-account, custom auth
-│   │
-│   ├── xai/               # OAuth authorization_code
-│   ├── openai_codex/      # OAuth authorization_code
-│   ├── freebuff/          # OAuth device_code
-│   └── nous_portal/       # OAuth device_code + auto-refresh
-│
-└── services/              # Business logic layer
-    ├── mod.rs
-    ├── caveman.rs         # terse system prompt
-    ├── rtk.rs             # Real Token Killer (tool compress)
-    ├── rtk_filters.rs     # 11 compression filters
-    ├── tool_normalizer.rs # tool message normalization
-    ├── gateway.rs         # gateway key validation
-    └── usage_tracking.rs  # usage logging
+├── main.rs, app.rs, state.rs, error.rs
+├── config/         # App config (loader, models)
+├── db/             # SQLite (migrations, models, queries)
+├── types/          # Shared structs (chat, model, provider)
+├── middleware/      # Auth + logging
+├── api/            # /v1/* endpoints
+│   └── chat/       # pipeline: normalize → RTK → caveman → route
+├── engine/         # Generic provider engines
+│   └── openai_compat/   # OpenAI-compatible engine (7 files)
+├── admin/          # Admin dashboard
+│   ├── api.rs      # thin router → routes/
+│   ├── auth_files.rs # auth files CRUD
+│   ├── routes/     # settings, providers, keys, gateway_keys, etc.
+│   └── oauth/      # per-provider: cx.rs, xai.rs, fb.rs, np.rs
+├── providers/      # 15 providers
+└── services/       # Business logic
+    ├── caveman.rs, gateway.rs, tool_normalizer.rs, usage_tracking.rs
+    └── rtk/        # Real Token Killer (P1 split)
+        ├── mod.rs
+        └── filters/  # 11 files: git_diff, git_status, grep, find, etc.
 ```
 
-### Frontend (React/TypeScript)
+### Frontend
 ```
 src/
-├── main.tsx, App.tsx
-├── api/                  # Modular API layer
-│   ├── index.ts          # barrel re-export
-│   ├── client.ts         # fetcher helper
-│   ├── types.ts          # shared interfaces
-│   ├── settings.ts, providers.ts, keys.ts
-│   ├── gateway.ts, oauth.ts, usage.ts
-│   ├── database.ts, auth-files.ts
-│
-├── hooks/                # Custom hooks
-│   ├── useOAuthFlow.ts
-│   └── useAsync.ts
-│
-├── components/           # Reusable components
+├── api/            # Modular API layer (11 files)
+│   ├── client.ts   # fetcher + apiFetch helper
+│   ├── types.ts, settings.ts, providers.ts, keys.ts, etc.
+│   └── index.ts    # barrel re-export
+├── hooks/          # useProviderDetail, useAsync
+├── components/     # Reusable
+│   ├── Modal.tsx           # P3: universal modal wrapper
+│   ├── AuthFileCard.tsx    # P2: extracted from AuthFiles page
+│   ├── OAuthConnectModal.tsx, GatewayKeysSection.tsx
+│   ├── DatabaseSection.tsx, ModelsSection.tsx
+│   ├── ModelPickerModal.tsx, FeatureRow.tsx
 │   ├── Layout.tsx, Loading.tsx, ErrorBox.tsx
-│   ├── OAuthConnectModal.tsx   # universal OAuth modal
-│   ├── GatewayKeysSection.tsx, ModelsSection.tsx
-│   ├── DatabaseSection.tsx, FeatureRow.tsx
-│   ├── ModelPickerModal.tsx
-│
-└── pages/                # Route pages
+└── pages/          # Route pages
     ├── Endpoint.tsx, Settings.tsx, Providers.tsx
-    ├── ProviderDetail.tsx, Playground.tsx
-    ├── AuthFiles.tsx, Combos.tsx, Logs.tsx
-    ├── Usage.tsx, Quota.tsx, ProxyPool.tsx
+    ├── ProviderDetail.tsx  # P1: useProviderDetail hook
+    ├── Playground.tsx, AuthFiles.tsx, Combos.tsx
+    ├── Logs.tsx, Usage.tsx, Quota.tsx, ProxyPool.tsx
 ```
 
 ## Providers (15)
 
-| ID  | Name              | Type     | Auth          | Flow            |
+| ID  | Name              | Type     | Auth          | OAuth Flow      |
 |-----|-------------------|----------|---------------|-----------------|
-| mst | Mistral           | API Key  | Bearer        | —               |
-| ocg | OpenCode Go       | API Key  | Bearer        | —               |
-| ocf | OpenCode Free     | API Key  | Bearer        | —               |
-| tbay| TokenBay          | API Key  | Bearer        | —               |
-| nrak| Nous Research     | API Key  | Bearer        | —               |
-| xak | xAI API Key       | API Key  | Bearer        | —               |
-| cl  | Cline             | API Key  | X-Api-Key     | —               |
-| mcf | MiMo Code Free    | API Key  | JWT bootstrap  | —               |
-| cf  | Cloudflare        | API Key  | Bearer        | —               |
+| mst | Mistral           | API Key  | Bearer        | — |
+| ocg | OpenCode Go       | API Key  | Bearer        | — |
+| ocf | OpenCode Free     | API Key  | Bearer        | — |
+| tbay| TokenBay          | API Key  | Bearer        | — |
+| nrak| Nous Research     | API Key  | Bearer        | — |
+| xak | xAI API Key       | API Key  | Bearer        | — |
+| cl  | Cline             | API Key  | X-Api-Key     | — |
+| mcf | MiMo Code Free    | API Key  | JWT bootstrap | — |
+| cf  | Cloudflare        | API Key  | Bearer        | — |
 | cx  | OpenAI Codex      | OAuth    | Bearer        | authorization_code |
 | xai | xAI               | OAuth    | Bearer        | authorization_code |
-| fb  | FreeBuff          | OAuth    | Bearer        | device_code     |
-| np  | Nous Portal       | OAuth    | Bearer        | device_code     |
+| fb  | FreeBuff          | OAuth    | Bearer        | device_code |
+| np  | Nous Portal       | OAuth    | Bearer        | device_code + auto-refresh |
 
-## OAuth Flow Types
-- `authorization_code`: cx, xai — redirect URL + code exchange
-- `device_code`: fb, np — device activation URL + auto-poll
+## Key Features
+- **apiFetch**: global helper — all `fetch('/admin/...')` → `apiFetch('/...')` via VITE_API_BASE
+- **Modal component**: universal `fixed inset-0 z-50` wrapper used in ProviderDetail, ModelPickerModal, Combos
+- **useProviderDetail hook**: extracted all state + handlers from ProviderDetail page
+- **AuthFileCard**: extracted card UI from AuthFiles page
+- **OAuth meta**: `oauth_flow` field in provider metadata — FE auto-detects device_code vs auth_code
+- **BE logging**: `RUST_LOG` env, `EnvFilter`, optional JSON format (`RUST_LOG_FORMAT=json`)
+- **DB export/import**: real column names, excludes `request_logs` + `usage` only
+- **Port config**: `AXUM_SERVER__PORT` via `.env` or `AXUM_` env vars
 
-Each provider implements OAuth in `admin/oauth/<id>.rs` + `providers/<id>/oauth.rs`.
+## Env Vars
 
-## API Layer (FE)
-Modular per-domain — `src/api/` folder with 11 files. Import via `'../api'` barrel.
+### Backend (.env atau AXUM_ prefix)
+```
+AXUM_SERVER__PORT=3000
+AXUM_DATABASE__URL=sqlite:data/axumrouter.db?mode=rwc
+RUST_LOG=info
+RUST_LOG_FORMAT=     # set to "json" for prod
+```
+
+### Frontend (.env)
+```
+VITE_API_BASE=http://152.42.198.51:3000/admin/api
+VITE_GATEWAY_BACKEND_URL=http://152.42.198.51:3000
+```
 
 ## Code Conventions
-- Raw string `r#"..."#` buat JSON inline di Rust
-- Tiap error path WAJIB di-log
-- PATCH sections, never full rewrite
 - `cargo build --release` after every Rust edit
-
-## Key Rules
-1. ❌ Jangan rewrite `data/axumrouter.db`
-2. ❌ Jangan rm binary `target/release/axumrouter`
-3. ✅ Build (`cargo check` atau `cargo build --release`) sebelum push
-4. ✅ `write_file` untuk file >50 lines (patch tool rawan corruption)
+- `tsc --noEmit` after every FE edit
+- PATCH small sections, `write_file` for full rewrites
+- Raw string `r#"..."#` for JSON in Rust
