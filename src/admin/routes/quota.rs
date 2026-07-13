@@ -27,8 +27,8 @@ pub async fn api_usage_quota(
     State(state): State<Arc<AppState>>,
     Path(key_id): Path<String>,
 ) -> Json<QuotaResponse> {
-    let row: Option<(String, String)> = sqlx::query_as(
-        "SELECT key_value, provider_id FROM api_keys WHERE id = ?"
+    let row: Option<(String, String, String)> = sqlx::query_as(
+        "SELECT key_value, provider_id, created_at FROM api_keys WHERE id = ?"
     )
     .bind(&key_id)
     .fetch_optional(&state.db)
@@ -36,10 +36,22 @@ pub async fn api_usage_quota(
     .unwrap_or(None);
 
     match row {
-        Some((kv_str, provider_id)) => {
+        Some((kv_str, provider_id, created_at)) => {
             let kv: serde_json::Value = serde_json::from_str(&kv_str).unwrap_or_default();
-            let expires_at = kv["expires_at"].as_str().map(String::from);
-            let last_refresh = kv["last_refresh"].as_str().map(String::from);
+
+            // expires_at: try string field first, then numeric expires_in from created_at
+            let expires_at = if let Some(s) = kv["expires_at"].as_str() {
+                Some(s.to_string())
+            } else if let Some(secs) = kv["expires_in"].as_u64() {
+                chrono::DateTime::parse_from_rfc3339(&created_at).ok().map(|ct| {
+                    (ct + chrono::Duration::seconds(secs as i64)).to_rfc3339()
+                })
+            } else { None };
+
+            let last_refresh = kv["last_refresh"].as_str()
+                .map(String::from)
+                .or_else(|| Some(created_at.clone()));
+
             let key_plan = kv["plan"].as_str().or(kv["codex_plan"].as_str()).map(String::from);
 
             // Fetch rate limits for cx (Codex) from WHAM API

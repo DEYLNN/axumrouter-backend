@@ -20,6 +20,10 @@ pub fn routes(state: Arc<AppState>) -> Router {
         // FreeBuff OAuth
         .route("/admin/oauth/fb/start", get(oauth_fb_start))
         .route("/admin/oauth/fb/poll", post(oauth_fb_poll))
+        // Nous Portal OAuth
+        .route("/admin/oauth/np/start", get(oauth_np_start))
+        .route("/admin/oauth/np/poll", get(oauth_np_poll_get))
+        .route("/admin/oauth/np/poll", post(oauth_np_poll_post))
         .with_state(state)
 }
 
@@ -121,6 +125,49 @@ async fn oauth_fb_poll(
                 if let Err(e) = crate::providers::freebuff::oauth::save_token(&state, &data).await {
                     return Json(serde_json::json!({"ok": false, "error": e}));
                 }
+            }
+            Json(data)
+        }
+        Err(e) => Json(serde_json::json!({"error": e})),
+    }
+}
+
+// ── Nous Portal OAuth ──
+
+async fn oauth_np_start() -> Json<serde_json::Value> {
+    match crate::providers::nous_portal::oauth::start().await {
+        Ok(resp) => Json(serde_json::json!(resp)),
+        Err(e) => Json(serde_json::json!({"error": e})),
+    }
+}
+
+async fn oauth_np_poll_get(
+    State(state): State<Arc<AppState>>,
+    params: axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let device_code = params.get("device_code").cloned().unwrap_or_default();
+    np_poll_inner(state, &device_code).await
+}
+
+async fn oauth_np_poll_post(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let device_code = body.get("device_code").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    np_poll_inner(state, &device_code).await
+}
+
+async fn np_poll_inner(state: Arc<AppState>, device_code: &str) -> Json<serde_json::Value> {
+    if device_code.is_empty() {
+        return Json(serde_json::json!({"error": "Missing device_code"}));
+    }
+    match crate::providers::nous_portal::oauth::poll(device_code).await {
+        Ok(data) => {
+            if data.get("access_token").is_some() {
+                if let Err(e) = crate::providers::nous_portal::oauth::save_token(&state, &data).await {
+                    return Json(serde_json::json!({"error": e}));
+                }
+                return Json(serde_json::json!({"success": true, "accessToken": data["access_token"], "message": "Nous Portal connected"}));
             }
             Json(data)
         }

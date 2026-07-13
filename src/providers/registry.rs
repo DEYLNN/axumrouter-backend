@@ -27,6 +27,9 @@ impl ProviderRegistry {
         registry.register("tbay", |keys| {
             Ok(Box::new(crate::providers::tokenbay::new_with_keys(keys)))
         });
+        registry.register("nrak", |keys| {
+            Ok(Box::new(crate::providers::nous_api_key::new_with_keys(keys)))
+        });
         registry.register("cl", |keys| {
             Ok(Box::new(crate::providers::cline::new_with_keys(keys)))
         });
@@ -37,6 +40,12 @@ impl ProviderRegistry {
         });
         registry.register("fb", |keys| {
             Ok(Box::new(crate::providers::freebuff::provider::FbProvider::new_with_keys(keys)))
+        });
+        registry.register("mcf", |keys| {
+            Ok(Box::new(crate::providers::mimo_code_free::provider::McfProvider::new_with_keys(keys)))
+        });
+        registry.register("np", |keys| {
+            Ok(Box::new(crate::providers::nous_portal::provider::NpProvider::new_with_keys(keys)))
         });
         registry.register("cx", |keys| {
             Ok(Box::new(crate::providers::openai_codex::provider::CxProvider::new_with_keys(keys)))
