@@ -10,8 +10,8 @@ pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/admin/api/auth-files", get(get_auth_files_json))
         .route("/admin/api/auth-files/download/:id", get(download_auth_file))
-        .route("/admin/auth-files/import", post(import_auth_files))
-        .route("/admin/auth-files/delete", post(delete_selected))
+        .route("/admin/api/auth-files/import", post(import_auth_files))
+        .route("/admin/api/auth-files/delete", post(delete_selected))
         .with_state(state)
 }
 

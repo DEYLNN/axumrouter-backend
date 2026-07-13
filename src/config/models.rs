@@ -12,6 +12,8 @@ pub struct AppConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    #[serde(default)]
+    pub public_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
