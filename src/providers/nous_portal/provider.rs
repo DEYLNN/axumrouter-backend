@@ -68,28 +68,10 @@ impl NpProvider {
                 return Err(GatewayError::ProviderError("Token expired and no refresh_token".into()));
             }
 
-            let client = reqwest::Client::new();
-            let resp = client
-                .post("https://portal.nousresearch.com/api/oauth/token")
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(format!(
-                    "grant_type=refresh_token&client_id={}&refresh_token={}",
-                    urlencoding::encode(constants::CLIENT_ID),
-                    urlencoding::encode(&refresh_token),
-                ))
-                .send().await.map_err(|e| GatewayError::ProviderError(format!("Refresh HTTP: {}", e)))?;
-
-            if !resp.status().is_success() {
-                return Err(GatewayError::ProviderError(format!("Refresh failed: HTTP {}", resp.status().as_u16())));
-            }
-
-            let tokens: serde_json::Value = resp.json().await
-                .map_err(|e| GatewayError::ProviderError(format!("Refresh parse: {}", e)))?;
+            let tokens = super::oauth::refresh_token(&refresh_token).await
+                .map_err(|e| GatewayError::ProviderError(e))?;
 
             let new_at = tokens["access_token"].as_str().unwrap_or("").to_string();
-            if new_at.is_empty() {
-                return Err(GatewayError::ProviderError("Refresh response missing access_token".into()));
-            }
 
             // Update in-memory
             kv["access_token"] = serde_json::Value::String(new_at.clone());

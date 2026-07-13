@@ -127,3 +127,34 @@ pub async fn save_token(state: &Arc<AppState>, token: &serde_json::Value) -> Res
     state.provider_manager.write().await.reload_provider("np").await;
     Ok(())
 }
+
+/// Refresh access token using refresh_token.
+/// Returns full token response (includes new access_token, refresh_token, expires_in).
+pub async fn refresh_token(refresh_token: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let body = format!(
+        "grant_type=refresh_token&client_id={}&refresh_token={}",
+        urlencoding::encode(constants::CLIENT_ID),
+        urlencoding::encode(refresh_token),
+    );
+    let resp = client
+        .post(constants::TOKEN_URL)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| format!("Refresh HTTP: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Refresh failed: HTTP {}", resp.status().as_u16()));
+    }
+
+    let tokens: serde_json::Value = resp.json().await
+        .map_err(|e| format!("Refresh parse: {}", e))?;
+
+    if tokens.get("access_token").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
+        return Err("Refresh response missing access_token".into());
+    }
+
+    Ok(tokens)
+}

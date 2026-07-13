@@ -17,6 +17,7 @@ const MIMO_SYSTEM_MARKER: &str =
 pub struct McfClient {
     http: reqwest::Client,
     jwt: Mutex<(Option<String>, Instant)>, // (jwt, expires_at)
+    session_id: String,
 }
 
 impl McfClient {
@@ -25,7 +26,8 @@ impl McfClient {
             .timeout(Duration::from_secs(timeout_secs))
             .build()
             .unwrap_or_default();
-        Self { http, jwt: Mutex::new((None, Instant::now())) }
+        let session_id = format!("ses_{}", uuid::Uuid::new_v4().to_string().replace('-', "").chars().take(24).collect::<String>());
+        Self { http, jwt: Mutex::new((None, Instant::now())), session_id }
     }
 
     fn random_ua() -> &'static str {
@@ -93,11 +95,11 @@ impl McfClient {
 
         let is_stream = body.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
         let accept = if is_stream { "text/event-stream" } else { "application/json" };
-
-        let session_id = format!("ses_{}", uuid::Uuid::new_v4().to_string().replace('-', "").chars().take(24).collect::<String>());
+        let sid = self.session_id.clone();
 
         let do_request = |jwt: String| {
-            let sid = session_id.clone();
+            let sid = sid.clone();
+            let accept = accept;
             let http = &self.http;
             let body = body.clone();
             async move {
@@ -116,6 +118,28 @@ impl McfClient {
         };
 
         let resp = do_request(jwt.clone()).await?;
+
+        // On auth failure, invalidate cache and retry once
+        if resp.status().as_u16() == 401 || resp.status().as_u16() == 403 {
+            {
+                let mut cache = self.jwt.lock().unwrap();
+                *cache = (None, Instant::now());
+            }
+            let jwt = self.bootstrap_jwt().await?;
+            return do_request(jwt).await;
+        }
+
+        // On 441 risk control, wait and retry once
+        if resp.status().as_u16() == 441 {
+            let _ = resp.text().await;
+            tokio::time::sleep(Duration::from_secs(15)).await;
+            let jwt = self.bootstrap_jwt().await?;
+            let retry = do_request(jwt).await?;
+            if retry.status().as_u16() == 441 {
+                return Err(format!("MiMo 441 rate limited — wait a few minutes and retry"));
+            }
+            return Ok(retry);
+        }
 
         // On auth failure, invalidate cache and retry once
         if resp.status().as_u16() == 401 || resp.status().as_u16() == 403 {

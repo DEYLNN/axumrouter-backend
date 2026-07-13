@@ -6,8 +6,8 @@ pub struct ApiKey {
     pub provider_id: String,
     pub key_value: String,
     pub label: Option<String>,
-    pub is_active: i64,  // SQLite stores as integer, convert at usage
-    pub rate_limit: Option<i64>,
+    pub is_active: i64,
+    pub rate_limit: Option<String>,  // SQLite stores as TEXT (empty) or INTEGER — handle both
     pub last_used_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,

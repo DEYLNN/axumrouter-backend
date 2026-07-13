@@ -6,12 +6,21 @@ use sqlx::SqlitePool;
 
 use crate::state::AppState;
 
-// === Dynamic table detection ===
-// Query sqlite_master instead of hardcoding — auto-adapts to new migrations.
+// Tables excluded from export/import — too large or contain transient data.
+const EXCLUDED_TABLES: &[&str] = &["request_logs", "usage"];
 
 async fn fetch_all_tables(db: &SqlitePool) -> Vec<String> {
     sqlx::query_scalar::<_, String>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('sqlite_sequence') ORDER BY name"
+    )
+    .fetch_all(db)
+    .await
+    .unwrap_or_default()
+}
+
+async fn fetch_columns(db: &SqlitePool, table: &str) -> Vec<String> {
+    sqlx::query_scalar::<_, String>(
+        &format!("SELECT name FROM pragma_table_info('{}') ORDER BY cid", table)
     )
     .fetch_all(db)
     .await
@@ -45,9 +54,7 @@ pub async fn api_database_info(State(state): State<Arc<AppState>>) -> Json<Datab
             .metadata()
             .map(|m| m.len() as i64)
             .unwrap_or(0)
-    } else {
-        0
-    };
+    } else { 0 };
     let size_mb = size_bytes as f64 / 1_048_576.0;
 
     let table_names = fetch_all_tables(&state.db).await;
@@ -61,11 +68,7 @@ pub async fn api_database_info(State(state): State<Arc<AppState>>) -> Json<Datab
             .await
             .unwrap_or(0);
         total_rows += rows;
-        tables.push(TableInfo {
-            name: name.clone(),
-            rows,
-            row_count: rows,
-        });
+        tables.push(TableInfo { name: name.clone(), rows, row_count: rows });
     }
 
     let backup_count: i64 = std::path::Path::new("data/backups")
@@ -73,14 +76,7 @@ pub async fn api_database_info(State(state): State<Arc<AppState>>) -> Json<Datab
         .map(|d| d.flatten().count() as i64)
         .unwrap_or(0);
 
-    Json(DatabaseInfo {
-        url,
-        size_bytes,
-        size_mb,
-        tables,
-        total_rows,
-        backup_count,
-    })
+    Json(DatabaseInfo { url, size_bytes, size_mb, tables, total_rows, backup_count })
 }
 
 pub async fn api_database_export(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
@@ -88,6 +84,11 @@ pub async fn api_database_export(State(state): State<Arc<AppState>>) -> Json<ser
     let mut out: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
 
     for name in &table_names {
+        if EXCLUDED_TABLES.contains(&name.as_str()) { continue; }
+
+        let cols = fetch_columns(&state.db, name).await;
+        if cols.is_empty() { continue; }
+
         let q = format!("SELECT * FROM \"{}\"", name);
         let rows = match sqlx::query(&q).fetch_all(&state.db).await {
             Ok(r) => r,
@@ -97,12 +98,27 @@ pub async fn api_database_export(State(state): State<Arc<AppState>>) -> Json<ser
         let mut table_data: Vec<serde_json::Value> = Vec::new();
         for row in &rows {
             let mut obj = serde_json::Map::new();
-            for (i, _) in (0..20).enumerate() {
-                if let Ok(v) = sqlx::Row::try_get::<i64, _>(row, i) {
-                    obj.insert(format!("col{}", i), serde_json::Value::Number(v.into()));
-                } else if let Ok(v) = sqlx::Row::try_get::<String, _>(row, i) {
-                    obj.insert(format!("col{}", i), serde_json::Value::String(v));
-                }
+            for (i, col) in cols.iter().enumerate() {
+                let val: serde_json::Value = match sqlx::Row::try_get::<String, _>(row, i) {
+                    Ok(s) if s.starts_with('{') || s.starts_with('[') => {
+                        serde_json::from_str(&s).unwrap_or(serde_json::Value::String(s))
+                    }
+                    Ok(s) => serde_json::Value::String(s),
+                    Err(_) => {
+                        if let Ok(n) = sqlx::Row::try_get::<i64, _>(row, i) {
+                            serde_json::Value::Number(n.into())
+                        } else if let Ok(f) = sqlx::Row::try_get::<f64, _>(row, i) {
+                            serde_json::Number::from_f64(f)
+                                .map(|n| serde_json::Value::Number(n))
+                                .unwrap_or(serde_json::Value::Null)
+                        } else if let Ok(b) = sqlx::Row::try_get::<bool, _>(row, i) {
+                            serde_json::Value::Bool(b)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }
+                };
+                obj.insert(col.clone(), val);
             }
             table_data.push(serde_json::Value::Object(obj));
         }
@@ -134,21 +150,26 @@ pub async fn api_database_import(
             errors.push(format!("Table not allowed or doesn't exist: {}", table_name));
             continue;
         }
-        if rows.is_empty() {
+        if EXCLUDED_TABLES.contains(&table_name.as_str()) {
+            errors.push(format!("Skipping excluded table: {}", table_name));
             continue;
         }
+        if rows.is_empty() { continue; }
+
+        // Get existing columns to match against
+        let existing_cols = fetch_columns(&state.db, table_name).await;
 
         let first = match rows[0].as_object() {
             Some(o) => o,
-            None => {
-                errors.push(format!("Invalid row in {}", table_name));
-                continue;
-            }
+            None => { errors.push(format!("Invalid row in {}", table_name)); continue; }
         };
-        let cols: Vec<String> = first.keys().cloned().collect();
-        if cols.is_empty() {
-            continue;
-        }
+
+        // Filter columns to only those that exist in the table
+        let cols: Vec<String> = first.keys()
+            .filter(|k| existing_cols.contains(k))
+            .cloned()
+            .collect();
+        if cols.is_empty() { continue; }
 
         if req.replace {
             let del = format!("DELETE FROM \"{}\"", table_name);
@@ -159,35 +180,21 @@ pub async fn api_database_import(
         }
 
         let placeholders: String = (0..cols.len()).map(|_| "?").collect::<Vec<_>>().join(",");
-        let col_list = cols
-            .iter()
-            .map(|c| format!("\"{}\"", c))
-            .collect::<Vec<_>>()
-            .join(",");
-        let ins = format!(
-            "INSERT INTO \"{}\" ({}) VALUES ({})",
-            table_name, col_list, placeholders
-        );
+        let col_list = cols.iter().map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(",");
+        let ins = format!("INSERT INTO \"{}\" ({}) VALUES ({})", table_name, col_list, placeholders);
 
         for row in rows {
-            let obj = match row.as_object() {
-                Some(o) => o,
-                None => continue,
-            };
+            let obj = match row.as_object() { Some(o) => o, None => continue };
             let mut q = sqlx::query(&ins);
             for col in &cols {
                 let v = obj.get(col).cloned().unwrap_or(serde_json::Value::Null);
                 q = match v {
                     serde_json::Value::Null => q.bind(Option::<String>::None),
-                    serde_json::Value::Bool(b) => q.bind(b),
+                    serde_json::Value::Bool(b) => q.bind(b as i64),
                     serde_json::Value::Number(n) => {
-                        if let Some(i) = n.as_i64() {
-                            q.bind(i)
-                        } else if let Some(f) = n.as_f64() {
-                            q.bind(f)
-                        } else {
-                            q.bind(n.to_string())
-                        }
+                        if let Some(i) = n.as_i64() { q.bind(i) }
+                        else if let Some(f) = n.as_f64() { q.bind(f) }
+                        else { q.bind(n.to_string()) }
                     }
                     serde_json::Value::String(s) => q.bind(s),
                     other => q.bind(other.to_string()),
@@ -195,9 +202,7 @@ pub async fn api_database_import(
             }
             match q.execute(&state.db).await {
                 Ok(r) => imported += r.rows_affected() as i64,
-                Err(e) => {
-                    errors.push(format!("Insert into {} failed: {}", table_name, e));
-                }
+                Err(e) => errors.push(format!("Insert into {} failed: {}", table_name, e)),
             }
         }
     }
