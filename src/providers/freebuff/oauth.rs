@@ -90,7 +90,14 @@ pub async fn save_token(state: &Arc<crate::state::AppState>, data: &serde_json::
     let now = chrono::Utc::now().to_rfc3339();
     let email = data.get("email").and_then(|v| v.as_str()).unwrap_or("freebuff");
     let raw = data.get("_raw").cloned().unwrap_or_default();
-    let kv = serde_json::to_string(&raw).map_err(|e| format!("Serialize: {}", e))?;
+    let access_token = data.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
+    // Merge access_token into stored data so provider.rs can read kv["access_token"]
+    let mut kv_obj = raw.as_object().cloned().unwrap_or_default();
+    kv_obj.insert("access_token".into(), serde_json::Value::String(access_token.to_string()));
+    if !email.is_empty() {
+        kv_obj.insert("email".into(), serde_json::Value::String(email.to_string()));
+    }
+    let kv = serde_json::to_string(&serde_json::Value::Object(kv_obj)).map_err(|e| format!("Serialize: {}", e))?;
 
     sqlx::query("INSERT INTO api_keys (id, provider_id, key_value, label, is_active, key_type, created_at, updated_at) VALUES (?, 'fb', ?, ?, 1, 'oauth', ?, ?)")
         .bind(&kid).bind(&kv).bind(email).bind(&now).bind(&now)
