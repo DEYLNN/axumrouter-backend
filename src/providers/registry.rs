@@ -5,6 +5,21 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use crate::providers::traits::Provider;
 
+/// Macro to register a provider with a `new_with_keys(keys)` constructor.
+macro_rules! register_provider {
+    ($reg:expr, $id:expr, $path:path) => {
+        $reg.register($id, |keys: Vec<ApiKey>, _db: Arc<SqlitePool>| {
+            Ok(Box::new($path(keys)))
+        });
+    };
+    // Variant that also receives the DB pool (e.g. np auto-refresh)
+    ($reg:expr, $id:expr, $path:path, db) => {
+        $reg.register($id, |keys: Vec<ApiKey>, db: Arc<SqlitePool>| {
+            Ok(Box::new($path(keys, db)))
+        });
+    };
+}
+
 /// Maps provider name → constructor function.
 pub struct ProviderRegistry {
     builders: HashMap<String, Box<dyn Fn(Vec<ApiKey>, Arc<sqlx::SqlitePool>) -> anyhow::Result<Box<dyn Provider>> + Send + Sync>>,
@@ -16,49 +31,24 @@ impl ProviderRegistry {
             builders: HashMap::new(),
         };
 
-        // OpenAI-compatible (API key + Bearer/XApiKey auth):
-        registry.register("mst", |keys, db| {
-            Ok(Box::new(crate::providers::mistral::new_with_keys(keys)))
-        });
-        registry.register("ocg", |keys, db| {
-            Ok(Box::new(crate::providers::opencode_go::new_with_keys(keys)))
-        });
-        registry.register("ocf", |keys, db| {
-            Ok(Box::new(crate::providers::opencode_free::new_with_keys(keys)))
-        });
-        registry.register("tbay", |keys, db| {
-            Ok(Box::new(crate::providers::tokenbay::new_with_keys(keys)))
-        });
-        registry.register("nrak", |keys, db| {
-            Ok(Box::new(crate::providers::nous_api_key::new_with_keys(keys)))
-        });
-        registry.register("cl", |keys, db| {
-            Ok(Box::new(crate::providers::cline::new_with_keys(keys)))
-        });
-        
+        // OpenAI-compatible (API key):
+        register_provider!(registry, "mst", crate::providers::mistral::new_with_keys);
+        register_provider!(registry, "ocg", crate::providers::opencode_go::new_with_keys);
+        register_provider!(registry, "ocf", crate::providers::opencode_free::new_with_keys);
+        register_provider!(registry, "tbay", crate::providers::tokenbay::new_with_keys);
+        register_provider!(registry, "nrak", crate::providers::nous_api_key::new_with_keys);
+        register_provider!(registry, "cl", crate::providers::cline::new_with_keys);
+
         // Custom providers:
-        registry.register("cf", |keys, db| {
-            Ok(Box::new(crate::providers::cloudflare::provider::CfProvider::new_with_keys(keys)))
-        });
-        registry.register("fb", |keys, db| {
-            Ok(Box::new(crate::providers::freebuff::provider::FbProvider::new_with_keys(keys)))
-        });
-        registry.register("mcf", |keys, db| {
-            Ok(Box::new(crate::providers::mimo_code_free::provider::McfProvider::new_with_keys(keys)))
-        });
-        registry.register("np", |keys, db| {
-            Ok(Box::new(crate::providers::nous_portal::provider::NpProvider::new_with_keys(keys, db)))
-        });
-        registry.register("cx", |keys, db| {
-            Ok(Box::new(crate::providers::openai_codex::provider::CxProvider::new_with_keys(keys)))
-        });
-        registry.register("xai", |keys, db| {
-            Ok(Box::new(crate::providers::xai::provider::XaiProvider::new_with_keys(keys)))
-        });
-        // API-key providers (openai_compat):
-        registry.register("xak", |keys, db| {
-            Ok(Box::new(crate::providers::xai_api_key::new_with_keys(keys)))
-        });
+        register_provider!(registry, "cf", crate::providers::cloudflare::provider::CfProvider::new_with_keys);
+        register_provider!(registry, "fb", crate::providers::freebuff::provider::FbProvider::new_with_keys);
+        register_provider!(registry, "mcf", crate::providers::mimo_code_free::provider::McfProvider::new_with_keys);
+        register_provider!(registry, "np", crate::providers::nous_portal::provider::NpProvider::new_with_keys, db);
+        register_provider!(registry, "cx", crate::providers::openai_codex::provider::CxProvider::new_with_keys);
+        register_provider!(registry, "xai", crate::providers::xai::provider::XaiProvider::new_with_keys);
+
+        // API-key (openai_compat):
+        register_provider!(registry, "xak", crate::providers::xai_api_key::new_with_keys);
 
         registry
     }

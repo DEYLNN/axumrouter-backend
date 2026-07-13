@@ -6,11 +6,10 @@ AxumRouter — OpenAI-compatible API Gateway in Rust (Axum 0.7).
 8 providers, multi-key failover, combo routing, gateway key management.
 
 ## Paths
-- Backend: `/root/.hermes/projects/axumrouter-backend`
-- Frontend: `/root/.hermes/projects/axumrouter-frontend`
+- Backend: `src/` (see AGENTS.md for full tree)
+- Frontend: `axumrouter-frontend/` (React)
 - DB: `data/axumrouter.db` (SQLite, auto-backup on startup)
 - Ports: BE=3000, FE=5173
-- VPS: `152.42.198.51:3000` (BE), `152.42.198.51:5173` (FE)
 
 ## Build & Run
 ```bash

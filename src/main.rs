@@ -14,9 +14,16 @@ mod utils;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .init();
+    let fmt = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info".into()),
+        );
+    if std::env::var("RUST_LOG_FORMAT").as_deref() == Ok("json") {
+        fmt.json().init();
+    } else {
+        fmt.init();
+    }
 
     let cfg = config::loader::load()?;
 

@@ -2,6 +2,8 @@
 // Injected before caveman, after normalize_tool_messages.
 // Port of 9router open-sse/rtk/index.js + autodetect.js
 
+pub mod filters;
+
 use super::rtk_filters::*;
 
 use crate::types::chat::Message;
@@ -138,7 +140,7 @@ fn safe_apply(filter_fn: fn(&str) -> String, text: &str) -> String {
             if out.is_empty() || out.len() >= text.len() { text.to_string() } else { out }
         }
         Err(_) => {
-            eprintln!("[RTK] warning: filter panicked — passing through raw output");
+            tracing::warn!(target: "rtk", "filter panicked — passing through raw output");
             text.to_string()
         }
     }

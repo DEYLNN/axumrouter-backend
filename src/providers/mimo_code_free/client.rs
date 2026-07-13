@@ -91,6 +91,9 @@ impl McfClient {
         // Inject anti-abuse system message if missing
         inject_system_marker(&mut body);
 
+        let is_stream = body.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
+        let accept = if is_stream { "text/event-stream" } else { "application/json" };
+
         let session_id = format!("ses_{}", uuid::Uuid::new_v4().to_string().replace('-', "").chars().take(24).collect::<String>());
 
         let do_request = |jwt: String| {
@@ -104,7 +107,7 @@ impl McfClient {
                     .header("X-Mimo-Source", "mimocode-cli-free")
                     .header("x-session-affinity", &sid)
                     .header("User-Agent", Self::random_ua())
-                    .header("Accept", "text/event-stream, application/json")
+                    .header("Accept", accept)
                     .json(&body)
                     .send()
                     .await

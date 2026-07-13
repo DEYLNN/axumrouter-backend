@@ -328,7 +328,7 @@ impl Provider for FbProvider {
         let orig_tool_count = body.get("tools").and_then(|t| t.as_array()).map(|a| a.len()).unwrap_or(0);
         let orig_msg_count = body.get("messages").and_then(|m| m.as_array()).map(|a| a.len()).unwrap_or(0);
         let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("?");
-        eprintln!("[FreeBuff:chat] req: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
+        tracing::info!(target: "freebuff", "chat: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
 
         let stream = self.client.send_stream(body, &cred).await.map_err(|e| {
             self.keys.lock_key(&key.id, 500, e.to_string());
@@ -347,7 +347,7 @@ impl Provider for FbProvider {
         let fin = response.choices.first().and_then(|c| c.finish_reason.as_deref()).unwrap_or("?");
         let tool_calls = response.choices.first().and_then(|c| c.message.tool_calls.as_ref()).map(|t| t.len()).unwrap_or(0);
         let u = response.usage.as_ref();
-        eprintln!("[FreeBuff:chat] resp: finish={} tool_calls={} pt={} ct={}",
+        tracing::info!(target: "freebuff", "chat resp: finish={} tool_calls={} pt={} ct={}",
             fin, tool_calls,
             u.map(|u| u.prompt_tokens).unwrap_or(0),
             u.map(|u| u.completion_tokens).unwrap_or(0));
@@ -443,7 +443,7 @@ impl Provider for FbProvider {
         let orig_tool_count = body.get("tools").and_then(|t| t.as_array()).map(|a| a.len()).unwrap_or(0);
         let orig_msg_count = body.get("messages").and_then(|m| m.as_array()).map(|a| a.len()).unwrap_or(0);
         let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("?");
-        eprintln!("[FreeBuff:stream] req: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
+        tracing::info!(target: "freebuff", "stream: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
 
         let result = self.client.send_stream(body, &cred).await.map_err(|e| {
             self.keys.lock_key(&key.id, 500, e.to_string());
