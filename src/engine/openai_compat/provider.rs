@@ -38,6 +38,7 @@ impl OpenAICompatibleProvider {
             category: config.category.to_string(),
             icon_url: config.icon_url.to_string(),
             color: config.color.to_string(),
+            oauth_flow: None,
         };
 
         Self {

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use sqlx::SqlitePool;
 
 use crate::config::models::AppConfig;
@@ -26,7 +27,7 @@ impl ProviderManager {
             let keys = crate::db::load_provider_keys(db, provider_id).await?;
             let key_count = keys.len();
 
-            if let Some(provider) = registry.build(provider_id, keys) {
+            if let Some(provider) = registry.build(provider_id, keys, Arc::new(db.clone())) {
                 tracing::info!(
                     "Provider '{}' loaded with {} key(s)",
                     provider_id,
@@ -56,7 +57,7 @@ impl ProviderManager {
         let keys = crate::db::load_provider_keys(&self.db, provider_id).await?;
         let key_count = keys.len();
 
-        if let Some(provider) = self.registry.build(provider_id, keys) {
+        if let Some(provider) = self.registry.build(provider_id, keys, Arc::new(self.db.clone())) {
             tracing::info!(
                 "Provider '{}' reloaded with {} key(s)",
                 provider_id,

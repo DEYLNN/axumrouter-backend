@@ -21,6 +21,7 @@ pub struct ProviderListItem {
     pub total_keys: i64,
     pub active_keys: i64,
     pub locked_keys: i64,
+    pub oauth_flow: Option<String>,
 }
 
 pub async fn api_providers(State(state): State<Arc<AppState>>) -> Json<Vec<ProviderListItem>> {
@@ -46,6 +47,7 @@ pub async fn api_providers(State(state): State<Arc<AppState>>) -> Json<Vec<Provi
                 total_keys: total,
                 active_keys: active,
                 locked_keys: locked,
+                oauth_flow: meta.oauth_flow.clone(),
             });
         }
     }
@@ -126,6 +128,7 @@ pub async fn api_provider_detail(
             "active_keys": active_keys,
             "locked_keys": locked_keys,
             "type": key_type,
+            "oauth_flow": meta.oauth_flow,
             "description": "",
             "models": models,
             "keys": keys,

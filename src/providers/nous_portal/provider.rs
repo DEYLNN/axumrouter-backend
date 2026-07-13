@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::db::models::ApiKey;
 use crate::error::GatewayError;
@@ -14,12 +15,13 @@ use super::client::NpClient;
 
 pub struct NpProvider {
     metadata: ProviderMetadata,
-    keys: Vec<ApiKey>,
+    keys: Arc<Mutex<Vec<ApiKey>>>,
     client: Arc<NpClient>,
+    db: Arc<sqlx::SqlitePool>,
 }
 
 impl NpProvider {
-    pub fn new_with_keys(keys: Vec<ApiKey>) -> Self {
+    pub fn new_with_keys(keys: Vec<ApiKey>, db: Arc<sqlx::SqlitePool>) -> Self {
         let metadata = ProviderMetadata {
             name: constants::PROVIDER_ID.to_string(),
             display_name: constants::PROVIDER_NAME.to_string(),
@@ -29,22 +31,86 @@ impl NpProvider {
             category: constants::CATEGORY.to_string(),
             icon_url: constants::ICON_URL.to_string(),
             color: constants::COLOR.to_string(),
+            oauth_flow: Some("device_code".to_string()),
         };
         Self {
             metadata,
-            keys,
+            keys: Arc::new(Mutex::new(keys)),
             client: Arc::new(NpClient::new(constants::DEFAULT_TIMEOUT_SECS)),
+            db,
         }
     }
 
-    fn get_access_token(&self) -> Result<(String, String), GatewayError> {
-        for key in &self.keys {
-            let kv: serde_json::Value = serde_json::from_str(&key.key_value).unwrap_or_default();
-            if let Some(tok) = kv["access_token"].as_str() {
-                if !tok.is_empty() {
-                    return Ok((tok.to_string(), key.id.clone()));
+    /// Ensure access token is fresh — refresh if expiring within 2 minutes.
+    async fn ensure_fresh_token(&self) -> Result<(String, String), GatewayError> {
+        let mut keys = self.keys.lock().await;
+        for key in keys.iter_mut() {
+            let mut kv: serde_json::Value = serde_json::from_str(&key.key_value).unwrap_or_default();
+            let access_token = kv["access_token"].as_str().unwrap_or("").to_string();
+            if access_token.is_empty() { continue; }
+
+            let needs_refresh = match kv["expires_at"].as_str() {
+                Some(ea) => {
+                    if let Ok(exp) = chrono::DateTime::parse_from_rfc3339(ea) {
+                        chrono::Utc::now() > exp  // only when actually expired
+                    } else { false }
                 }
+                None => false, // no expires_at, skip refresh
+            };
+
+            if !needs_refresh {
+                return Ok((access_token, key.id.clone()));
             }
+
+            // Refresh token
+            let refresh_token = kv["refresh_token"].as_str().unwrap_or("").to_string();
+            if refresh_token.is_empty() {
+                return Err(GatewayError::ProviderError("Token expired and no refresh_token".into()));
+            }
+
+            let client = reqwest::Client::new();
+            let resp = client
+                .post("https://portal.nousresearch.com/api/oauth/token")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .body(format!(
+                    "grant_type=refresh_token&client_id={}&refresh_token={}",
+                    urlencoding::encode(constants::CLIENT_ID),
+                    urlencoding::encode(&refresh_token),
+                ))
+                .send().await.map_err(|e| GatewayError::ProviderError(format!("Refresh HTTP: {}", e)))?;
+
+            if !resp.status().is_success() {
+                return Err(GatewayError::ProviderError(format!("Refresh failed: HTTP {}", resp.status().as_u16())));
+            }
+
+            let tokens: serde_json::Value = resp.json().await
+                .map_err(|e| GatewayError::ProviderError(format!("Refresh parse: {}", e)))?;
+
+            let new_at = tokens["access_token"].as_str().unwrap_or("").to_string();
+            if new_at.is_empty() {
+                return Err(GatewayError::ProviderError("Refresh response missing access_token".into()));
+            }
+
+            // Update in-memory
+            kv["access_token"] = serde_json::Value::String(new_at.clone());
+            if let Some(rt) = tokens["refresh_token"].as_str() {
+                kv["refresh_token"] = serde_json::Value::String(rt.to_string());
+            }
+            if let Some(ei) = tokens["expires_in"].as_u64() {
+                let exp_at = chrono::Utc::now() + chrono::Duration::seconds(ei as i64);
+                kv["expires_at"] = serde_json::Value::String(exp_at.to_rfc3339());
+            }
+            kv["last_refresh"] = serde_json::Value::String(chrono::Utc::now().to_rfc3339());
+
+            let updated = kv.to_string();
+            key.key_value = updated.clone();
+
+            // Persist to DB
+            let _ = sqlx::query("UPDATE api_keys SET key_value = ?, updated_at = datetime('now') WHERE id = ?")
+                .bind(&updated).bind(&key.id)
+                .execute(&*self.db).await;
+
+            return Ok((new_at, key.id.clone()));
         }
         Err(GatewayError::ProviderError("No valid access token".into()))
     }
@@ -55,10 +121,9 @@ impl Provider for NpProvider {
     fn metadata(&self) -> ProviderMetadata { self.metadata.clone() }
 
     async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatResult, GatewayError> {
-        let (token, key_id) = self.get_access_token()?;
+        let (token, key_id) = self.ensure_fresh_token().await?;
         let mut body = serde_json::to_value(&request).map_err(|e| GatewayError::ProviderError(format!("Serialize: {}", e)))?;
 
-        // Strip np/ prefix from model name (keep everything after first /)
         if let Some(m) = body["model"].as_str() {
             if let Some(rest) = m.strip_prefix("np/") {
                 body["model"] = serde_json::Value::String(rest.to_string());
@@ -81,7 +146,7 @@ impl Provider for NpProvider {
     }
 
     async fn chat_completion_stream(&self, request: ChatCompletionRequest) -> Result<ChatStreamResult, GatewayError> {
-        let (token, key_id) = self.get_access_token()?;
+        let (token, key_id) = self.ensure_fresh_token().await?;
         let mut body = serde_json::to_value(&request).map_err(|e| GatewayError::ProviderError(format!("Serialize: {}", e)))?;
         if let Some(m) = body["model"].as_str() {
             if let Some(rest) = m.strip_prefix("np/") {
@@ -124,7 +189,7 @@ impl Provider for NpProvider {
     }
 
     async fn health_check(&self) -> Result<bool, GatewayError> {
-        match self.get_access_token() {
+        match self.ensure_fresh_token().await {
             Ok((tok, _)) => {
                 let resp = self.client.chat(&tok, serde_json::json!({
                     "model": "Hermes-3-Llama-3.2-3B", "messages": [{"role":"user","content":"hi"}], "max_tokens": 1
@@ -136,6 +201,6 @@ impl Provider for NpProvider {
     }
 
     async fn authenticate(&self) -> Result<(), GatewayError> { Ok(()) }
-    fn total_keys(&self) -> usize { self.keys.len() }
-    fn active_keys(&self) -> usize { self.keys.iter().filter(|k| k.is_active == 1).count() }
+    fn total_keys(&self) -> usize { self.keys.try_lock().map(|k| k.len()).unwrap_or(0) }
+    fn active_keys(&self) -> usize { self.keys.try_lock().map(|k| k.iter().filter(|x| x.is_active == 1).count()).unwrap_or(0) }
 }

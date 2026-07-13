@@ -2,7 +2,7 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::state::AppState;
 
@@ -48,7 +48,6 @@ pub async fn start() -> Result<serde_json::Value, String> {
         .or(data["verification_uri"].as_str())
         .unwrap_or(&verification_uri).to_string();
 
-    // Store for polling
     poll_state().lock().unwrap().insert(device_code.clone(), data.clone());
 
     Ok(serde_json::json!({
@@ -112,12 +111,17 @@ pub async fn save_token(state: &Arc<AppState>, token: &serde_json::Value) -> Res
     }
 
     let kv = serde_json::to_string(&enriched).map_err(|e| format!("Serialize: {}", e))?;
-    let email = token.get("email").and_then(|v| v.as_str()).unwrap_or("nous-portal").to_string();
+
+    // Unique label from access token prefix
+    let label = token.get("access_token")
+        .and_then(|v| v.as_str())
+        .map(|at| format!("np-{}", &at[..at.len().min(12)]))
+        .unwrap_or_else(|| "np-portal".to_string());
 
     sqlx::query(
         "INSERT INTO api_keys (id, provider_id, key_value, label, is_active, key_type, created_at, updated_at) VALUES (?, 'np', ?, ?, 1, 'oauth', ?, ?)"
     )
-    .bind(&kid).bind(&kv).bind(&email).bind(&now).bind(&now)
+    .bind(&kid).bind(&kv).bind(&label).bind(&now).bind(&now)
     .execute(&state.db).await.map_err(|e| format!("DB: {}", e))?;
 
     state.provider_manager.write().await.reload_provider("np").await;

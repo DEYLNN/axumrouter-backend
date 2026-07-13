@@ -10,4 +10,6 @@ pub struct ProviderMetadata {
     pub category: String,
     pub icon_url: String,
     pub color: String,
+    /// OAuth flow type: "device_code" | "authorization_code" | null
+    pub oauth_flow: Option<String>,
 }
