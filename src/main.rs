@@ -25,6 +25,8 @@ async fn main() -> anyhow::Result<()> {
         fmt.init();
     }
 
+    let _ = dotenvy::dotenv();
+
     let cfg = config::loader::load()?;
 
     // Initialize database

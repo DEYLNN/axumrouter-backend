@@ -170,6 +170,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "config",
+ "dotenvy",
  "futures",
  "rand",
  "reqwest",
