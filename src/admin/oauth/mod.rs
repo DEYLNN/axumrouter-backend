@@ -29,7 +29,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/admin/api/oauth/np/poll", get(np::poll_get))
         .route("/admin/api/oauth/np/poll", post(np::poll_post))
         // Kilo Code OAuth
-        .route("/admin/api/oauth/kl/start", get(kc::start))
-        .route("/admin/api/oauth/kl/poll", post(kc::poll))
+        .route("/admin/api/oauth/kc/start", get(kc::start))
+        .route("/admin/api/oauth/kc/poll", post(kc::poll))
         .with_state(state)
 }
