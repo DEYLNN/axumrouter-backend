@@ -9,6 +9,7 @@ pub mod traits;
 pub mod cline;
 pub mod cloudflare;
 pub mod freebuff;
+pub mod kilocode;
 pub mod mimo_code_free;
 pub mod mistral;
 pub mod nous_api_key;

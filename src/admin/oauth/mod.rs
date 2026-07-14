@@ -8,6 +8,8 @@ mod xai;
 mod fb;
 mod np;
 
+mod kl;
+
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         // Codex OAuth
@@ -26,5 +28,8 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/admin/api/oauth/np/start", get(np::start))
         .route("/admin/api/oauth/np/poll", get(np::poll_get))
         .route("/admin/api/oauth/np/poll", post(np::poll_post))
+        // Kilo Code OAuth
+        .route("/admin/api/oauth/kl/start", get(kl::start))
+        .route("/admin/api/oauth/kl/poll", post(kl::poll))
         .with_state(state)
 }
