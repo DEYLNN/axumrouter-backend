@@ -137,17 +137,25 @@ impl KeyManager {
 
         locked.insert(
             key_id.to_string(),
-            LockedKey {
-                key_id: key_id.to_string(),
-                locked_at: now,
-                locked_until: Some(locked_until),
-                reason: format!(
-                    "HTTP {} — {} (cooldown {}s, backoff_level={})",
-                    status,
-                    reason.split('{').next().unwrap_or(&reason).trim(),
-                    cooldown_secs, new_backoff
-                ),
-                backoff_level: new_backoff,
+            {
+                let readable = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&reason) {
+                    v["error"]["message"].as_str().map(|s| s.to_string())
+                        .or_else(|| v["error"].as_str().map(|s| s.to_string()))
+                        .or_else(|| v["message"].as_str().map(|s| s.to_string()))
+                        .unwrap_or_else(|| reason.split('{').next().unwrap_or(&reason).trim().to_string())
+                } else {
+                    reason.split('{').next().unwrap_or(&reason).trim().to_string()
+                };
+                LockedKey {
+                    key_id: key_id.to_string(),
+                    locked_at: now,
+                    locked_until: Some(locked_until),
+                    reason: format!(
+                        "HTTP {} — {} (cooldown {}s, backoff_level={})",
+                        status, readable, cooldown_secs, new_backoff
+                    ),
+                    backoff_level: new_backoff,
+                }
             },
         );
 

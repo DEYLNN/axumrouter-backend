@@ -6,6 +6,7 @@ pub mod result;
 pub mod spec;
 pub mod traits;
 
+pub mod agnesai;
 pub mod cline;
 pub mod cloudflare;
 pub mod freebuff;

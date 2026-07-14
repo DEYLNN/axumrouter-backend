@@ -2,12 +2,21 @@ use serde_json::{json, Value};
 
 use crate::types::chat::ChatCompletionRequest;
 
+use super::constants;
+
 pub struct KlMapper;
 
 impl KlMapper {
+    /// Map our model id (kc/nvidia-nemotron-...) to KC's backend model (nvidia/nemotron-...:free)
     pub fn to_chat_request(&self, request: ChatCompletionRequest) -> Value {
+        let model_id = request.model.trim_start_matches("kc/");
+        let backend_model = constants::MODELS
+            .iter()
+            .find(|m| m.id == model_id)
+            .map(|m| m.backend_model)
+            .unwrap_or(model_id);
         let mut body = json!({
-            "model": request.model.trim_start_matches("kc/"),
+            "model": backend_model,
             "messages": request.messages,
             "stream": request.stream.unwrap_or(true),
         });
