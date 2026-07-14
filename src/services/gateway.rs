@@ -35,6 +35,7 @@ pub async fn check_model_access(
 pub async fn track_gateway_usage(
     db: &SqlitePool,
     gateway_key_id: &str,
+    provider_id: &str,
     model_id: &str,
     prompt_tokens: i64,
     completion_tokens: i64,
@@ -45,7 +46,7 @@ pub async fn track_gateway_usage(
         "INSERT INTO usage (id, provider_id, model_id, status, status_code, prompt_tokens, completion_tokens, total_tokens, latency_ms, gateway_key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(format!("usage_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()))
-    .bind("gateway")
+    .bind(provider_id)
     .bind(model_id)
     .bind("success")
     .bind(200i64)

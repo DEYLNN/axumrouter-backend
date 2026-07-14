@@ -44,7 +44,7 @@ pub(crate) async fn handle_non_streaming(
             let pt = chat_result.response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0) as i64;
             let ct = chat_result.response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0) as i64;
 
-            crate::services::gateway::track_gateway_usage(&state.db, &gw_key.key_id, model, pt, ct, latency_ms).await;
+            crate::services::gateway::track_gateway_usage(&state.db, &gw_key.key_id, provider_id, model, pt, ct, latency_ms).await;
 
             if let Err(e) = crate::db::log_usage(
                 &state.db, provider_id,
