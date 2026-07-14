@@ -56,11 +56,11 @@ pub async fn inject(db: &SqlitePool, messages: &mut Vec<Message>) {
         .map(|(_, p)| *p)
         .unwrap_or(PROMPTS[2].1); // default: ultra
 
-    // Append to existing system message (like 9router) — more effective than inserting new
+    // Prepend to existing system message — primacy effect: model reads concise rule first
     if let Some(sys) = messages.iter_mut().find(|m| m.role == "system") {
         if let Some(ref mut content) = sys.content {
-            content.push_str("\n\n");
-            content.push_str(prompt);
+            let new_content = format!("{}\n\n{}", prompt, content);
+            *content = new_content;
             return;
         }
     }
