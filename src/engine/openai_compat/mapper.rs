@@ -70,11 +70,7 @@ impl Mapper {
                 index: c.index,
                 message: Message {
                     role: c.message.role.clone(),
-                    content: {
-                        let raw = c.message.content.clone();
-                        let is_empty = raw.as_ref().map(|s| s.is_empty()).unwrap_or(true);
-                        if is_empty { c.message.reasoning_content.clone() } else { raw }
-                    },
+                    content: c.message.content.clone(),
                     tool_calls: c.message.tool_calls.clone(),
                     tool_call_id: None,
                     name: None,
@@ -128,7 +124,6 @@ impl Mapper {
             .unwrap_or_else(|| crate::engine::openai_compat::types::StreamDelta {
                 role: None,
                 content: None,
-                reasoning_content: None,
                 tool_calls: None,
             });
 
@@ -144,11 +139,7 @@ impl Mapper {
                 index: chunk.choices.first().map(|c| c.index).unwrap_or(0),
                 delta: crate::types::chat::Delta {
                     role: delta.role,
-                    content: {
-                        let raw = delta.content.clone();
-                        let is_empty = raw.as_ref().map(|s| s.is_empty()).unwrap_or(true);
-                        if is_empty { delta.reasoning_content.clone() } else { raw }
-                    },
+                    content: delta.content,
                     tool_calls: delta.tool_calls,
                 },
                 finish_reason: chunk.choices.first().and_then(|c| c.finish_reason.clone()),
