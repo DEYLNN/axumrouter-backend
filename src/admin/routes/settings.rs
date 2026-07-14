@@ -8,6 +8,7 @@ use crate::state::AppState;
 pub struct ApiSettingsResponse {
     pub rtk_enabled: String,
     pub caveman_enabled: String,
+    pub ponytail_enabled: String,
     pub gateway_timeout: i64,
     pub public_ip: String,
     pub public_url: String,
@@ -32,10 +33,13 @@ pub async fn api_settings(State(state): State<Arc<AppState>>) -> Json<ApiSetting
         .fetch_optional(&state.db).await.unwrap_or(None).unwrap_or_else(|| "off".into());
     let caveman_enabled: String = sqlx::query_scalar("SELECT value FROM settings WHERE key='caveman_enabled'")
         .fetch_optional(&state.db).await.unwrap_or(None).unwrap_or_else(|| "off".into());
+    let ponytail_enabled: String = sqlx::query_scalar("SELECT value FROM settings WHERE key='ponytail_enabled'")
+        .fetch_optional(&state.db).await.unwrap_or(None).unwrap_or_else(|| "off".into());
 
     Json(ApiSettingsResponse {
         rtk_enabled,
         caveman_enabled,
+        ponytail_enabled,
         gateway_timeout: cfg.gateway.timeout_secs as i64,
         public_ip: state.public_ip.clone(),
         public_url: state.public_url.clone(),

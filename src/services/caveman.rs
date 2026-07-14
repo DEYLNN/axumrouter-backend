@@ -9,6 +9,8 @@ const PROMPTS: [(&str, &str); 3] = [
     ("lite", concat!(
         "Respond tersely. Keep grammar and full sentences but drop filler, hedging and pleasantries (just/really/basically/sure/of course/I'd be happy to). ",
         "Pattern: state the thing, the action, the reason. Then next step.\n\n",
+        "NEVER self-narrate. Do NOT start with 'The user wants', 'Now I have', 'Let me', 'I will', 'Here is', 'Based on', 'After analyzing', 'I can see', 'The results show'. ",
+        "No planning preamble. No announce-what-I'm-about-to-do. Output result directly.\n\n",
         "Code blocks, file paths, commands, errors, URLs: keep exact. ",
         "Security warnings, irreversible action confirmations, multi-step ordered sequences: write normal. Resume terse style after.\n\n",
         "ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift. Still active if unsure.\n\n",
@@ -20,8 +22,8 @@ const PROMPTS: [(&str, &str); 3] = [
         "Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries, hedging. Fragments OK. ",
         "Short synonyms (big not extensive, fix not implement a solution for).\n\n",
         "Pattern: [thing] [action] [reason]. [next step].\n\n",
-        "NEVER narrate thought process. Do NOT start with 'The user wants', 'Thinking', 'Let me', 'I will', 'First', 'Okay'. ",
-        "No planning preamble. No 'I need to' or 'I should'. No internal monologue. Just output action or answer directly.\n\n",
+        "NEVER self-narrate. Do NOT start with 'The user wants', 'Now I have', 'Let me', 'I will', 'Here is', 'Based on', 'After analyzing', 'I can see', 'The results show'. ",
+        "No planning preamble. No 'I need to' or 'I should'. No announce-what-I'm-about-to-do. Output result directly.\n\n",
         "Code blocks, file paths, commands, errors, URLs: keep exact. ",
         "Security warnings, irreversible action confirmations, multi-step ordered sequences: write normal. Resume terse style after.\n\n",
         "ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift. Still active if unsure.\n\n",
@@ -31,8 +33,8 @@ const PROMPTS: [(&str, &str); 3] = [
     ("ultra", concat!(
         "Respond in ultra-terse telegraphic style. No articles, no pronouns, no verbs when possible. Max compression. Only key information.\n\n",
         "Pattern: [thing] [action] [reason]. [next step].\n\n",
-        "NEVER narrate thought process. Do NOT start with 'The user wants', 'Thinking', 'Let me', 'I will', 'First', 'Okay'. ",
-        "No planning preamble. No internal monologue. Just output action or answer directly.\n\n",
+        "NEVER self-narrate. Do NOT start with 'The user wants', 'Now I have', 'Let me', 'I will', 'Here is', 'Based on', 'After analyzing', 'I can see', 'The results show'. ",
+        "No planning preamble. No announce-what-I'm-about-to-do. Output result directly.\n\n",
         "Code blocks, file paths, commands, errors, URLs: keep exact. ",
         "Security warnings, irreversible action confirmations, multi-step ordered sequences: write normal. Resume terse style after.\n\n",
         "ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift. Still active if unsure.\n\n",
@@ -55,7 +57,6 @@ pub async fn inject(db: &SqlitePool, messages: &mut Vec<Message>) {
         .unwrap_or(PROMPTS[2].1); // default: ultra
 
     // Append to existing system message (like 9router) — more effective than inserting new
-    // The model sees both the Hermes prompt AND the concise instruction in one message
     if let Some(sys) = messages.iter_mut().find(|m| m.role == "system") {
         if let Some(ref mut content) = sys.content {
             content.push_str("\n\n");

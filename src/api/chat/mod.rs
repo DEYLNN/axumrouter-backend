@@ -13,6 +13,7 @@ use std::time::Instant;
 use crate::error::GatewayError;
 use crate::middleware::auth::GatewayKeyInfo;
 use crate::services::caveman;
+use crate::services::ponytail;
 use crate::services::rtk;
 use crate::services::tool_normalizer::normalize_tool_messages;
 use crate::state::AppState;
@@ -122,6 +123,8 @@ async fn chat_completions(
     rtk::compress(&state.db, &mut provider_request.messages).await;
     // Caveman: inject terse system prompt
     caveman::inject(&state.db, &mut provider_request.messages).await;
+    // Ponytail: inject "lazy senior dev" minimalism prompt
+    ponytail::inject(&state.db, &mut provider_request.messages).await;
 
     // Reasoning placeholder: inject reasoning_content: " " on assistant messages
     // Signals upstream (OCG/deepseek) to separate thinking from visible content.
