@@ -165,6 +165,10 @@ pub(crate) async fn handle_combo_request_stream(
                     axum::http::HeaderValue::from_static("no-cache, no-transform"),
                 );
                 resp.headers_mut().insert(
+                    axum::http::header::CONNECTION,
+                    axum::http::HeaderValue::from_static("keep-alive"),
+                );
+                resp.headers_mut().insert(
                     "X-Accel-Buffering",
                     axum::http::HeaderValue::from_static("no"),
                 );

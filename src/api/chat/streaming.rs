@@ -114,6 +114,10 @@ pub(crate) async fn handle_streaming(
                 axum::http::HeaderValue::from_static("no-cache, no-transform"),
             );
             response.headers_mut().insert(
+                axum::http::header::CONNECTION,
+                axum::http::HeaderValue::from_static("keep-alive"),
+            );
+            response.headers_mut().insert(
                 "X-Accel-Buffering",
                 axum::http::HeaderValue::from_static("no"),
             );
