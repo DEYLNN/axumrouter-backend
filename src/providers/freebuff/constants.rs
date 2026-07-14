@@ -29,7 +29,7 @@ pub const FREEBUFF_MAX_MESSAGE_CHARS: usize = 16000;
 pub const FREEBUFF_MAX_TOOL_CHARS: usize = 8000;
 pub const FREEBUFF_MAX_TOOL_ARG_CHARS: usize = 6000;
 pub const FREEBUFF_CONTEXT_PRUNER_AGENT: &str = "context-pruner";
-pub const FREEBUFF_MAX_OUTPUT_TOKENS: u32 = 393216;
+pub const FREEBUFF_DEFAULT_MAX_TOKENS: u32 = 400;
 
 pub const CONTEXT_PRUNER_AGENT_ID: &str = "context-pruner";
 

@@ -274,19 +274,11 @@ impl Provider for FbProvider {
             // Even non-streaming requests MUST set stream=true.
             // Without this, FreeBuff API returns empty response.
             obj.insert("stream".into(), serde_json::Value::Bool(true));
-            // Use model-specific max_tokens from constants
-            if !obj.contains_key("max_tokens") && !obj.contains_key("max_completion_tokens") {
-                let model_max = constants::MODELS.iter()
-                    .find(|m| m.backend_model == backend_model)
-                    .map(|m| m.max_tokens)
-                    .unwrap_or(65536);
-                obj.insert("max_tokens".into(), serde_json::json!(model_max.min(constants::FREEBUFF_MAX_OUTPUT_TOKENS)));
-            }
-            // Clamp max_tokens to FreeBuff's limit (393216)
-            if let Some(mt) = obj.get_mut("max_tokens").and_then(|v| v.as_u64()) {
-                if mt > constants::FREEBUFF_MAX_OUTPUT_TOKENS as u64 {
-                    obj["max_tokens"] = serde_json::json!(constants::FREEBUFF_MAX_OUTPUT_TOKENS);
-                }
+            // ⚠️ CRITICAL: max_tokens default 400 per nexrouter
+            // Delete max_completion_tokens — FreeBuff uses max_tokens only
+            obj.remove("max_completion_tokens");
+            if !obj.contains_key("max_tokens") {
+                obj.insert("max_tokens".into(), serde_json::json!(constants::FREEBUFF_DEFAULT_MAX_TOKENS));
             }
             // ⚠️ CRITICAL: FreeBuff requires this exact stop sequence server-side.
             // Removing this causes 400 Bad Request or truncated responses.
@@ -470,19 +462,11 @@ impl Provider for FbProvider {
             // Even non-streaming requests MUST set stream=true.
             // Without this, FreeBuff API returns empty response.
             obj.insert("stream".into(), serde_json::Value::Bool(true));
-            // Use model-specific max_tokens from constants
-            if !obj.contains_key("max_tokens") && !obj.contains_key("max_completion_tokens") {
-                let model_max = constants::MODELS.iter()
-                    .find(|m| m.backend_model == backend_model)
-                    .map(|m| m.max_tokens)
-                    .unwrap_or(65536);
-                obj.insert("max_tokens".into(), serde_json::json!(model_max.min(constants::FREEBUFF_MAX_OUTPUT_TOKENS)));
-            }
-            // Clamp max_tokens to FreeBuff's limit (393216)
-            if let Some(mt) = obj.get_mut("max_tokens").and_then(|v| v.as_u64()) {
-                if mt > constants::FREEBUFF_MAX_OUTPUT_TOKENS as u64 {
-                    obj["max_tokens"] = serde_json::json!(constants::FREEBUFF_MAX_OUTPUT_TOKENS);
-                }
+            // ⚠️ CRITICAL: max_tokens default 400 per nexrouter
+            // Delete max_completion_tokens — FreeBuff uses max_tokens only
+            obj.remove("max_completion_tokens");
+            if !obj.contains_key("max_tokens") {
+                obj.insert("max_tokens".into(), serde_json::json!(constants::FREEBUFF_DEFAULT_MAX_TOKENS));
             }
             // ⚠️ CRITICAL: FreeBuff requires this exact stop sequence server-side.
             // Removing this causes 400 Bad Request or truncated responses.
