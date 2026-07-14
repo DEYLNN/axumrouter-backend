@@ -24,8 +24,10 @@ async fn log_and_return(
     err: GatewayError,
     status: u16,
 ) -> GatewayError {
+    // Extract provider from model_ref (e.g. "mst/mistral-small-latest" → "mst")
+    let provider = model_ref.split('/').next().filter(|p| !p.is_empty()).unwrap_or("gateway");
     let _ = crate::db::log_usage(
-        db, "gateway", None, model_ref,
+        db, provider, None, model_ref,
         "error", Some(status as i64), 0, 0, None,
         Some(err.to_string()), None, None,
     ).await;
