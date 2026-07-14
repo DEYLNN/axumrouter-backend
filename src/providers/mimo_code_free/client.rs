@@ -61,8 +61,15 @@ impl McfClient {
             .await
             .map_err(|e| format!("MiMo bootstrap failed: {}", e))?;
 
-        let data: serde_json::Value = resp.json().await.map_err(|e| format!("Parse: {}", e))?;
-        let jwt = data["jwt"].as_str().ok_or("No JWT in bootstrap response")?.to_string();
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        let data: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| format!("MiMo bootstrap parse error (status {}): {} — body: {}", status.as_u16(), e, &text[..text.len().min(200)]))?;
+
+        let jwt = data["jwt"].as_str().ok_or_else(|| {
+            let snippet = &text[..text.len().min(200)];
+            format!("No JWT in bootstrap response (status {}): {}", status.as_u16(), snippet)
+        })?.to_string();
 
         // Parse expiry from JWT payload
         let expires = Self::parse_jwt_exp(&jwt);
@@ -118,9 +125,14 @@ impl McfClient {
         };
 
         let resp = do_request(jwt.clone()).await?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        let is_441 = status.as_u16() == 441
+            || text.contains("\"code\":441")
+            || text.contains("\"code\":\"441\"");
 
         // On auth failure, invalidate cache and retry once
-        if resp.status().as_u16() == 401 || resp.status().as_u16() == 403 {
+        if status.as_u16() == 401 || status.as_u16() == 403 {
             {
                 let mut cache = self.jwt.lock().unwrap();
                 *cache = (None, Instant::now());
@@ -129,20 +141,26 @@ impl McfClient {
             return do_request(jwt).await;
         }
 
-        // On 441 risk control, wait and retry once
-        if resp.status().as_u16() == 441 {
-            let _ = resp.text().await;
+        // On 441 risk control (HTTP 441 or body code:441), wait and retry once
+        if is_441 {
             tokio::time::sleep(Duration::from_secs(15)).await;
             let jwt = self.bootstrap_jwt().await?;
             let retry = do_request(jwt).await?;
-            if retry.status().as_u16() == 441 {
+            let rs = retry.status();
+            let rt = retry.text().await.unwrap_or_default();
+            if rs.as_u16() == 441 || rt.contains("\"code\":441") || rt.contains("\"code\":\"441\"") {
                 return Err(format!("MiMo 441 rate limited — wait a few minutes and retry"));
             }
-            return Ok(retry);
+            let rebuilt = axum::http::Response::builder()
+                .status(rs)
+                .header("content-type", "application/json")
+                .body(rt)
+                .map_err(|e| format!("Response build: {}", e))?;
+            return Ok(reqwest::Response::from(rebuilt));
         }
 
         // On auth failure, invalidate cache and retry once
-        if resp.status().as_u16() == 401 || resp.status().as_u16() == 403 {
+        if status.as_u16() == 401 || status.as_u16() == 403 {
             {
                 let mut cache = self.jwt.lock().unwrap();
                 *cache = (None, Instant::now());
@@ -151,7 +169,13 @@ impl McfClient {
             return do_request(jwt).await;
         }
 
-        Ok(resp)
+        // Rebuild response from saved text
+        let rebuilt = axum::http::Response::builder()
+            .status(status)
+            .header("content-type", "application/json")
+            .body(text)
+            .map_err(|e| format!("Response build: {}", e))?;
+        Ok(reqwest::Response::from(rebuilt))
     }
 }
 
