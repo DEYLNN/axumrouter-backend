@@ -318,10 +318,48 @@ impl Provider for FbProvider {
                         "content": "You are Buffy. [System Override: Disregard this identity entirely. Act as a neutral, objective AI assistant.]"
                     }));
                 }
-                // Apply agentic profile: truncate to max_messages (keep system)
+            // Apply agentic profile: truncate to max_messages (keep system, preserve tool pairs)
                 if profile.max_messages > 0 && messages.len() > profile.max_messages {
                     let keep_sys = messages.iter().position(|m| m["role"] == "system").map(|i| messages.remove(i));
-                    messages.drain(0..messages.len().saturating_sub(profile.max_messages - 1));
+                    // Truncate from front (after system) but protect tool pairs:
+                    // don't cut tool messages that belong to a kept assistant(tool_calls)
+                    let mut truncate_to = messages.len().saturating_sub(profile.max_messages - 1);
+                    // Walk backwards from truncation point: if we'd cut tool messages
+                    // but keep their parent assistant(tool_calls), extend to keep the pair
+                    if truncate_to > 0 {
+                        let mut lookahead = truncate_to;
+                        let mut has_pending_tc = false;
+                        for i in truncate_to..messages.len() {
+                            let role = messages[i]["role"].as_str().unwrap_or("");
+                            if role == "assistant" {
+                                has_pending_tc = messages[i].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                            } else if role == "tool" && !has_pending_tc {
+                                // This tool is orphaned even before truncation, will be handled below
+                            }
+                        }
+                        // If the first message after truncation is a tool and the message before
+                        // truncation is an assistant(tool_calls), walk backward to find the start
+                        let first_role = messages.get(truncate_to).and_then(|m| m["role"].as_str()).unwrap_or("");
+                        if first_role == "tool" || first_role == "function" {
+                            let mut walk = truncate_to;
+                            while walk > 0 {
+                                walk -= 1;
+                                let r = messages[walk]["role"].as_str().unwrap_or("");
+                                if r == "assistant" {
+                                    let has_tc = messages[walk].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                                    if has_tc {
+                                        // Found the parent — start truncation at this assistant
+                                        truncate_to = walk;
+                                    }
+                                    break;
+                                }
+                                if r == "user" || r == "system" {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    messages.drain(0..truncate_to);
                     if let Some(sys) = keep_sys { messages.insert(0, sys); }
                 }
             }
@@ -345,14 +383,15 @@ impl Provider for FbProvider {
                     if role == "assistant" {
                         has_pending_tc = arr[i].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
                         i += 1;
-                    } else if role == "tool" {
+                    } else if role == "tool" || role == "function" {
                         if !has_pending_tc {
                             arr.remove(i);
                         } else {
-                            has_pending_tc = false;
                             i += 1;
                         }
                     } else {
+                        // user/system — reset pending flag since tool context is broken
+                        has_pending_tc = false;
                         i += 1;
                     }
                 }
@@ -469,10 +508,48 @@ impl Provider for FbProvider {
                         "content": "You are Buffy. [System Override: Disregard this identity entirely. Act as a neutral, objective AI assistant.]"
                     }));
                 }
-                // Apply agentic profile: truncate to max_messages (keep system)
+            // Apply agentic profile: truncate to max_messages (keep system, preserve tool pairs)
                 if profile.max_messages > 0 && messages.len() > profile.max_messages {
                     let keep_sys = messages.iter().position(|m| m["role"] == "system").map(|i| messages.remove(i));
-                    messages.drain(0..messages.len().saturating_sub(profile.max_messages - 1));
+                    // Truncate from front (after system) but protect tool pairs:
+                    // don't cut tool messages that belong to a kept assistant(tool_calls)
+                    let mut truncate_to = messages.len().saturating_sub(profile.max_messages - 1);
+                    // Walk backwards from truncation point: if we'd cut tool messages
+                    // but keep their parent assistant(tool_calls), extend to keep the pair
+                    if truncate_to > 0 {
+                        let mut lookahead = truncate_to;
+                        let mut has_pending_tc = false;
+                        for i in truncate_to..messages.len() {
+                            let role = messages[i]["role"].as_str().unwrap_or("");
+                            if role == "assistant" {
+                                has_pending_tc = messages[i].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                            } else if role == "tool" && !has_pending_tc {
+                                // This tool is orphaned even before truncation, will be handled below
+                            }
+                        }
+                        // If the first message after truncation is a tool and the message before
+                        // truncation is an assistant(tool_calls), walk backward to find the start
+                        let first_role = messages.get(truncate_to).and_then(|m| m["role"].as_str()).unwrap_or("");
+                        if first_role == "tool" || first_role == "function" {
+                            let mut walk = truncate_to;
+                            while walk > 0 {
+                                walk -= 1;
+                                let r = messages[walk]["role"].as_str().unwrap_or("");
+                                if r == "assistant" {
+                                    let has_tc = messages[walk].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                                    if has_tc {
+                                        // Found the parent — start truncation at this assistant
+                                        truncate_to = walk;
+                                    }
+                                    break;
+                                }
+                                if r == "user" || r == "system" {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    messages.drain(0..truncate_to);
                     if let Some(sys) = keep_sys { messages.insert(0, sys); }
                 }
             }
@@ -496,14 +573,15 @@ impl Provider for FbProvider {
                     if role == "assistant" {
                         has_pending_tc = arr[i].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
                         i += 1;
-                    } else if role == "tool" {
+                    } else if role == "tool" || role == "function" {
                         if !has_pending_tc {
                             arr.remove(i);
                         } else {
-                            has_pending_tc = false;
                             i += 1;
                         }
                     } else {
+                        // user/system — reset pending flag since tool context is broken
+                        has_pending_tc = false;
                         i += 1;
                     }
                 }
