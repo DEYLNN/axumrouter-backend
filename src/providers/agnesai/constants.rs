@@ -14,7 +14,6 @@ pub const API_KEY_URL: &str = "https://agnesi.ai";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 120;
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "agnes-1.5-flash", name: "Agnes 1.5 Flash", max_tokens: 500000, supports_vision: false, supports_tools: true },
     ModelDef { id: "agnes-2.0-flash", name: "Agnes 2.0 Flash", max_tokens: 500000, supports_vision: false, supports_tools: true },
 ];
 

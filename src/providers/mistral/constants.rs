@@ -14,11 +14,9 @@ pub const API_KEY_URL: &str = "https://console.mistral.ai/api-keys";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "mistral-large-latest", name: "Mistral Large 3", max_tokens: 128000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "mistral-medium-latest", name: "Mistral Medium 3", max_tokens: 32000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "mistral-small-latest", name: "Mistral Small 3", max_tokens: 32000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "pixtral-large-latest", name: "Pixtral Large", max_tokens: 128000, supports_vision: true, supports_tools: true },
-    ModelDef { id: "mistral-embed", name: "Mistral Embed", max_tokens: 8000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "mistral-large-latest", name: "Mistral Large 3", max_tokens: 262144, supports_vision: false, supports_tools: true },
+    ModelDef { id: "mistral-medium-latest", name: "Mistral Medium 3", max_tokens: 262144, supports_vision: false, supports_tools: true },
+    ModelDef { id: "mistral-small-latest", name: "Mistral Small 3", max_tokens: 262144, supports_vision: false, supports_tools: true },
 ];
 
 pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {

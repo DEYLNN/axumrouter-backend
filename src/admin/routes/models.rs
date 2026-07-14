@@ -77,6 +77,7 @@ pub async fn api_all_models(
             "id": m.id,
             "owned_by": m.owned_by,
             "enabled": !is_disabled,
+            "context_length": m.context_length,
         }));
     }
     Json(serde_json::json!(providers_map))

@@ -29,29 +29,29 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModelDef { pub id: &'static str, pub name: &'static str }
+pub struct ModelDef { pub id: &'static str, pub name: &'static str, pub max_tokens: u32, pub supports_vision: bool, pub supports_tools: bool }
 
 pub const MODELS: &[ModelDef] = &[
     // Terbaru (2026)
-    ModelDef { id: "@cf/zai-org/glm-5.2", name: "GLM 5.2" },
-    ModelDef { id: "@cf/moonshotai/kimi-k2.7-code", name: "Kimi K2.7 Code" },
-    ModelDef { id: "@cf/moonshotai/kimi-k2.6", name: "Kimi K2.6" },
-    ModelDef { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B" },
+    ModelDef { id: "@cf/zai-org/glm-5.2", name: "GLM 5.2", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/moonshotai/kimi-k2.7-code", name: "Kimi K2.7 Code", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/moonshotai/kimi-k2.6", name: "Kimi K2.6", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B", max_tokens: 32000, supports_vision: false, supports_tools: false },
     // Populer & terkenal
-    ModelDef { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
-    ModelDef { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B" },
-    ModelDef { id: "@cf/meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 11B Vision" },
-    ModelDef { id: "@cf/meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B" },
-    ModelDef { id: "@cf/meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B" },
-    ModelDef { id: "@cf/meta/llama-3.1-8b-instruct-fp8", name: "Llama 3.1 8B" },
-    ModelDef { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B" },
-    ModelDef { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", name: "DeepSeek R1 Distill 32B" },
-    ModelDef { id: "@cf/qwen/qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B" },
-    ModelDef { id: "@cf/qwen/qwq-32b", name: "QwQ 32B" },
-    ModelDef { id: "@cf/qwen/qwen3-30b-a3b-fp8", name: "Qwen3 30B" },
-    ModelDef { id: "@cf/openai/gpt-oss-120b", name: "GPT-OSS 120B" },
-    ModelDef { id: "@cf/openai/gpt-oss-20b", name: "GPT-OSS 20B" },
-    ModelDef { id: "@cf/zai-org/glm-4.7-flash", name: "GLM 4.7 Flash" },
-    ModelDef { id: "@cf/google/gemma-2b-it-lora", name: "Gemma 2B" },
-    ModelDef { id: "@cf/google/gemma-7b-it-lora", name: "Gemma 7B" },
+    ModelDef { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 11B Vision", max_tokens: 128000, supports_vision: true, supports_tools: false },
+    ModelDef { id: "@cf/meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/meta/llama-3.1-8b-instruct-fp8", name: "Llama 3.1 8B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", name: "DeepSeek R1 Distill 32B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/qwen/qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/qwen/qwq-32b", name: "QwQ 32B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/qwen/qwen3-30b-a3b-fp8", name: "Qwen3 30B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/openai/gpt-oss-120b", name: "GPT-OSS 120B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/openai/gpt-oss-20b", name: "GPT-OSS 20B", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/zai-org/glm-4.7-flash", name: "GLM 4.7 Flash", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/google/gemma-2b-it-lora", name: "Gemma 2B", max_tokens: 8000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "@cf/google/gemma-7b-it-lora", name: "Gemma 7B", max_tokens: 8000, supports_vision: false, supports_tools: false },
 ];

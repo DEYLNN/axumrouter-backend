@@ -85,7 +85,7 @@ impl FbProvider {
             id: format!("{}/{}", constants::PROVIDER_ID, m.id),
             object: "model".to_string(),
             owned_by: constants::PROVIDER_NAME.to_string(),
-            context_length: None,
+            context_length: Some(m.max_tokens),
         }).collect()
     }
 

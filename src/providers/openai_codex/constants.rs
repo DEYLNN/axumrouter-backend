@@ -32,9 +32,8 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModelDef { pub id: &'static str, pub name: &'static str }
+pub struct ModelDef { pub id: &'static str, pub name: &'static str, pub max_tokens: u32, pub supports_vision: bool, pub supports_tools: bool }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "gpt-5.5", name: "GPT 5.5" },
-    ModelDef { id: "gpt-5.5-review", name: "GPT 5.5 Review" },
+    ModelDef { id: "gpt-5.5", name: "GPT 5.5", max_tokens: 1000000, supports_vision: false, supports_tools: true },
 ];

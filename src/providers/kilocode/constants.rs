@@ -35,7 +35,7 @@ pub const ICON_URL: &str = "/public/providers/kc.png";
 pub const WEBSITE: &str = "https://kilocode.ai";
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "nvidia-nemotron-3-ultra-550b-a55b-free", name: "NVIDIA Nemotron 3 Ultra 550B", backend_model: "nvidia/nemotron-3-ultra-550b-a55b:free", max_tokens: 128000, supports_vision: false, supports_tools: false },
-    ModelDef { id: "tencent-hy3-free", name: "Tencent Hunyuan 3", backend_model: "tencent/hy3:free", max_tokens: 128000, supports_vision: false, supports_tools: false },
-    ModelDef { id: "stepfun-step-3-7-flash-free", name: "StepFun Step 3.7 Flash", backend_model: "stepfun/step-3.7-flash:free", max_tokens: 128000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "nvidia-nemotron-3-ultra-550b-a55b-free", name: "NVIDIA Nemotron 3 Ultra 550B", backend_model: "nvidia/nemotron-3-ultra-550b-a55b:free", max_tokens: 1000000, supports_vision: false, supports_tools: false },
+    ModelDef { id: "tencent-hy3-free", name: "Tencent Hunyuan 3", backend_model: "tencent/hy3:free", max_tokens: 262144, supports_vision: false, supports_tools: false },
+    ModelDef { id: "stepfun-step-3-7-flash-free", name: "StepFun Step 3.7 Flash", backend_model: "stepfun/step-3.7-flash:free", max_tokens: 256000, supports_vision: false, supports_tools: false },
 ];
