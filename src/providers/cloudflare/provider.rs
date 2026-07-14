@@ -41,6 +41,7 @@ impl CfProvider {
             id: format!("{}/{}", constants::PROVIDER_ID, m.id.strip_prefix("@cf/").unwrap_or(m.id)),
             object: "model".to_string(),
             owned_by: constants::PROVIDER_ID.to_string(),
+            context_length: None,
         }).collect()
     }
 

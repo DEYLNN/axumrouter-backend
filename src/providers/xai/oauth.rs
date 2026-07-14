@@ -57,7 +57,16 @@ pub async fn start() -> OAuthStartResponse {
 }
 
 pub async fn exchange_code(code: &str, oauth_state: &str) -> Result<serde_json::Value, String> {
-    let code_verifier = pkce_store().lock().unwrap().remove(oauth_state).unwrap_or_default();
+    let code_verifier = {
+        let mut store = pkce_store().lock().unwrap();
+        if !oauth_state.is_empty() {
+            store.remove(oauth_state)
+        } else {
+            // Fallback: pop any pending verifier (single concurrent OAuth flow)
+            let key = store.keys().next().cloned();
+            key.map(|k| store.remove(&k)).flatten()
+        }.unwrap_or_default()
+    };
     if code_verifier.is_empty() {
         return Err("Session expired — start OAuth again".into());
     }
