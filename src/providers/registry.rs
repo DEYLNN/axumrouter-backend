@@ -50,7 +50,7 @@ impl ProviderRegistry {
         // API-key (openai_compat):
         register_provider!(registry, "xak", crate::providers::xai_api_key::new_with_keys);
         // Kilo Code (OAuth)
-        register_provider!(registry, "kl", crate::providers::kilocode::provider::KlProvider::new_with_keys);
+        register_provider!(registry, "kc", crate::providers::kilocode::provider::KlProvider::new_with_keys);
 
         registry
     }

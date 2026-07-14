@@ -29,7 +29,7 @@ impl KlProvider {
             display_name: constants::PROVIDER_NAME.to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             capabilities: vec!["chat".to_string(), "models".to_string(), "streaming".to_string(), "oauth".to_string()],
-            icon_path: "/public/providers/kl.png".to_string(),
+            icon_path: "/public/providers/kc.png".to_string(),
             category: constants::CATEGORY.to_string(),
             icon_url: constants::ICON_URL.to_string(),
             color: constants::COLOR.to_string(),

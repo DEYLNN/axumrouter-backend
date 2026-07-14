@@ -8,7 +8,7 @@ pub struct ModelDef {
     pub supports_tools: bool,
 }
 
-pub const PROVIDER_ID: &str = "kl";
+pub const PROVIDER_ID: &str = "kc";
 pub const PROVIDER_NAME: &str = "Kilo Code";
 pub const PROVIDER_FULL_NAME: &str = "kilocode";
 
@@ -31,7 +31,7 @@ pub const SUPPORTS_TOOLS: bool = true;
 
 pub const COLOR: &str = "#FF6B35";
 pub const ICON: &str = "code";
-pub const ICON_URL: &str = "/public/providers/kl.png";
+pub const ICON_URL: &str = "/public/providers/kc.png";
 pub const WEBSITE: &str = "https://kilocode.ai";
 
 pub const MODELS: &[ModelDef] = &[
