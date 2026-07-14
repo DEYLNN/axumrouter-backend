@@ -279,7 +279,13 @@ impl Provider for FbProvider {
                     .find(|m| m.backend_model == backend_model)
                     .map(|m| m.max_tokens)
                     .unwrap_or(65536);
-                obj.insert("max_tokens".into(), serde_json::json!(model_max));
+                obj.insert("max_tokens".into(), serde_json::json!(model_max.min(constants::FREEBUFF_MAX_OUTPUT_TOKENS)));
+            }
+            // Clamp max_tokens to FreeBuff's limit (393216)
+            if let Some(mt) = obj.get_mut("max_tokens").and_then(|v| v.as_u64()) {
+                if mt > constants::FREEBUFF_MAX_OUTPUT_TOKENS as u64 {
+                    obj["max_tokens"] = serde_json::json!(constants::FREEBUFF_MAX_OUTPUT_TOKENS);
+                }
             }
             // ⚠️ CRITICAL: FreeBuff requires this exact stop sequence server-side.
             // Removing this causes 400 Bad Request or truncated responses.
@@ -469,7 +475,13 @@ impl Provider for FbProvider {
                     .find(|m| m.backend_model == backend_model)
                     .map(|m| m.max_tokens)
                     .unwrap_or(65536);
-                obj.insert("max_tokens".into(), serde_json::json!(model_max));
+                obj.insert("max_tokens".into(), serde_json::json!(model_max.min(constants::FREEBUFF_MAX_OUTPUT_TOKENS)));
+            }
+            // Clamp max_tokens to FreeBuff's limit (393216)
+            if let Some(mt) = obj.get_mut("max_tokens").and_then(|v| v.as_u64()) {
+                if mt > constants::FREEBUFF_MAX_OUTPUT_TOKENS as u64 {
+                    obj["max_tokens"] = serde_json::json!(constants::FREEBUFF_MAX_OUTPUT_TOKENS);
+                }
             }
             // ⚠️ CRITICAL: FreeBuff requires this exact stop sequence server-side.
             // Removing this causes 400 Bad Request or truncated responses.
