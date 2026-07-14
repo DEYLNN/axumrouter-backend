@@ -73,7 +73,7 @@ impl Mapper {
                     content: {
                         let raw = c.message.content.clone();
                         let is_empty = raw.as_ref().map(|s| s.is_empty()).unwrap_or(true);
-                        if is_empty { raw.or_else(|| c.message.reasoning_content.clone()) } else { raw }
+                        if is_empty { c.message.reasoning_content.clone() } else { raw }
                     },
                     tool_calls: c.message.tool_calls.clone(),
                     tool_call_id: None,
@@ -146,7 +146,7 @@ impl Mapper {
                     content: {
                         let raw = delta.content.clone();
                         let is_empty = raw.as_ref().map(|s| s.is_empty()).unwrap_or(true);
-                        if is_empty { raw.or_else(|| delta.reasoning_content.clone()) } else { raw }
+                        if is_empty { delta.reasoning_content.clone() } else { raw }
                     },
                     tool_calls: delta.tool_calls,
                 },
