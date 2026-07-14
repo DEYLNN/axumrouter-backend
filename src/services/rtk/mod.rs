@@ -11,7 +11,7 @@ use crate::types::chat::Message;
 // ── Auto-detect: which filter to use based on content pattern ──
 
 fn auto_detect_filter(text: &str) -> Option<fn(&str) -> String> {
-    let head = if text.len() > DETECT_WINDOW { &text[..DETECT_WINDOW] } else { text };
+    let head = if text.len() > DETECT_WINDOW { text.chars().take(DETECT_WINDOW).collect::<String>() } else { text.to_string() };
 
     // git diff: starts with "diff --git" or contains "@@"
     if head.contains("diff --git ") || head.contains("\n@@ ") || head.starts_with("@@ ") {
@@ -35,7 +35,7 @@ fn auto_detect_filter(text: &str) -> Option<fn(&str) -> String> {
     }
 
     // Porcelain git status (e.g. "M  path", "?? path")
-    if is_mostly_porcelain(head) { return Some(git_status); }
+    if is_mostly_porcelain(&head) { return Some(git_status); }
 
     let lines: Vec<&str> = head.lines().collect();
     let non_empty: Vec<&str> = lines.iter().filter(|l| !l.trim().is_empty()).copied().collect();
@@ -56,7 +56,7 @@ fn auto_detect_filter(text: &str) -> Option<fn(&str) -> String> {
     }
 
     // ls: "total N" header or perms rows
-    if head.contains("total ") || count_ls_rows(head) >= 3 {
+    if head.contains("total ") || count_ls_rows(&head) >= 3 {
         return Some(ls);
     }
 
