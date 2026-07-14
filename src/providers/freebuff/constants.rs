@@ -23,8 +23,8 @@ pub const ICON: &str = "bolt";
 pub const ICON_URL: &str = "/public/providers/fb.png";
 pub const WEBSITE: &str = "https://freebuff.com";
 
-pub const FREEBUFF_MAX_MESSAGES: usize = 32;
-pub const FREEBUFF_DEEPSEEK_MAX_MESSAGES: usize = 64;
+pub const FREEBUFF_MAX_MESSAGES: usize = 24;
+pub const FREEBUFF_DEEPSEEK_MAX_MESSAGES: usize = 24;
 pub const FREEBUFF_MAX_MESSAGE_CHARS: usize = 16000;
 pub const FREEBUFF_MAX_TOOL_CHARS: usize = 8000;
 pub const FREEBUFF_MAX_TOOL_ARG_CHARS: usize = 6000;
