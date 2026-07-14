@@ -34,6 +34,10 @@ pub struct Message {
     /// Serialized as absent (not "") when None — upstream rejects `content: ""` + tool_calls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
+    /// Reasoning content placeholder — injected for thinking-mode models (deepseek, kimi)
+    /// Signals upstream API to separate thinking from visible content.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     /// Tool calls made by the assistant (in assistant-role messages)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,

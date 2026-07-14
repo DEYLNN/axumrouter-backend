@@ -172,6 +172,7 @@ impl XaiClient {
             tool_calls: None,
             tool_call_id: None,
             name: None,
+            reasoning_content: None,
         };
 
         Ok(ChatCompletionResponse {

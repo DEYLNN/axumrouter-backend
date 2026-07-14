@@ -78,6 +78,7 @@ impl Mapper {
                     tool_calls: c.message.tool_calls.clone(),
                     tool_call_id: None,
                     name: None,
+                    reasoning_content: None,
                 },
                 finish_reason: c.finish_reason.clone(),
             })

@@ -180,6 +180,7 @@ pub async fn api_test_model(
             tool_calls: None,
             tool_call_id: None,
             name: None,
+            reasoning_content: None,
         }],
         temperature: Some(0.0),
         max_tokens: Some(20),

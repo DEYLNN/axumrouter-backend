@@ -116,7 +116,7 @@ impl CxClient {
             model: "cx".to_string(),
             choices: vec![Choice {
                 index: 0,
-                message: Message { role: "assistant".to_string(), content: Some(out), tool_calls: None, tool_call_id: None, name: None },
+                message: Message { role: "assistant".to_string(), content: Some(out), tool_calls: None, tool_call_id: None, name: None, reasoning_content: None },
                 finish_reason: Some("stop".to_string()),
             }],
             usage: Some(Usage { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }),

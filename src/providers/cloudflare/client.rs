@@ -171,6 +171,7 @@ impl CfClient {
                     tool_calls: None,
                     tool_call_id: None,
                     name: None,
+                    reasoning_content: None,
                 },
                 finish_reason: finish.or(Some("stop".to_string())),
             }],

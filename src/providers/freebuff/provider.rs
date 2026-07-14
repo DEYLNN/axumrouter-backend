@@ -184,6 +184,7 @@ fn assemble_from_chunks(chunks: &[ChatCompletionChunk], model: &str) -> ChatComp
         tool_calls: None,
         tool_call_id: None,
         name: None,
+        reasoning_content: None,
     };
 
     if !tool_calls_acc.is_empty() {

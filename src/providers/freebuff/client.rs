@@ -484,6 +484,7 @@ impl FbClient {
                         tool_calls: None,
                         tool_call_id: None,
                         name: None,
+                        reasoning_content: None,
                     },
                     finish_reason: Some(finish),
                 }
