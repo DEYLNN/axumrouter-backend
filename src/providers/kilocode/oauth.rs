@@ -6,15 +6,29 @@ const POLL_URL_BASE: &str = "https://api.kilo.ai/api/device-auth/codes";
 const PROFILE_URL: &str = "https://api.kilo.ai/api/profile";
 
 pub async fn start() -> Result<Value, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+        .build()
+        .map_err(|e| format!("KiloCode client: {e}"))?;
     let resp = client
         .post("https://api.kilo.ai/api/device-auth/codes")
         .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Origin", "https://app.kilo.ai")
+        .header("Referer", "https://app.kilo.ai/")
         .body("{}")
         .send()
         .await
         .map_err(|e| format!("KiloCode initiate: {e}"))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("KiloCode API HTTP {status}: {body}"));
+    }
     let text = resp.text().await.map_err(|e| format!("KiloCode body: {e}"))?;
+    if text.is_empty() {
+        return Err("KiloCode API returned empty body".into());
+    }
     let data: Value = serde_json::from_str(&text).map_err(|e| format!("KiloCode parse: {e}"))?;
 
     Ok(serde_json::json!({
@@ -103,7 +117,7 @@ pub async fn save_token(state: &Arc<AppState>, data: &Value) -> Result<(), Strin
     let kv_str = serde_json::to_string(&kv).map_err(|e| format!("KiloCode serialize: {e}"))?;
 
     sqlx::query(
-        "INSERT INTO api_keys (id, provider_id, key_value, label, is_active, key_type, created_at, updated_at) VALUES (?, 'kl', ?, ?, 1, 'oauth', ?, ?)",
+        "INSERT INTO api_keys (id, provider_id, key_value, label, is_active, key_type, created_at, updated_at) VALUES (?, 'kc', ?, ?, 1, 'oauth', ?, ?)",
     )
     .bind(&kid)
     .bind(&kv_str)
@@ -114,6 +128,6 @@ pub async fn save_token(state: &Arc<AppState>, data: &Value) -> Result<(), Strin
     .await
     .map_err(|e| format!("KiloCode DB: {e}"))?;
 
-    state.provider_manager.write().await.reload_provider("kl").await;
+    state.provider_manager.write().await.reload_provider("kc").await;
     Ok(())
 }

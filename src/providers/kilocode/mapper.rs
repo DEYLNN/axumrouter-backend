@@ -7,7 +7,7 @@ pub struct KlMapper;
 impl KlMapper {
     pub fn to_chat_request(&self, request: ChatCompletionRequest) -> Value {
         let mut body = json!({
-            "model": request.model.trim_start_matches("kl/"),
+            "model": request.model.trim_start_matches("kc/"),
             "messages": request.messages,
             "stream": request.stream.unwrap_or(true),
         });
