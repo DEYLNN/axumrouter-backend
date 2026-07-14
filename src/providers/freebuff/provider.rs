@@ -325,10 +325,13 @@ impl Provider for FbProvider {
                     if let Some(sys) = keep_sys { messages.insert(0, sys); }
                 }
             }
-            // Remove unsupported fields for DeepSeek thinking mode
-            obj.remove("response_format");
-            obj.remove("reasoning_effort");
-            obj.remove("reasoning");
+            // Forward or strip reasoning params per profile
+            if profile.strip_reasoning_params {
+                obj.remove("response_format");
+                obj.remove("reasoning_effort");
+                obj.remove("reasoning");
+                obj.remove("thinking");
+            }
             // Ensure reasoning content placeholder for tool_calls
             let _ = obj.get_mut("messages").map(|m| ensure_reasoning_content(m));
             // ⚠️ CRITICAL: FreeBuff validates tool message ordering.
@@ -473,10 +476,13 @@ impl Provider for FbProvider {
                     if let Some(sys) = keep_sys { messages.insert(0, sys); }
                 }
             }
-            // Remove unsupported fields for DeepSeek thinking mode
-            obj.remove("response_format");
-            obj.remove("reasoning_effort");
-            obj.remove("reasoning");
+            // Forward or strip reasoning params per profile
+            if profile.strip_reasoning_params {
+                obj.remove("response_format");
+                obj.remove("reasoning_effort");
+                obj.remove("reasoning");
+                obj.remove("thinking");
+            }
             // Ensure reasoning content placeholder for tool_calls
             let _ = obj.get_mut("messages").map(|m| ensure_reasoning_content(m));
             // ⚠️ CRITICAL: FreeBuff validates tool message ordering.

@@ -24,6 +24,7 @@ pub const ICON_URL: &str = "/public/providers/fb.png";
 pub const WEBSITE: &str = "https://freebuff.com";
 
 pub const FREEBUFF_MAX_MESSAGES: usize = 32;
+pub const FREEBUFF_DEEPSEEK_MAX_MESSAGES: usize = 64;
 pub const FREEBUFF_MAX_MESSAGE_CHARS: usize = 16000;
 pub const FREEBUFF_MAX_TOOL_CHARS: usize = 8000;
 pub const FREEBUFF_MAX_TOOL_ARG_CHARS: usize = 6000;
@@ -94,6 +95,8 @@ pub struct AgenticProfile {
     pub max_messages: usize,
     pub max_message_chars: usize,
     pub max_tool_chars: usize,
+    pub strip_reasoning_params: bool,
+    pub forward_thinking: bool,
 }
 
 pub const BASE_AGENTIC_PROFILE: AgenticProfile = AgenticProfile {
@@ -104,9 +107,26 @@ pub const BASE_AGENTIC_PROFILE: AgenticProfile = AgenticProfile {
     max_messages: FREEBUFF_MAX_MESSAGES,
     max_message_chars: FREEBUFF_MAX_MESSAGE_CHARS,
     max_tool_chars: FREEBUFF_MAX_TOOL_CHARS,
+    strip_reasoning_params: true,
+    forward_thinking: false,
 };
 
-pub fn agentic_profile_for_backend(_backend_model: &str) -> &'static AgenticProfile {
-    // All models use the same base profile for now
-    &BASE_AGENTIC_PROFILE
+pub const DEEPSEEK_V4_AGENTIC_PROFILE: AgenticProfile = AgenticProfile {
+    native_tools: true,
+    forward_tool_choice: true,
+    forward_parallel_tool_calls: true,
+    inject_reasoning_content: true,
+    max_messages: FREEBUFF_DEEPSEEK_MAX_MESSAGES,
+    max_message_chars: FREEBUFF_MAX_MESSAGE_CHARS,
+    max_tool_chars: FREEBUFF_MAX_TOOL_CHARS,
+    strip_reasoning_params: false,
+    forward_thinking: true,
+};
+
+pub fn agentic_profile_for_backend(backend_model: &str) -> &'static AgenticProfile {
+    if backend_model.contains("deepseek") {
+        &DEEPSEEK_V4_AGENTIC_PROFILE
+    } else {
+        &BASE_AGENTIC_PROFILE
+    }
 }
