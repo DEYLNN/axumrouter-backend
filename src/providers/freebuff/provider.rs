@@ -331,6 +331,29 @@ impl Provider for FbProvider {
             obj.remove("reasoning");
             // Ensure reasoning content placeholder for tool_calls
             let _ = obj.get_mut("messages").map(|m| ensure_reasoning_content(m));
+            // ⚠️ CRITICAL: FreeBuff validates tool message ordering.
+            // Every 'tool' message must have a preceding assistant with tool_calls.
+            // Strip orphan tool messages to prevent 400 errors.
+            let _ = obj.get_mut("messages").and_then(|m| m.as_array_mut()).map(|arr| {
+                let mut i = 0;
+                let mut has_pending_tc = false;
+                while i < arr.len() {
+                    let role = arr[i]["role"].as_str().unwrap_or("");
+                    if role == "assistant" {
+                        has_pending_tc = arr[i].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                        i += 1;
+                    } else if role == "tool" {
+                        if !has_pending_tc {
+                            arr.remove(i);
+                        } else {
+                            has_pending_tc = false;
+                            i += 1;
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+            });
             let meta = self.client.metadata(&run_id, instance_id.as_deref(), Some(&trace_session_id));
             obj.insert("codebuff_metadata".into(), meta);
         }
@@ -456,6 +479,29 @@ impl Provider for FbProvider {
             obj.remove("reasoning");
             // Ensure reasoning content placeholder for tool_calls
             let _ = obj.get_mut("messages").map(|m| ensure_reasoning_content(m));
+            // ⚠️ CRITICAL: FreeBuff validates tool message ordering.
+            // Every 'tool' message must have a preceding assistant with tool_calls.
+            // Strip orphan tool messages to prevent 400 errors.
+            let _ = obj.get_mut("messages").and_then(|m| m.as_array_mut()).map(|arr| {
+                let mut i = 0;
+                let mut has_pending_tc = false;
+                while i < arr.len() {
+                    let role = arr[i]["role"].as_str().unwrap_or("");
+                    if role == "assistant" {
+                        has_pending_tc = arr[i].get("tool_calls").and_then(|t| t.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                        i += 1;
+                    } else if role == "tool" {
+                        if !has_pending_tc {
+                            arr.remove(i);
+                        } else {
+                            has_pending_tc = false;
+                            i += 1;
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+            });
             let meta = self.client.metadata(&run_id, instance_id.as_deref(), Some(&trace_session_id));
             obj.insert("codebuff_metadata".into(), meta);
         }
