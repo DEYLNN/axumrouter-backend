@@ -78,6 +78,7 @@ pub(crate) async fn handle_combo_request(
                     Some(latency), None,
                     Some(serde_json::to_string(&request).unwrap_or_default()),
                     Some(serde_json::to_string(&result.response).unwrap_or_default()),
+                    None,
                 ).await;
                 return Ok(Json(result.response).into_response());
             }
@@ -86,7 +87,7 @@ pub(crate) async fn handle_combo_request(
                 let _ = crate::db::log_usage(
                     &state.db, provider_id, None,
                     &model_id, "error", Some(502),
-                    0, 0, Some(latency), Some(e.to_string()), None, None,
+                    0, 0, Some(latency), Some(e.to_string()), None, None, None,
                 ).await;
                 last_error = Some(e);
             }
@@ -131,6 +132,7 @@ pub(crate) async fn handle_combo_request_stream(
                     &model_id, "streaming", Some(200),
                     0, 0, Some(latency), None,
                     Some(serde_json::to_string(&request).unwrap_or_default()),
+                    None,
                     None,
                 ).await;
 
@@ -179,7 +181,7 @@ pub(crate) async fn handle_combo_request_stream(
                 let _ = crate::db::log_usage(
                     &state.db, provider_id, None,
                     &model_id, "error", Some(502),
-                    0, 0, Some(latency), Some(e.to_string()), None, None,
+                    0, 0, Some(latency), Some(e.to_string()), None, None, None,
                 ).await;
                 last_error = Some(e);
             }

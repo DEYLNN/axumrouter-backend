@@ -51,8 +51,8 @@ pub async fn auth_middleware(
                 "error",
                 Some(401i64),
                 0, 0, None,
-                Some("missing_authorization: Missing or invalid Authorization header".into()),
-                None, None,
+                Some("missing_authorization: Missing *** invalid Authorization header".into()),
+                None, None, None,
             ).await;
             return err_response(
                 StatusCode::UNAUTHORIZED,
@@ -92,7 +92,7 @@ pub async fn auth_middleware(
             Some(401i64),
             0, 0, None,
             Some("invalid_api_key: Invalid or inactive gateway API key".into()),
-            None, None,
+            None, None, None,
         ).await;
         return err_response(
             StatusCode::UNAUTHORIZED,

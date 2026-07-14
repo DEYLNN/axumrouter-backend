@@ -206,7 +206,7 @@ pub async fn api_test_model(
                 &state.db, &provider_id, result.used_key_id.as_deref(),
                 &req.model, "success", Some(200),
                 usage.prompt_tokens as i64, usage.completion_tokens as i64,
-                Some(latency), None, None, None,
+                Some(latency), None, None, None, None,
             ).await;
             Json(TestModelResponse {
                 ok: true,
@@ -224,7 +224,7 @@ pub async fn api_test_model(
             let _ = crate::db::log_usage(
                 &state.db, &provider_id, None,
                 &req.model, "error", Some(500),
-                0, 0, Some(latency), Some(e.to_string()), None, None,
+                0, 0, Some(latency), Some(e.to_string()), None, None, None,
             ).await;
             Json(TestModelResponse {
                 ok: false, response: String::new(), model: req.model,

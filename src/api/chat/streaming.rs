@@ -14,6 +14,7 @@ use crate::types::chat::ChatCompletionRequest;
 /// Handle streaming chat completion.
 pub(crate) async fn handle_streaming(
     state: &Arc<AppState>,
+    gw_key: &crate::middleware::auth::GatewayKeyInfo,
     provider: &(dyn crate::providers::traits::Provider + Send + Sync),
     provider_id: &str,
     model: &str,
@@ -34,6 +35,7 @@ pub(crate) async fn handle_streaming(
                     Some(latency_ms),
                     Some(failed.error.to_string()),
                     None, None,
+                    None,
                 ).await;
             }
 
@@ -45,6 +47,7 @@ pub(crate) async fn handle_streaming(
                 Some(latency_ms), None,
                 Some(serde_json::to_string(provider_request).unwrap_or_default()),
                 None,
+                Some(&gw_key.key_id),
             ).await.unwrap_or_default();
 
             let db = state.db.clone();
@@ -131,6 +134,7 @@ pub(crate) async fn handle_streaming(
                 Some(latency_ms),
                 Some(e.to_string()),
                 Some(serde_json::to_string(provider_request).unwrap_or_default()),
+                None,
                 None,
             ).await;
             Err(e)

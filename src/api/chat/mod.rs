@@ -30,7 +30,7 @@ async fn log_and_return(
     let _ = crate::db::log_usage(
         db, provider, None, model_ref,
         "error", Some(status as i64), 0, 0, None,
-        Some(err.to_string()), None, None,
+        Some(err.to_string()), None, None, None,
     ).await;
     err
 }
@@ -138,7 +138,7 @@ async fn chat_completions(
     // ── Route to handler ──
 
     if is_streaming {
-        streaming::handle_streaming(&state, provider, provider_id, &model, &provider_request, start).await
+        streaming::handle_streaming(&state, &gw_key, provider, provider_id, &model, &provider_request, start).await
     } else {
         non_streaming::handle_non_streaming(&state, &gw_key, provider, provider_id, &model, &provider_request, start).await
     }

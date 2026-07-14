@@ -98,6 +98,7 @@ pub async fn log_usage(
     error_message: Option<String>,
     request_body: Option<String>,
     response_body: Option<String>,
+    gateway_key_id: Option<&str>,
 ) -> anyhow::Result<String> {
     let usage_id = format!("usage_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
     let total_tokens = prompt_tokens + completion_tokens;
@@ -109,8 +110,8 @@ pub async fn log_usage(
         INSERT INTO usage (
             id, provider_id, api_key_id, model_id, status, status_code,
             prompt_tokens, completion_tokens, total_tokens, latency_ms,
-            error_message, request_body, response_body
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            error_message, request_body, response_body, gateway_key_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#
     )
     .bind(&usage_id)
@@ -126,6 +127,7 @@ pub async fn log_usage(
     .bind(error_message)
     .bind(request_body)
     .bind(response_body)
+    .bind(gateway_key_id)
     .execute(pool)
     .await?;
 

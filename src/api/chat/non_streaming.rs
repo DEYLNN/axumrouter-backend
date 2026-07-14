@@ -33,6 +33,7 @@ pub(crate) async fn handle_non_streaming(
                 Some(failed.error.to_string()),
                 Some(serde_json::to_string(provider_request).unwrap_or_default()),
                 None,
+                None,
             ).await {
                 tracing::error!("Failed to log failed-key usage: {}", e);
             }
@@ -53,6 +54,7 @@ pub(crate) async fn handle_non_streaming(
                 pt, ct, Some(latency_ms), None,
                 Some(serde_json::to_string(provider_request).unwrap_or_default()),
                 Some(serde_json::to_string(&chat_result.response).unwrap_or_default()),
+                None,
             ).await {
                 tracing::error!("Failed to log usage: {}", e);
             }
@@ -64,6 +66,7 @@ pub(crate) async fn handle_non_streaming(
                 model, "error", None, 0, 0,
                 Some(latency_ms), Some(e.to_string()),
                 Some(serde_json::to_string(provider_request).unwrap_or_default()),
+                None,
                 None,
             ).await {
                 tracing::error!("Failed to log usage: {}", err);
