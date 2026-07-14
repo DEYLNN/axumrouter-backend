@@ -34,6 +34,8 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
         color: COLOR,
         icon_url: ICON_URL,
         default_timeout_secs: DEFAULT_TIMEOUT_SECS,
+        stream_first_chunk_timeout_secs: 200,
+        stream_stall_timeout_secs: 360,
         models: MODELS,
         quirks: ProviderQuirks {
             drop_stream_options: false,

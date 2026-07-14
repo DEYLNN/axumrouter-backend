@@ -28,7 +28,20 @@ async fn list_models(
         .collect();
     models.retain(|m| !disabled.contains(&m.id));
 
-    // Layer 2: Apply gateway key access_type permissions
+    // Layer 2: Filter out providers with zero API keys
+    // Models from a provider without keys are unusable — hide them.
+    {
+        let pm = state.provider_manager.read().await;
+        let zero_key_prefixes: Vec<String> = pm.provider_names().iter()
+            .filter(|name| pm.total_keys_for(name).unwrap_or(0) == 0)
+            .map(|name| format!("{}/", name))
+            .collect();
+        // release lock before retain
+        drop(pm);
+        models.retain(|m| !zero_key_prefixes.iter().any(|prefix| m.id.starts_with(prefix)));
+    }
+
+    // Layer 3: Apply gateway key access_type permissions
     match gw_key.access_type.as_str() {
         "allow" => {
             // Only show models in allowed_models list

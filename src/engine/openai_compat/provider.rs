@@ -146,12 +146,19 @@ impl Provider for OpenAICompatibleProvider {
             match self.client.chat_stream(&auth, &provider_req).await {
                 Ok(resp) => {
                     let mapper = self.mapper.clone();
+                    let config = self.config.clone();
                     let stream = async_stream::stream! {
                         let mut buffer = String::new();
                         let mut upstream = resp.bytes_stream();
+                        let mut first_chunk_received = false;
                         loop {
+                            let timeout_dur = if !first_chunk_received {
+                                std::time::Duration::from_secs(config.stream_first_chunk_timeout_secs)
+                            } else {
+                                std::time::Duration::from_secs(config.stream_stall_timeout_secs)
+                            };
                             let next = tokio::time::timeout(
-                                std::time::Duration::from_secs(30),
+                                timeout_dur,
                                 upstream.next(),
                             ).await;
                             let chunk = match next {
@@ -176,6 +183,9 @@ impl Provider for OpenAICompatibleProvider {
                                     if line.is_empty() || line == "data: [DONE]" { continue; }
                                     match mapper.parse_stream_chunk(line) {
                                         Ok(sse_chunk) => {
+                                            if !first_chunk_received {
+                                                first_chunk_received = true;
+                                            }
                                             let gw_chunk = mapper.to_gateway_chunk(&sse_chunk);
                                             yield Ok(gw_chunk);
                                         }

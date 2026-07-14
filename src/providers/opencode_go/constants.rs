@@ -11,7 +11,7 @@ pub const COLOR: &str = "#E87040";
 pub const ICON_URL: &str = "/public/providers/ocg.webp";
 pub const DOCS_URL: &str = "https://opencode.ai/auth";
 pub const API_KEY_URL: &str = "https://opencode.ai/auth";
-pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
+pub const DEFAULT_TIMEOUT_SECS: u64 = 180;
 
 pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "glm-5.2", name: "GLM 5.2", max_tokens: 128000, supports_vision: false, supports_tools: true },
@@ -38,6 +38,8 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
         color: COLOR,
         icon_url: ICON_URL,
         default_timeout_secs: DEFAULT_TIMEOUT_SECS,
+        stream_first_chunk_timeout_secs: 200,
+        stream_stall_timeout_secs: 360,
         models: MODELS,
         quirks: ProviderQuirks {
             drop_stream_options: false,
