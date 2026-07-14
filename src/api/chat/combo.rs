@@ -155,12 +155,20 @@ pub(crate) async fn handle_combo_request_stream(
 
                 let done = futures::stream::once(async { Ok::<_, Infallible>(Event::default().data("[DONE]")) });
                 let sse = stream.chain(done);
-
-                return Ok(axum::response::Sse::new(sse)
+                let mut resp = axum::response::Sse::new(sse)
                     .keep_alive(axum::response::sse::KeepAlive::new()
                         .interval(std::time::Duration::from_secs(15))
                         .text("keep-alive"))
-                    .into_response());
+                    .into_response();
+                resp.headers_mut().insert(
+                    axum::http::header::CACHE_CONTROL,
+                    axum::http::HeaderValue::from_static("no-cache, no-transform"),
+                );
+                resp.headers_mut().insert(
+                    "X-Accel-Buffering",
+                    axum::http::HeaderValue::from_static("no"),
+                );
+                return Ok(resp);
             }
             Err(e) => {
                 let latency = start.elapsed().as_millis() as i64;

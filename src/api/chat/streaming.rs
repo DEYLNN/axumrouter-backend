@@ -102,12 +102,23 @@ pub(crate) async fn handle_streaming(
             });
 
             let sse = stream.chain(done);
-            let response = Sse::new(sse)
+            let mut response = Sse::new(sse)
                 .keep_alive(axum::response::sse::KeepAlive::new()
                     .interval(std::time::Duration::from_secs(15))
-                    .text("keep-alive"));
+                    .text("keep-alive"))
+                .into_response();
 
-            Ok(response.into_response())
+            // Anti-buffer headers for CDN/proxy (Cloudflare, nginx, etc.)
+            response.headers_mut().insert(
+                axum::http::header::CACHE_CONTROL,
+                axum::http::HeaderValue::from_static("no-cache, no-transform"),
+            );
+            response.headers_mut().insert(
+                "X-Accel-Buffering",
+                axum::http::HeaderValue::from_static("no"),
+            );
+
+            Ok(response)
         }
         Err(e) => {
             let _ = crate::db::log_usage(
