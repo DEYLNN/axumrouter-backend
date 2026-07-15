@@ -9,7 +9,7 @@ pub struct OpenAIConfig {
     pub api_key_url: &'static str,
     pub category: &'static str,
     pub color: &'static str,
-    pub icon_url: &'static str,
+    pub icon_name: &'static str,
     pub default_timeout_secs: u64,
     /// Timeout (seconds) waiting for the first SSE chunk (model loading/prompt prefill).
     /// Mirrors 9router's STREAM_FIRST_CHUNK_TIMEOUT_MS / 1000.

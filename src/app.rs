@@ -20,6 +20,7 @@ pub fn build(state: AppState) -> Router {
 
     // Admin dashboard JSON API + auth_files
     let admin = crate::admin::api::admin_routes(shared.clone())
+        .merge(crate::admin::login::routes(shared.clone()))
         .merge(crate::admin::auth_files::routes(shared.clone()))
         .merge(crate::admin::oauth::routes(shared.clone()));
 

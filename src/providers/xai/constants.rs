@@ -2,7 +2,7 @@ pub const PROVIDER_ID: &str = "xai";
 pub const PROVIDER_NAME: &str = "xAI";
 pub const CATEGORY: &str = "oauth";
 pub const COLOR: &str = "#1DA1F2";
-pub const ICON_URL: &str = "/public/providers/xai.png";
+pub const ICON_NAME: &str = "xai.png";
 
 // OpenAI-compatible
 pub const BASE_URL: &str = "https://api.x.ai/v1/chat/completions";
@@ -37,7 +37,7 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
         supports_tools: false,
         supports_vision: false,
         color: COLOR,
-        icon_url: ICON_URL,
+        icon_name: ICON_NAME,
         usage_url: None,
         quirks: Default::default(),
     }

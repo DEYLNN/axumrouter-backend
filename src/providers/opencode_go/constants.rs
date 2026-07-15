@@ -8,7 +8,7 @@ pub const BASE_URL: &str = "https://opencode.ai/zen/go";
 pub const VALIDATE_URL: &str = "https://opencode.ai/auth";
 pub const CATEGORY: &str = "apikey";
 pub const COLOR: &str = "#E87040";
-pub const ICON_URL: &str = "/public/providers/ocg.webp";
+pub const ICON_NAME: &str = "ocg.webp";
 pub const DOCS_URL: &str = "https://opencode.ai/auth";
 pub const API_KEY_URL: &str = "https://opencode.ai/auth";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 180;
@@ -38,7 +38,7 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
         api_key_url: API_KEY_URL,
         category: CATEGORY,
         color: COLOR,
-        icon_url: ICON_URL,
+        icon_name: ICON_NAME,
         default_timeout_secs: DEFAULT_TIMEOUT_SECS,
         stream_first_chunk_timeout_secs: 200,
         stream_stall_timeout_secs: 360,

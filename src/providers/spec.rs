@@ -13,7 +13,7 @@ pub struct ProviderSpec {
     pub supports_tools: bool,
     pub supports_vision: bool,
     pub color: &'static str,
-    pub icon_url: &'static str,
+    pub icon_name: &'static str,
     pub usage_url: Option<&'static str>,
     pub quirks: ProviderQuirks,
 }

@@ -65,11 +65,11 @@ pub async fn api_create_key(
     use rand::Rng;
 
     let id = format!("gk_{}", Uuid::new_v4().to_string().replace('-', "").chars().take(8).collect::<String>());
-    let random_part: String = (0..124).map(|_| {
-        let c: u8 = rand::thread_rng().gen_range(0..62);
-        (if c < 26 { b'a' + c } else if c < 52 { b'A' + c - 26 } else { b'0' + c - 52 }) as char
+    let random_part: String = (0..64).map(|_| {
+        let c: u8 = rand::thread_rng().gen_range(0..36);
+        (if c < 26 { b'a' + c } else { b'0' + c - 26 }) as char
     }).collect();
-    let key_value = format!("axm-{}", random_part);
+    let key_value = format!("sk-axm-{}", random_part);
 
     let access_type = req.access_type.unwrap_or_else(|| "full".into());
     let allowed_models = serde_json::to_string(&req.allowed_models.unwrap_or_default()).unwrap_or_default();

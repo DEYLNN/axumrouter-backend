@@ -6,6 +6,7 @@ use axum::response::{IntoResponse, Response};
 use crate::error::err_response;
 use crate::state::AppState;
 use std::sync::Arc;
+use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
 
 /// Stored in request extensions by auth middleware for downstream handlers.
 #[derive(Clone)]
@@ -15,9 +16,8 @@ pub struct GatewayKeyInfo {
     pub allowed_models: Vec<String>,
 }
 
-/// Auth middleware: protects /v1/* with gateway keys.
-/// Public routes (/admin/*, /health) bypass.
-/// Logs failed auth attempts to usage table.
+/// Auth middleware: protects /v1/* with gateway keys, protects /admin/api/* with JWT (if configured).
+/// Public routes bypass.
 pub async fn auth_middleware(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     request: Request<Body>,
@@ -25,15 +25,54 @@ pub async fn auth_middleware(
 ) -> impl IntoResponse {
     let path = request.uri().path().to_string();
 
-    // Public paths — bypass auth
-    if path.starts_with("/admin")
-        || path.starts_with("/health")
-        || !path.starts_with("/v1/")
-    {
+    // === Admin API JWT auth (if password configured) ===
+    if path.starts_with("/admin/api/") {
+        // Login endpoint is public
+        if path == "/admin/api/login" {
+            return next.run(request).await;
+        }
+
+        let admin_password_set = state.config.auth.admin_password
+            .as_ref()
+            .map_or(false, |p| !p.is_empty());
+
+        if !admin_password_set {
+            // No password set — admin API is public
+            return next.run(request).await;
+        }
+
+        let jwt_secret = state.config.auth.jwt_secret.clone()
+            .unwrap_or_else(|| "default-dev-secret-change-in-prod".into());
+
+        let auth_header = request
+            .headers()
+            .get("authorization")
+            .and_then(|h| h.to_str().ok());
+
+        let token = match auth_header {
+            Some(h) if h.starts_with("Bearer ") => &h[7..],
+            _ => return unauthorized_response("missing_token", "Missing admin token"),
+        };
+
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
+
+        return match decode::<serde_json::Value>(
+            token,
+            &DecodingKey::from_secret(jwt_secret.as_bytes()),
+            &validation,
+        ) {
+            Ok(_) => next.run(request).await,
+            Err(_) => unauthorized_response("invalid_token", "Admin token invalid or expired"),
+        }
+    }
+
+    // === Public paths (bypass completely) ===
+    if path.starts_with("/health") || !path.starts_with("/v1/") {
         return next.run(request).await;
     }
 
-    // Extract Bearer token
+    // === /v1/* Gateway key auth (existing logic) ===
     let auth_header = request
         .headers()
         .get("authorization")
@@ -42,7 +81,6 @@ pub async fn auth_middleware(
     let key_value = match auth_header {
         Some(h) if h.starts_with("Bearer ") => &h[7..],
         _ => {
-            // Log missing auth
             let _ = crate::db::log_usage(
                 &state.db,
                 "gateway",
@@ -51,19 +89,18 @@ pub async fn auth_middleware(
                 "error",
                 Some(401i64),
                 0, 0, None,
-                Some("missing_authorization: Missing *** invalid Authorization header".into()),
+                Some("missing_authorization: Missing or invalid Authorization header".into()),
                 None, None, None,
             ).await;
             return err_response(
                 StatusCode::UNAUTHORIZED,
                 "authentication_error",
                 "missing_authorization",
-                "Missing or invalid `Authorization` header. Send `Authorization: Bearer <gateway key>` header.",
+                "Missing or invalid `Authorization` header. Send `Authorization: Bearer <your-key>` header.",
             );
         }
     };
 
-    // Resolve gateway key id for logging
     let key_id_opt: Option<String> = sqlx::query_scalar(
         "SELECT id FROM gateway_keys WHERE key_value = ?"
     )
@@ -72,7 +109,6 @@ pub async fn auth_middleware(
     .await
     .unwrap_or(None);
 
-    // Validate gateway key (inlined from deleted admin/gateway_keys.rs)
     let valid: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM gateway_keys WHERE key_value = ? AND is_active = 1)"
     )
@@ -82,7 +118,6 @@ pub async fn auth_middleware(
     .unwrap_or(false);
 
     if !valid {
-        // Log invalid key attempt
         let _ = crate::db::log_usage(
             &state.db,
             "gateway",
@@ -102,7 +137,6 @@ pub async fn auth_middleware(
         );
     }
 
-    // Look up gateway key permissions and store in request extensions
     if let Some(kid) = &key_id_opt {
         let row = sqlx::query_as::<_, (String, String)>(
             "SELECT access_type, allowed_models FROM gateway_keys WHERE id = ?"
@@ -136,7 +170,15 @@ pub async fn auth_middleware(
             next.run(req).await
         }
     } else {
-        // Key not found in DB (shouldn't happen since we validated it), but still let through
         next.run(request).await
     }
+}
+
+fn unauthorized_response(error: &'static str, message: &'static str) -> Response {
+    err_response(
+        StatusCode::UNAUTHORIZED,
+        "authentication_error",
+        error,
+        message,
+    )
 }

@@ -31,7 +31,7 @@ impl CxProvider {
             capabilities: vec!["chat".to_string(), "models".to_string(), "streaming".to_string(), "oauth".to_string()],
             icon_path: "/public/providers/openai.png".to_string(),
             category: constants::CATEGORY.to_string(),
-            icon_url: constants::ICON_URL.to_string(),
+            icon_name: constants::ICON_NAME.to_string(),
             color: constants::COLOR.to_string(),
             oauth_flow: Some("authorization_code".to_string()),
         };

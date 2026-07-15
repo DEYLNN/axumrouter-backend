@@ -7,7 +7,7 @@ pub const BASE_URL: &str = "https://api.xiaomimimo.com/api/free-ai/openai/chat";
 pub const BOOTSTRAP_URL: &str = "https://api.xiaomimimo.com/api/free-ai/bootstrap";
 pub const CATEGORY: &str = "apikey";
 pub const COLOR: &str = "#FF6900";
-pub const ICON_URL: &str = "/public/providers/mcf.png";
+pub const ICON_NAME: &str = "mcf.png";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 90;
 
 pub const MODELS: &[ModelDef] = &[

@@ -8,7 +8,7 @@ pub struct ProviderMetadata {
     pub capabilities: Vec<String>,
     pub icon_path: String,
     pub category: String,
-    pub icon_url: String,
+    pub icon_name: String,
     pub color: String,
     /// OAuth flow type: "device_code" | "authorization_code" | null
     pub oauth_flow: Option<String>,

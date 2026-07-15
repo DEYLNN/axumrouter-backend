@@ -29,7 +29,7 @@ impl CfProvider {
             capabilities: vec!["chat".to_string(), "models".to_string(), "streaming".to_string()],
             icon_path: String::new(),
             category: constants::CATEGORY.to_string(),
-            icon_url: constants::ICON_URL.to_string(),
+            icon_name: constants::ICON_NAME.to_string(),
             color: constants::COLOR.to_string(),
             oauth_flow: None,
         };

@@ -8,7 +8,7 @@ pub const BASE_URL: &str = "https://api.x.ai";
 pub const VALIDATE_URL: &str = "https://api.x.ai/v1/models";
 pub const CATEGORY: &str = "apikey";
 pub const COLOR: &str = "#1DA1F2";
-pub const ICON_URL: &str = "/public/providers/xai.png";
+pub const ICON_NAME: &str = "xai.png";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
 
 pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
@@ -22,7 +22,7 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
         api_key_url: "https://console.x.ai",
         category: CATEGORY,
         color: COLOR,
-        icon_url: ICON_URL,
+        icon_name: ICON_NAME,
         default_timeout_secs: DEFAULT_TIMEOUT_SECS,
         stream_first_chunk_timeout_secs: 120,
         stream_stall_timeout_secs: 120,

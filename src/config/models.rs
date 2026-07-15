@@ -34,6 +34,9 @@ pub struct ProviderConfig {
 pub struct AuthConfig {
     pub api_key_header: String,
     pub api_key_prefix: String,
+    pub admin_password: Option<String>,
+    #[serde(default)]
+    pub jwt_secret: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

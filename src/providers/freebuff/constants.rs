@@ -20,7 +20,7 @@ pub const SUPPORTS_TOOLS: bool = true;
 
 pub const COLOR: &str = "#4F7CFF";
 pub const ICON: &str = "bolt";
-pub const ICON_URL: &str = "/public/providers/fb.png";
+pub const ICON_NAME: &str = "fb.png";
 pub const WEBSITE: &str = "https://freebuff.com";
 
 pub const FREEBUFF_MAX_MESSAGES: usize = 24;
@@ -56,7 +56,7 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
         supports_tools: SUPPORTS_TOOLS,
         supports_vision: SUPPORTS_VISION,
         color: COLOR,
-        icon_url: ICON_URL,
+        icon_name: ICON_NAME,
         usage_url: None,
         quirks: crate::providers::spec::ProviderQuirks {
             drop_stream_options: false,

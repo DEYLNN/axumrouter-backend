@@ -2,7 +2,7 @@ pub const PROVIDER_ID: &str = "cf";
 pub const PROVIDER_NAME: &str = "Cloudflare";
 pub const CATEGORY: &str = "apikey";
 pub const COLOR: &str = "#F38020";
-pub const ICON_URL: &str = "/public/providers/cf.png";
+pub const ICON_NAME: &str = "cf.png";
 pub const BASE_URL: &str = "https://api.cloudflare.com/client/v4/accounts";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 90;
 pub const STREAM_FIRST_CHUNK_TIMEOUT_SECS: u64 = 60;
@@ -22,7 +22,7 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
         supports_tools: false,
         supports_vision: true,
         color: COLOR,
-        icon_url: ICON_URL,
+        icon_name: ICON_NAME,
         usage_url: None,
         quirks: Default::default(),
     }

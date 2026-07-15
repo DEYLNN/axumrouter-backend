@@ -36,7 +36,7 @@ impl OpenAICompatibleProvider {
             capabilities: vec!["chat".to_string(), "models".to_string(), "streaming".to_string()],
             icon_path: format!("/public/providers/{}.png", config.provider_id),
             category: config.category.to_string(),
-            icon_url: config.icon_url.to_string(),
+            icon_name: config.icon_name.to_string(),
             color: config.color.to_string(),
             oauth_flow: None,
         };

@@ -22,3 +22,12 @@ pub mod tokenbay;
 pub mod xai;
 pub mod xai_api_key;
 
+pub mod ambient;
+pub mod gmi_cloud;
+pub mod husada;
+pub mod longcat;
+pub mod morph;
+pub mod oglabs;
+pub mod swift_router;
+pub mod token_router;
+pub mod zyloo;

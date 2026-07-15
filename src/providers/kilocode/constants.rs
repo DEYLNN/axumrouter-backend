@@ -31,7 +31,7 @@ pub const SUPPORTS_TOOLS: bool = true;
 
 pub const COLOR: &str = "#FF6B35";
 pub const ICON: &str = "code";
-pub const ICON_URL: &str = "/public/providers/kc.png";
+pub const ICON_NAME: &str = "kc.png";
 pub const WEBSITE: &str = "https://kilocode.ai";
 
 pub const MODELS: &[ModelDef] = &[

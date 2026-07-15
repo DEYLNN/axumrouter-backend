@@ -29,3 +29,4 @@ rand = "0.8"
 sha2 = "0.10"
 base64 = "0.22"
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
+jsonwebtoken = "9"

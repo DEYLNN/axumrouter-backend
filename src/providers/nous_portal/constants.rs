@@ -2,7 +2,7 @@ pub const PROVIDER_ID: &str = "np";
 pub const PROVIDER_NAME: &str = "Nous Portal";
 pub const CATEGORY: &str = "oauth";
 pub const COLOR: &str = "#2563EB";
-pub const ICON_URL: &str = "/public/providers/np.png";
+pub const ICON_NAME: &str = "np.png";
 
 pub const PORTAL_URL: &str = "https://portal.nousresearch.com";
 pub const INFERENCE_URL: &str = "https://inference-api.nousresearch.com/v1";

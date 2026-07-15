@@ -50,6 +50,16 @@ impl ProviderRegistry {
         // API-key (openai_compat):
         register_provider!(registry, "xak", crate::providers::xai_api_key::new_with_keys);
         register_provider!(registry, "ags", crate::providers::agnesai::new_with_keys);
+        register_provider!(registry, "amb", crate::providers::ambient::new_with_keys);
+        register_provider!(registry, "lc", crate::providers::longcat::new_with_keys);
+        register_provider!(registry, "zyl", crate::providers::zyloo::new_with_keys);
+        register_provider!(registry, "tr", crate::providers::token_router::new_with_keys);
+        register_provider!(registry, "0g", crate::providers::oglabs::new_with_keys);
+        register_provider!(registry, "mrph", crate::providers::morph::new_with_keys);
+        register_provider!(registry, "hus", crate::providers::husada::new_with_keys);
+        register_provider!(registry, "sr", crate::providers::swift_router::new_with_keys);
+        register_provider!(registry, "gmi", crate::providers::gmi_cloud::new_with_keys);
+        register_provider!(registry, "amb", crate::providers::ambient::new_with_keys);
         // Kilo Code (OAuth)
         register_provider!(registry, "kc", crate::providers::kilocode::provider::KlProvider::new_with_keys);
 
