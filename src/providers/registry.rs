@@ -60,6 +60,8 @@ impl ProviderRegistry {
         register_provider!(registry, "sr", crate::providers::swift_router::new_with_keys);
         register_provider!(registry, "gmi", crate::providers::gmi_cloud::new_with_keys);
         register_provider!(registry, "amb", crate::providers::ambient::new_with_keys);
+        register_provider!(registry, "poll", crate::providers::pollinations::new_with_keys);
+        register_provider!(registry, "zmx", crate::providers::zenmux::new_with_keys);
         // Kilo Code (OAuth)
         register_provider!(registry, "kc", crate::providers::kilocode::provider::KlProvider::new_with_keys);
 

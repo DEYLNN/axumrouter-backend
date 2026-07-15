@@ -32,9 +32,5 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "moonshotai/kimi-k2.7-code-free", name: "Kimi K2.7 Code Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "stepfun/step-3.7-flash-free", name: "Step 3.7 Flash Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "z-ai/glm-5.2-free", name: "GLM 5.2 Free", max_tokens: 1000000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "z-ai/glm-4.7-flash-free", name: "GLM 4.7 Flash Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "z-ai/glm-4.6v-flash-free", name: "GLM 4.6V Flash Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "stepfun/step-3.7-flash-free", name: "Step 3.7 Flash Free", max_tokens: 262144, supports_vision: false, supports_tools: true },
 ];

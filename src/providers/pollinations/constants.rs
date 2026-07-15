@@ -1,14 +1,14 @@
 use crate::engine::openai_compat::config::ModelDef;
 use crate::providers::spec::ProviderQuirks;
 
-pub const PROVIDER_ID: &str = "zyl";
-pub const PROVIDER_NAME: &str = "Zyloo";
-pub const MODEL_PREFIX: &str = "zyl";
-pub const BASE_URL: &str = "https://api.zyloo.io";
-pub const VALIDATE_URL: &str = "https://api.zyloo.io/v1/models";
+pub const PROVIDER_ID: &str = "poll";
+pub const PROVIDER_NAME: &str = "Pollinations";
+pub const MODEL_PREFIX: &str = "poll";
+pub const BASE_URL: &str = "https://text.pollinations.ai/openai/v1";
+pub const VALIDATE_URL: &str = "https://text.pollinations.ai/openai/v1/models";
 pub const CATEGORY: &str = "apikey";
-pub const COLOR: &str = "#111827";
-pub const ICON_NAME: &str = "zyloo.png";
+pub const COLOR: &str = "#22C55E";
+pub const ICON_NAME: &str = "pollinations.png";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
 
 pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
@@ -18,8 +18,8 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
         model_prefix: MODEL_PREFIX,
         base_url: BASE_URL,
         validate_url: VALIDATE_URL,
-        docs_url: "https://api.zyloo.io",
-        api_key_url: "https://api.zyloo.io",
+        docs_url: "https://pollinations.ai",
+        api_key_url: "",
         category: CATEGORY,
         color: COLOR,
         icon_name: ICON_NAME,
@@ -32,7 +32,5 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", max_tokens: 1000000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", max_tokens: 1000000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "MiniMax-M3", name: "MiniMax M3", max_tokens: 1000000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "openai-fast", name: "GPT-OSS 20B (Pollinations)", max_tokens: 131072, supports_vision: false, supports_tools: true },
 ];
