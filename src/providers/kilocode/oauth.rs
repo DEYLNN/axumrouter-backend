@@ -128,6 +128,6 @@ pub async fn save_token(state: &Arc<AppState>, data: &Value) -> Result<(), Strin
     .await
     .map_err(|e| format!("KiloCode DB: {e}"))?;
 
-    state.provider_manager.write().await.reload_provider("kc").await;
+    let _ = state.provider_manager.write().await.reload_provider("kc").await;
     Ok(())
 }

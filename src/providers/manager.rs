@@ -27,16 +27,16 @@ impl ProviderManager {
             let keys = crate::db::load_provider_keys(db, provider_id).await?;
             let key_count = keys.len();
 
-            if let Some(provider) = registry.build(provider_id, keys, Arc::new(db.clone())) {
+            match registry.build(provider_id, keys, Arc::new(db.clone())) { Some(provider) => {
                 tracing::info!(
                     "Provider '{}' loaded with {} key(s)",
                     provider_id,
                     key_count
                 );
                 active.insert(provider_id.to_string(), provider);
-            } else {
+            } _ => {
                 tracing::warn!("Provider '{}' failed to build", provider_id);
-            }
+            }}
         }
 
         Ok(Self { active, registry, db: db.clone() })
@@ -57,16 +57,16 @@ impl ProviderManager {
         let keys = crate::db::load_provider_keys(&self.db, provider_id).await?;
         let key_count = keys.len();
 
-        if let Some(provider) = self.registry.build(provider_id, keys, Arc::new(self.db.clone())) {
+        match self.registry.build(provider_id, keys, Arc::new(self.db.clone())) { Some(provider) => {
             tracing::info!(
                 "Provider '{}' reloaded with {} key(s)",
                 provider_id,
                 key_count
             );
             self.active.insert(provider_id.to_string(), provider);
-        } else {
+        } _ => {
             tracing::warn!("Provider '{}' failed to rebuild after reload", provider_id);
-        }
+        }}
 
         Ok(())
     }

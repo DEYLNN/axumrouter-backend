@@ -58,7 +58,7 @@ impl KlProvider {
             .map(|(id, remaining, reason)| format!("{} locked {}s: {}", id, remaining, reason))
             .collect::<Vec<_>>()
             .join("; ");
-        GatewayError::no_available_keys(if lock_summary.is_empty() {
+        GatewayError::NoAvailableKeys(if lock_summary.is_empty() {
             "No Kilo Code credentials available — connect via OAuth".to_string()
         } else {
             format!("All Kilo Code credentials exhausted — {}", lock_summary)

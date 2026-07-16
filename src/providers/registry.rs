@@ -7,13 +7,13 @@ use crate::providers::traits::Provider;
 
 /// Macro to register a provider with a `new_with_keys(keys)` constructor.
 macro_rules! register_provider {
-    ($reg:expr, $id:expr, $path:path) => {
+    ($reg:expr_2021, $id:expr_2021, $path:path) => {
         $reg.register($id, |keys: Vec<ApiKey>, _db: Arc<SqlitePool>| {
             Ok(Box::new($path(keys)))
         });
     };
     // Variant that also receives the DB pool (e.g. np auto-refresh)
-    ($reg:expr, $id:expr, $path:path, db) => {
+    ($reg:expr_2021, $id:expr_2021, $path:path, db) => {
         $reg.register($id, |keys: Vec<ApiKey>, db: Arc<SqlitePool>| {
             Ok(Box::new($path(keys, db)))
         });
@@ -36,7 +36,7 @@ impl ProviderRegistry {
         register_provider!(registry, "ocg", crate::providers::opencode_go::new_with_keys);
         register_provider!(registry, "ocf", crate::providers::opencode_free::new_with_keys);
         register_provider!(registry, "tbay", crate::providers::tokenbay::new_with_keys);
-        register_provider!(registry, "nrak", crate::providers::nous_api_key::new_with_keys);
+        register_provider!(registry, "nak", crate::providers::nous_api_key::new_with_keys);
         register_provider!(registry, "cl", crate::providers::cline::new_with_keys);
 
         // Custom providers:
@@ -53,15 +53,49 @@ impl ProviderRegistry {
         register_provider!(registry, "amb", crate::providers::ambient::new_with_keys);
         register_provider!(registry, "lc", crate::providers::longcat::new_with_keys);
         register_provider!(registry, "zyl", crate::providers::zyloo::new_with_keys);
-        register_provider!(registry, "tr", crate::providers::token_router::new_with_keys);
+        register_provider!(registry, "tr", crate::providers::tokenrouter::new_with_keys);
         register_provider!(registry, "0g", crate::providers::oglabs::new_with_keys);
         register_provider!(registry, "mrph", crate::providers::morph::new_with_keys);
         register_provider!(registry, "hus", crate::providers::husada::new_with_keys);
-        register_provider!(registry, "sr", crate::providers::swift_router::new_with_keys);
+        register_provider!(registry, "sr", crate::providers::swiftrouter::new_with_keys);
         register_provider!(registry, "gmi", crate::providers::gmi_cloud::new_with_keys);
-        register_provider!(registry, "amb", crate::providers::ambient::new_with_keys);
         register_provider!(registry, "poll", crate::providers::pollinations::new_with_keys);
         register_provider!(registry, "zmx", crate::providers::zenmux::new_with_keys);
+        register_provider!(registry, "btl", crate::providers::badtheory_labs::new_with_keys);
+        register_provider!(registry, "kim", crate::providers::kimchi::new_with_keys);
+        register_provider!(registry, "kimi", crate::providers::kimi::new_with_keys);
+        register_provider!(registry, "co", crate::providers::conduit_ozdoev::new_with_keys);
+        register_provider!(registry, "om", crate::providers::openmodel::new_with_keys);
+        register_provider!(registry, "cer", crate::providers::cerebras::new_with_keys);
+        register_provider!(registry, "or", crate::providers::openrouter::new_with_keys);
+        register_provider!(registry, "rwy", crate::providers::routeway::new_with_keys);
+        register_provider!(registry, "evo", crate::providers::evomap::new_with_keys);
+        register_provider!(registry, "gq", crate::providers::groq::new_with_keys);
+        register_provider!(registry, "nry", crate::providers::naraya_ai::new_with_keys);
+        register_provider!(registry, "bai", crate::providers::bai::new_with_keys);
+        register_provider!(registry, "cwv", crate::providers::canopywave::new_with_keys);
+        register_provider!(registry, "mmx", crate::providers::minimax::new_with_keys);
+        register_provider!(registry, "mmxcn", crate::providers::minimax_cn::new_with_keys);
+        register_provider!(registry, "glb", crate::providers::gitlawb::new_with_keys);
+        register_provider!(registry, "ocz", crate::providers::ocenza::new_with_keys);
+        register_provider!(registry, "qc", crate::providers::qwencloud::new_with_keys);
+        register_provider!(registry, "vk", crate::providers::vikey::new_with_keys);
+        register_provider!(registry, "volc", crate::providers::volcengine_ark::new_with_keys);
+        register_provider!(registry, "um", crate::providers::unimodel::new_with_keys);
+        register_provider!(registry, "nzc", crate::providers::nabz_clan::new_with_keys);
+        register_provider!(registry, "alc", crate::providers::alibaba_cloud::new_with_keys);
+        register_provider!(registry, "al", crate::providers::alibaba::new_with_keys);
+        register_provider!(registry, "alin", crate::providers::alibaba_intl::new_with_keys);
+        register_provider!(registry, "cv", crate::providers::cavoti::new_with_keys);
+        register_provider!(registry, "mimosg", crate::providers::xiaomi_mimo_sg::new_with_keys);
+        register_provider!(registry, "mimo", crate::providers::xiaomi_mimo::new_with_keys);
+        register_provider!(registry, "sn", crate::providers::sambanova::new_with_keys);
+        register_provider!(registry, "am", crate::providers::aimux::new_with_keys);
+        register_provider!(registry, "llm7", crate::providers::llm7::new_with_keys);
+        register_provider!(registry, "qin", crate::providers::qiniu::new_with_keys);
+        register_provider!(registry, "zai", crate::providers::zai::new_with_keys);
+        register_provider!(registry, "bmc", crate::providers::bigmodel_china::new_with_keys);
+        register_provider!(registry, "yun", crate::providers::yunwu::new_with_keys);
         // Kilo Code (OAuth)
         register_provider!(registry, "kc", crate::providers::kilocode::provider::KlProvider::new_with_keys);
 

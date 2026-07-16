@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use serde::Deserialize;
 
 fn store() -> &'static Mutex<String> {
     static STORE: OnceLock<Mutex<String>> = OnceLock::new();
@@ -103,6 +102,6 @@ pub async fn save_token(state: &Arc<crate::state::AppState>, data: &serde_json::
         .bind(&kid).bind(&kv).bind(email).bind(&now).bind(&now)
         .execute(&state.db).await.map_err(|e| format!("DB: {}", e))?;
 
-    state.provider_manager.write().await.reload_provider("fb").await;
+    let _ = state.provider_manager.write().await.reload_provider("fb").await;
     Ok(())
 }

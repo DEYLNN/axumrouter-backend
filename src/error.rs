@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -57,10 +58,9 @@ pub enum GatewayError {
     // ---- 502/503/504 (Upstream issues) ----
     #[error("Upstream HTTP {status}: {body}")]
     ProviderHttpError { status: u16, body: String, provider: String },
-
+    /// All API keys for provider `{0}` are exhausted or invalid
     #[error("All API keys for provider `{0}` are exhausted or invalid")]
-    #[allow(non_camel_case_types)]
-    no_available_keys(String),
+    NoAvailableKeys(String),
 
     // ---- 500 (Internal) ----
     #[error("Internal error: {0}")]
@@ -105,7 +105,7 @@ impl GatewayError {
                 "upstream_error",
                 "provider_http_error",
             ),
-            Self::no_available_keys(_) => (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable_error", "no_available_keys"),
+            Self::NoAvailableKeys(_) => (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable_error", "no_available_keys"),
 
             // 500
             Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_server_error", "internal_error"),
@@ -170,7 +170,7 @@ impl IntoResponse for GatewayError {
                 (format!("All keys for provider `{}` are rate-limited. Retry after cooldown.", p), code_prefix.to_string(),
                  Some(format!("Wait 60s or add keys in /admin/providers/{}", p)))
             }
-            Self::no_available_keys(p) => {
+            Self::NoAvailableKeys(p) => {
                 (format!("All keys for provider `{}` are exhausted or invalid.", p), code_prefix.to_string(),
                  Some(format!("Add active keys in /admin/providers/{}", p)))
             }

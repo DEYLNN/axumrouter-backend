@@ -7,7 +7,7 @@ pub fn dedup_log(input: &str) -> String {
     let mut blank_streak: usize = 0;
 
     let flush_run = |out: &mut Vec<String>, prev: &Option<&str>, run_count: &mut usize| {
-        if let Some(p) = prev {
+        if let Some(_p) = prev {
             if *run_count > 1 {
                 out.push(format!("  ... ({} duplicate lines)", *run_count - 1));
             }

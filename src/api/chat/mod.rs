@@ -4,7 +4,6 @@ pub mod non_streaming;
 pub mod streaming;
 
 use axum::extract::{State, Extension};
-use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
 use std::sync::Arc;
@@ -17,7 +16,7 @@ use crate::services::ponytail;
 use crate::services::rtk;
 use crate::services::tool_normalizer::normalize_tool_messages;
 use crate::state::AppState;
-use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse};
+use crate::types::chat::ChatCompletionRequest;
 
 async fn log_and_return(
     db: &sqlx::SqlitePool,

@@ -327,7 +327,7 @@ impl Provider for FbProvider {
                     // Walk backwards from truncation point: if we'd cut tool messages
                     // but keep their parent assistant(tool_calls), extend to keep the pair
                     if truncate_to > 0 {
-                        let mut lookahead = truncate_to;
+                        let _lookahead = truncate_to;
                         let mut has_pending_tc = false;
                         for i in truncate_to..messages.len() {
                             let role = messages[i]["role"].as_str().unwrap_or("");
@@ -515,7 +515,7 @@ impl Provider for FbProvider {
                     // Walk backwards from truncation point: if we'd cut tool messages
                     // but keep their parent assistant(tool_calls), extend to keep the pair
                     if truncate_to > 0 {
-                        let mut lookahead = truncate_to;
+                        let _lookahead = truncate_to;
                         let mut has_pending_tc = false;
                         for i in truncate_to..messages.len() {
                             let role = messages[i]["role"].as_str().unwrap_or("");

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -107,6 +106,6 @@ pub async fn save_token(state: &Arc<crate::state::AppState>, token: &serde_json:
         .bind(&kid).bind(&kv).bind(&label).bind(&now).bind(&now)
         .execute(&state.db).await.map_err(|e| format!("DB: {}", e))?;
 
-    state.provider_manager.write().await.reload_provider("xai").await;
+    let _ = state.provider_manager.write().await.reload_provider("xai").await;
     Ok(())
 }

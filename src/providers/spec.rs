@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Provider metadata and behavior flags used to keep provider implementations stable.
 /// Inspired by 9router provider registry + quirks model.
 #[derive(Debug, Clone)]
@@ -32,6 +33,10 @@ pub struct ProviderQuirks {
     pub max_tokens_field: MaxTokensField,
     /// Provider supports final usage chunk during SSE stream.
     pub supports_stream_usage: bool,
+    /// Default temperature when user doesn't specify. None = omit field.
+    pub default_temperature: Option<f64>,
+    /// Force temperature — always use this value, ignore user request.
+    pub force_temperature: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +60,8 @@ impl Default for ProviderQuirks {
             auth_header: AuthHeader::Bearer,
             max_tokens_field: MaxTokensField::MaxTokens,
             supports_stream_usage: true,
+            default_temperature: None,
+            force_temperature: None,
         }
     }
 }

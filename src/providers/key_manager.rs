@@ -94,7 +94,7 @@ impl KeyManager {
             .collect();
 
         if active.is_empty() {
-            return Err(GatewayError::no_available_keys(
+            return Err(GatewayError::NoAvailableKeys(
                 "No active API keys — all keys in cooldown lock".to_string(),
             ));
         }

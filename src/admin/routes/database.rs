@@ -105,17 +105,17 @@ pub async fn api_database_export(State(state): State<Arc<AppState>>) -> Json<ser
                     }
                     Ok(s) => serde_json::Value::String(s),
                     Err(_) => {
-                        if let Ok(n) = sqlx::Row::try_get::<i64, _>(row, i) {
+                        match sqlx::Row::try_get::<i64, _>(row, i) { Ok(n) => {
                             serde_json::Value::Number(n.into())
-                        } else if let Ok(f) = sqlx::Row::try_get::<f64, _>(row, i) {
+                        } _ => { match sqlx::Row::try_get::<f64, _>(row, i) { Ok(f) => {
                             serde_json::Number::from_f64(f)
                                 .map(|n| serde_json::Value::Number(n))
                                 .unwrap_or(serde_json::Value::Null)
-                        } else if let Ok(b) = sqlx::Row::try_get::<bool, _>(row, i) {
+                        } _ => { match sqlx::Row::try_get::<bool, _>(row, i) { Ok(b) => {
                             serde_json::Value::Bool(b)
-                        } else {
+                        } _ => {
                             serde_json::Value::Null
-                        }
+                        }}}}}}
                     }
                 };
                 obj.insert(col.clone(), val);

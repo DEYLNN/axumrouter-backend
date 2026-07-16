@@ -190,7 +190,7 @@ impl RtkStats {
         if self.hits == 0 { return None; }
         let saved = self.bytes_before.saturating_sub(self.bytes_after);
         let pct = if self.bytes_before > 0 {
-            ((saved as f64 / self.bytes_before as f64) * 100.0)
+            (saved as f64 / self.bytes_before as f64) * 100.0
         } else { 0.0 };
         Some(format!(
             "[RTK] saved {}B / {}B ({:.1}%) hits={}",

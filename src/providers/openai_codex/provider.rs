@@ -58,7 +58,7 @@ impl CxProvider {
             .map(|(id, remaining, reason)| format!("{} locked {}s: {}", id, remaining, reason))
             .collect::<Vec<_>>()
             .join("; ");
-        GatewayError::no_available_keys(if lock_summary.is_empty() {
+        GatewayError::NoAvailableKeys(if lock_summary.is_empty() {
             "No Codex OAuth credentials available — import OAuth JSON as provider key".to_string()
         } else {
             format!("All Codex OAuth credentials exhausted — {}", lock_summary)

@@ -1,8 +1,8 @@
 use crate::error::GatewayError;
 use crate::providers::spec::MaxTokensField;
-use crate::engine::openai_compat::config::{OpenAIConfig, ModelDef};
+use crate::engine::openai_compat::config::OpenAIConfig;
 use crate::engine::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
-use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Choice, Message, Usage, ToolCall};
+use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Choice, Message, Usage};
 use crate::types::model::Model;
 use std::sync::Arc;
 
@@ -36,7 +36,7 @@ impl Mapper {
         ChatRequest {
             model,
             messages: gateway_req.messages.clone(),
-            temperature: gateway_req.temperature,
+            temperature: quirks.force_temperature.or(gateway_req.temperature).or(quirks.default_temperature),
             max_tokens,
             max_completion_tokens,
             top_p: gateway_req.top_p,

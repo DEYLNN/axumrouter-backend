@@ -3,6 +3,7 @@ use serde::Serialize;
 
 /// Standard API response wrapper
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub struct ApiResponse<T: Serialize> {
     pub success: bool,
     pub data: Option<T>,

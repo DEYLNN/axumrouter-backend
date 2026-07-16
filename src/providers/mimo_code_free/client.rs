@@ -45,7 +45,7 @@ impl McfClient {
         // Check cache
         {
             let cache = self.jwt.lock().unwrap();
-            if let (Some(ref jwt), expires) = &*cache {
+            if let (Some(jwt), expires) = &*cache {
                 if Instant::now() < *expires - Duration::from_secs(300) {
                     return Ok(jwt.clone());
                 }

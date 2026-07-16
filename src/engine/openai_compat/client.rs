@@ -5,7 +5,7 @@ use crate::error::GatewayError;
 use crate::providers::spec::AuthHeader;
 use crate::engine::openai_compat::auth::ApiKeyAuth;
 use crate::engine::openai_compat::config::OpenAIConfig;
-use crate::engine::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
+use crate::engine::openai_compat::types::{ChatRequest, ChatResponse};
 
 /// Generic HTTP client for OpenAI-compatible providers.
 pub struct Client {

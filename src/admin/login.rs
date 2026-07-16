@@ -12,6 +12,7 @@ pub struct LoginRequest {
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub struct LoginResponse {
     pub token: String,
 }

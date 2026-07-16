@@ -49,7 +49,7 @@ impl CfProvider {
         let lock_summary = self.keys.locked_keys()
             .into_iter().map(|(id, remaining, reason)| format!("{} locked {}s: {}", id, remaining, reason))
             .collect::<Vec<_>>().join("; ");
-        GatewayError::no_available_keys(if lock_summary.is_empty() {
+        GatewayError::NoAvailableKeys(if lock_summary.is_empty() {
             "No Cloudflare keys available".into()
         } else {
             format!("All Cloudflare keys exhausted — {}", lock_summary)
@@ -64,7 +64,7 @@ impl Provider for CfProvider {
     async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatResult, GatewayError> {
         let total = self.keys.total_count();
         let mut failed = Vec::new();
-        for attempt in 0..total.max(1) {
+        for _attempt in 0..total.max(1) {
             let key = match self.keys.next() { Ok(k) => k, Err(_) => break };
             let key_id = key.id.clone();
             let cred = match CfCredential::parse(&key.key_value) {
@@ -103,7 +103,7 @@ impl Provider for CfProvider {
     async fn chat_completion_stream(&self, request: ChatCompletionRequest) -> Result<ChatStreamResult, GatewayError> {
         let total = self.keys.total_count();
         let mut failed = Vec::new();
-        for attempt in 0..total.max(1) {
+        for _attempt in 0..total.max(1) {
             let key = match self.keys.next() { Ok(k) => k, Err(_) => break };
             let key_id = key.id.clone();
             let cred = match CfCredential::parse(&key.key_value) {

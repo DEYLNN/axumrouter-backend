@@ -1,5 +1,5 @@
 use crate::error::GatewayError;
-use crate::types::chat::{ChatCompletionChunk, ChatCompletionResponse, Usage};
+use crate::types::chat::{ChatCompletionChunk, ChatCompletionResponse};
 use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
@@ -92,7 +92,7 @@ impl KlClient {
             });
         }
 
-        let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("model").to_string();
+        let _model = body.get("model").and_then(|v| v.as_str()).unwrap_or("model").to_string();
         let mut upstream = response.bytes_stream();
         let ft = self.first_chunk_timeout;
         let st = self.stall_timeout;

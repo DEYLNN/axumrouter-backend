@@ -124,7 +124,7 @@ pub async fn save_token(state: &Arc<AppState>, token: &serde_json::Value) -> Res
     .bind(&kid).bind(&kv).bind(&label).bind(&now).bind(&now)
     .execute(&state.db).await.map_err(|e| format!("DB: {}", e))?;
 
-    state.provider_manager.write().await.reload_provider("np").await;
+    let _ = state.provider_manager.write().await.reload_provider("np").await;
     Ok(())
 }
 

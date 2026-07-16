@@ -45,7 +45,7 @@ pub fn ls(input: &str) -> String {
         ext_vec.sort_by(|a, b| b.1.cmp(a.1));
         summary.push_str(" (");
         let mut first = true;
-        for (i, (ext, count)) in ext_vec.iter().take(LS_EXT_SUMMARY_TOP).enumerate() {
+        for (_i, (ext, count)) in ext_vec.iter().take(LS_EXT_SUMMARY_TOP).enumerate() {
             if !first { summary.push_str(", "); }
             first = false;
             summary.push_str(&format!("{} {}", count, ext));

@@ -1,9 +1,9 @@
 use crate::engine::openai_compat::config::ModelDef;
 use crate::providers::spec::ProviderQuirks;
 
-pub const PROVIDER_ID: &str = "nrak";
-pub const PROVIDER_NAME: &str = "Nous Research";
-pub const MODEL_PREFIX: &str = "nrak";
+pub const PROVIDER_ID: &str = "nak";
+pub const PROVIDER_NAME: &str = "Nous";
+pub const MODEL_PREFIX: &str = "nak";
 pub const BASE_URL: &str = "https://inference-api.nousresearch.com/v1";
 pub const VALIDATE_URL: &str = "https://inference-api.nousresearch.com/v1/models";
 pub const CATEGORY: &str = "apikey";
