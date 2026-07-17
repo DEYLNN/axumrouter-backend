@@ -64,13 +64,10 @@ async fn chat_completions(
         return Err(log_and_return(&state.db, &model, e, 429).await);
     }
 
-    let parts: Vec<&str> = model.split('/').collect();
-    if parts.len() != 2 {
-        return Err(log_and_return(&state.db, model.as_str(), GatewayError::InvalidModelFormat(model.clone()), 400).await);
-    }
-
-    let provider_id = parts[0];
-    let model_name = parts[1];
+    let (provider_id, model_name) = match model.split_once('/') {
+        Some((pid, rest)) => (pid, rest),
+        None => return Err(log_and_return(&state.db, model.as_str(), GatewayError::InvalidModelFormat(model.clone()), 400).await),
+    };
     let is_streaming = request.stream.unwrap_or(false);
 
     // Combo routing
