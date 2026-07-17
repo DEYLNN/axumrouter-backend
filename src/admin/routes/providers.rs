@@ -117,6 +117,22 @@ pub async fn api_provider_detail(
             })
         })
         .collect();
+
+        // Runtime cooldown locks from key_manager — merge into key entries
+        let runtime_locked: std::collections::HashMap<String, (u64, String)> = p.locked_keys()
+            .into_iter()
+            .map(|(k, s, r)| (k, (s, r)))
+            .collect();
+        let keys: Vec<serde_json::Value> = keys.into_iter().map(|mut k| {
+            if let Some(id) = k["id"].as_str() {
+                if let Some((remaining, reason)) = runtime_locked.get(id) {
+                    k["is_locked"] = serde_json::Value::Bool(true);
+                    k["locked_reason"] = serde_json::Value::String(reason.clone());
+                    k["locked_remaining"] = serde_json::Value::Number(serde_json::Number::from(*remaining));
+                }
+            }
+            k
+        }).collect();
         Json(serde_json::json!({
             "id": provider_id,
             "display_name": meta.display_name,
@@ -192,6 +208,17 @@ pub async fn api_test_model(
     };
 
     let start = std::time::Instant::now();
+
+    // Snapshot active key IDs for error logging (runtime lock may miss non-retryable errors)
+    let known_keys: Vec<String> = sqlx::query_scalar(
+        "SELECT id FROM api_keys WHERE provider_id=? AND is_active=1 ORDER BY created_at DESC LIMIT 1"
+    )
+    .bind(&provider_id)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    let db_key_id = known_keys.first().cloned();
+
     match provider.chat_completion(chat_request).await {
         Ok(result) => {
             let latency = start.elapsed().as_millis() as i64;
@@ -201,13 +228,23 @@ pub async fn api_test_model(
             let usage = result.response.usage.unwrap_or(crate::types::chat::Usage {
                 prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
             });
-            // Log test to usage table
+            // Log usage
             let _ = crate::db::log_usage(
                 &state.db, &provider_id, result.used_key_id.as_deref(),
                 &req.model, "success", Some(200),
                 usage.prompt_tokens as i64, usage.completion_tokens as i64,
                 Some(latency), None, None, None, None,
             ).await;
+            // Log failed key attempts
+            for failed in &result.failed_keys {
+                let _ = crate::db::log_usage(
+                    &state.db, &provider_id, Some(&failed.key_id),
+                    &req.model, "error", Some(401),
+                    0, 0, Some(latency),
+                    Some(failed.error.to_string()),
+                    None, None, None,
+                ).await;
+            }
             Json(TestModelResponse {
                 ok: true,
                 response: response_text,
@@ -221,8 +258,10 @@ pub async fn api_test_model(
         }
         Err(e) => {
             let latency = start.elapsed().as_millis() as i64;
+            let failed_key = provider.locked_keys().first().map(|(id, _, _)| id.clone())
+                .or_else(|| db_key_id.clone());
             let _ = crate::db::log_usage(
-                &state.db, &provider_id, None,
+                &state.db, &provider_id, failed_key.as_deref(),
                 &req.model, "error", Some(500),
                 0, 0, Some(latency), Some(e.to_string()), None, None, None,
             ).await;

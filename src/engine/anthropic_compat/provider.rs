@@ -9,6 +9,7 @@ use crate::engine::anthropic_compat::config::AnthropicConfig;
 use crate::engine::anthropic_compat::mapper::{Mapper, StreamState};
 use crate::error::GatewayError;
 use crate::providers::error_classifier::classify_provider_error;
+use crate::engine::helpers::lock_key_on_error;
 use crate::providers::key_manager::KeyManager;
 use crate::providers::result::{ChatResult, ChatStreamResult};
 use crate::providers::traits::Provider;
@@ -91,9 +92,8 @@ impl Provider for AnthropicCompatibleProvider {
                 }
                 Err(e) => {
                     attempt += 1;
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable && attempt < total {
-                        self.keys.lock_key(&key_id, classified.lock_status.unwrap_or(classified.status.unwrap_or(503)), e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable && attempt < total {
                         continue;
                     }
                     return Err(e);
@@ -186,9 +186,8 @@ impl Provider for AnthropicCompatibleProvider {
                     });
                 }
                 Err(e) => {
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable && _attempt + 1 < total.max(1) {
-                        self.keys.lock_key(&key_id, classified.lock_status.unwrap_or(classified.status.unwrap_or(503)), e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable && _attempt + 1 < total.max(1) {
                         failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
                         continue;
                     }

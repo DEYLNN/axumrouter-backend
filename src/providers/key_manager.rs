@@ -40,7 +40,7 @@ impl Default for KeyLockConfig {
             // 5m — like 9router BACKOFF_CONFIG.max=5*60*1000
             rate_limit_backoff_max: 300,
             // 30s — like 9router TRANSIENT_COOLDOWN_MS=30000
-            transient_cooldown_secs: 30,
+            transient_cooldown_secs: 120,
         }
     }
 }

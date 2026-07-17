@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::db::models::ApiKey;
+use crate::engine::helpers::lock_key_on_error;
 use crate::error::GatewayError;
-use crate::providers::error_classifier::classify_provider_error;
 use crate::providers::key_manager::KeyManager;
 use crate::providers::result::{ChatResult, ChatStreamResult, FailedKeyAttempt};
 use crate::providers::traits::Provider;
@@ -91,11 +91,9 @@ impl Provider for CxProvider {
                     return Ok(ChatResult { response, used_key_id: Some(key_id), failed_keys: failed });
                 }
                 Err(e) => {
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable {
-                        let status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
-                        tracing::warn!("Codex key '{}' failed attempt {}/{}, kind={:?}", key_id, attempt + 1, total, classified.kind);
-                        self.keys.lock_key(&key.id, status, e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable {
+                        tracing::warn!("Codex key '{}' failed attempt {}/{}, kind={:?}", key_id, attempt + 1, total, c.kind);
                         failed.push(FailedKeyAttempt { key_id: key_id.clone(), error: e });
                         continue;
                     }
@@ -127,11 +125,9 @@ impl Provider for CxProvider {
                     return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed });
                 }
                 Err(e) => {
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable {
-                        let status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
-                        tracing::warn!("Codex key '{}' failed attempt {}/{}, kind={:?}", key_id, attempt + 1, total, classified.kind);
-                        self.keys.lock_key(&key.id, status, e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable {
+                        tracing::warn!("Codex key '{}' failed attempt {}/{}, kind={:?}", key_id, attempt + 1, total, c.kind);
                         failed.push(FailedKeyAttempt { key_id: key_id.clone(), error: e });
                         continue;
                     }

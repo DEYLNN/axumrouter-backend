@@ -4,7 +4,7 @@ use crate::providers::spec::ProviderQuirks;
 pub const PROVIDER_ID: &str = "yun";
 pub const PROVIDER_NAME: &str = "Yunwu AI";
 pub const MODEL_PREFIX: &str = "yun";
-pub const BASE_URL: &str = "https://yunwu.ai/v1";
+pub const BASE_URL: &str = "https://yunwu.ai";
 pub const VALIDATE_URL: &str = "https://yunwu.ai/v1/models";
 pub const CATEGORY: &str = "apikey";
 pub const COLOR: &str = "#6366F1";

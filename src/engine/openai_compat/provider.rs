@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::db::models::ApiKey;
 use crate::error::GatewayError;
 use crate::providers::error_classifier::classify_provider_error;
+use crate::engine::helpers::lock_key_on_error;
 use crate::providers::key_manager::KeyManager;
 use crate::engine::openai_compat::auth::ApiKeyAuth;
 use crate::engine::openai_compat::client::Client;
@@ -104,11 +105,9 @@ impl Provider for OpenAICompatibleProvider {
                 }
                 Err(e) => {
                     attempt += 1;
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable && attempt < total {
-                        let status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
-                        self.keys.lock_key(&key_id, status, e.to_string());
-                        continue; // try next key
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable && attempt < total {
+                        continue;
                     }
                     return Err(e);
                 }
@@ -206,10 +205,8 @@ impl Provider for OpenAICompatibleProvider {
                     });
                 }
                 Err(e) => {
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable && _attempt + 1 < total.max(1) {
-                        let status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
-                        self.keys.lock_key(&key_id, status, e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable && _attempt + 1 < total.max(1) {
                         failed.push(crate::providers::result::FailedKeyAttempt {
                             key_id: key_id.clone(),
                             error: e,

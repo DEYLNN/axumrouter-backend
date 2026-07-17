@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::db::models::ApiKey;
 use crate::error::GatewayError;
+use crate::engine::helpers::lock_key_on_error;
 use crate::providers::error_classifier::classify_provider_error;
 use crate::providers::key_manager::KeyManager;
 use crate::providers::result::{ChatResult, ChatStreamResult, FailedKeyAttempt};
@@ -87,9 +88,8 @@ impl Provider for CfProvider {
             match self.client.send_collect(body, &cred).await {
                 Ok(response) => { self.keys.unlock(&key_id); return Ok(ChatResult { response, used_key_id: Some(key_id), failed_keys: failed }); }
                 Err(e) => {
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable {
-                        self.keys.lock_key(&key.id, classified.lock_status.unwrap_or(503), e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable {
                         failed.push(FailedKeyAttempt { key_id, error: e });
                         continue;
                     }
@@ -125,9 +125,8 @@ impl Provider for CfProvider {
             match self.client.send_stream(body, &cred).await {
                 Ok(stream) => { self.keys.unlock(&key_id); return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed }); }
                 Err(e) => {
-                    let classified = classify_provider_error(&e);
-                    if classified.retryable {
-                        self.keys.lock_key(&key.id, classified.lock_status.unwrap_or(503), e.to_string());
+                    let c = lock_key_on_error(&self.keys, &key_id, &e);
+                    if c.retryable {
                         failed.push(FailedKeyAttempt { key_id, error: e });
                         continue;
                     }
