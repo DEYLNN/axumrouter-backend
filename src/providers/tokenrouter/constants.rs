@@ -35,4 +35,5 @@ pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "MiniMax-M3", name: "MiniMax M3", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek/deepseek-v4-pro", name: "DeepSeek V4 Pro", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash", max_tokens: 1000000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "z-ai/glm-5.2-free", name: "Z-AI GLM 5.2 Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
 ];
