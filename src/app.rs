@@ -39,7 +39,7 @@ pub fn build(state: AppState) -> Router {
         .merge(admin)
         .merge(static_assets)
         .merge(spa)
-        .layer(CorsLayer::permissive())
         .layer(from_fn(middleware::logging::logging_middleware))
         .layer(from_fn_with_state(shared.clone(), middleware::auth::auth_middleware))
+        .layer(CorsLayer::permissive())
 }

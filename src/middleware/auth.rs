@@ -25,6 +25,11 @@ pub async fn auth_middleware(
 ) -> impl IntoResponse {
     let path = request.uri().path().to_string();
 
+    // CORS preflight — bypass auth entirely
+    if request.method() == "OPTIONS" {
+        return next.run(request).await;
+    }
+
     // === Admin API JWT auth (if password configured) ===
     if path.starts_with("/admin/api/") {
         // Login endpoint is public
