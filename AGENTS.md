@@ -1,12 +1,33 @@
 # AGENTS.md — AxumRouter Project Rules
 
+## Golden Rule
+**Analisa dulu, edit setelah paham.** Sebelum ubah apapun, baca & pahami kode yang ada — struktur, aliran data, konteks.
+
+## Philosophy
+- **Clear** — readable > clever. Nama variable/fungsi jelas.
+- **Clean** — DRY. Satu tanggung jawab per fungsi. No dead code.
+- **Modern** — Rust edition 2021, fitur stabil terbaru.
+- **Modular** — file < 500 baris. Gede? Pecah.
+- **Maintainable** ��� kalo orang lain baca langsung ngerti.
+
+## Before Any Edit
+1. Baca struktur folder repo
+2. Pahamin alur data: input → process → output
+3. Identifikasi dependensi & side effects
+4. Baru edit
+
+## Conventions
+- `cargo build --release` tiap abis edit
+- Jangan leave commented code
+- Jangan tambah dependency kalo stdlib/crate existing cukup
+- Commit terpisah per logical change
+
 ## Project
-AxumRouter — OpenAI-compatible API Gateway di Rust (Axum).
-Multi-provider router. 15 providers (API Key, OAuth auth_code, OAuth device_code).
+OpenAI-compatible AI Gateway di Rust (Axum). Multi-provider router. 69+ providers (API Key, OAuth auth_code, OAuth device_code).
 
 ## Workspace
-- Backend: `axumrouter-backend/` (Rust, Axum 0.7, port 3000)
-- Frontend: `axumrouter-frontend/` (React/TypeScript, Vite, port 5173)
+- Backend: `backend/` (Rust, Axum 0.7, port 3000)
+- Frontend: `../frontend/` (React/TypeScript, Vite, port 5173)
 - DB: `data/axumrouter.db` (SQLite)
 - Binary: `target/release/axumrouter`
 

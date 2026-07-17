@@ -1,10 +1,14 @@
 # AxumRouter Provider Guide — Cara Tambah Provider Baru
 
+> **Sebelum mulai:** baca `GUIDE.md` dulu buat gambaran project, struktur, dan cara build.
+
 Target: tambah provider baru ke AxumRouter.
 
 Ada 2 pattern:
 1. **OpenAI-compatible (API Key)** — recommended, paling cepat
 2. **Full Custom (OAuth / special logic)** — untuk provider yang butuh auth custom
+
+Template file siap copy: `docs/provider_templates/apikey/`
 
 ---
 

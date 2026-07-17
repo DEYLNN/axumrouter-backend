@@ -130,7 +130,7 @@ fn chunk(model: &str, content: Option<String>, finish_reason: Option<String>) ->
         object: "chat.completion.chunk".to_string(),
         created: chrono::Utc::now().timestamp() as u64,
         model: model.to_string(),
-        choices: vec![ChunkChoice { index: 0, delta: Delta { role: None, content, tool_calls: None }, finish_reason }],
+        choices: vec![ChunkChoice { index: 0, delta: Delta { role: None, content, reasoning_content: None, tool_calls: None }, finish_reason }],
         usage: None,
     }
 }

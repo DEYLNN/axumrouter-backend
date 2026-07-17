@@ -2,6 +2,7 @@ use crate::error::GatewayError;
 use crate::types::chat::{ChatCompletionChunk, ChatCompletionResponse};
 use futures::stream::BoxStream;
 use futures::StreamExt;
+use futures::FutureExt;
 use reqwest::Client;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -370,44 +371,50 @@ impl FbClient {
         }
 
         let buf = Arc::new(Mutex::new(String::new()));
-        let stream = response.bytes_stream().filter_map(move |chunk| {
-            let buf = buf.clone();
-            async move {
+        let stream = async_stream::stream! {
+            use futures::StreamExt;
+            let mut byte_stream = response.bytes_stream();
+            while let Some(chunk) = byte_stream.next().await {
                 let chunk = match chunk {
                     Ok(c) => c,
-                    Err(e) => return Some(Err(GatewayError::ProviderError(format!("FreeBuff stream: {}", e)))),
+                    Err(e) => { yield Err(GatewayError::ProviderError(format!("FreeBuff stream: {}", e))); continue; }
                 };
                 let text = String::from_utf8_lossy(&chunk);
-                let mut buffer = buf.lock().unwrap();
-                buffer.push_str(&text);
-                // Try to extract complete lines
-                let mut results: Vec<Result<ChatCompletionChunk, GatewayError>> = Vec::new();
-                loop {
-                    if let Some(newline) = buffer.find('\n') {
-                        let line = buffer[..newline].trim().to_string();
-                        *buffer = buffer[newline + 1..].to_string();
-                        if line.is_empty() { continue; }
-                        if !line.starts_with("data: ") { continue; }
-                        let data = line[6..].trim();
-                        if data.is_empty() || data == "[DONE]" {
-                            results.push(Ok(ChatCompletionChunk {
-                                id: String::new(), object: String::new(), created: 0,
-                                model: String::new(), choices: vec![], usage: None,
-                            }));
-                            continue;
+
+                // Parse complete lines, hold lock only during extraction
+                let parsed: Vec<Result<ChatCompletionChunk, GatewayError>> = {
+                    let mut buffer = buf.lock().unwrap();
+                    buffer.push_str(&text);
+                    let mut results = Vec::new();
+                    loop {
+                        if let Some(newline) = buffer.find('\n') {
+                            let line = buffer[..newline].trim().to_string();
+                            *buffer = buffer[newline + 1..].to_string();
+                            if line.is_empty() { continue; }
+                            if !line.starts_with("data:") { continue; }
+                            let data = line[5..].trim();
+                            if data.is_empty() || data == "[DONE]" {
+                                results.push(Ok(ChatCompletionChunk {
+                                    id: String::new(), object: String::new(), created: 0,
+                                    model: String::new(), choices: vec![], usage: None,
+                                }));
+                                continue;
+                            }
+                            match serde_json::from_str::<ChatCompletionChunk>(data) {
+                                Ok(chunk) => results.push(Ok(chunk)),
+                                Err(e) => results.push(Err(GatewayError::ProviderError(format!("FreeBuff parse: {}", e)))),
+                            }
+                        } else {
+                            break;
                         }
-                        match serde_json::from_str::<ChatCompletionChunk>(data) {
-                            Ok(chunk) => results.push(Ok(chunk)),
-                            Err(e) => results.push(Err(GatewayError::ProviderError(format!("FreeBuff parse: {}", e)))),
-                        }
-                    } else {
-                        break;
                     }
+                    results
+                };
+                for result in parsed {
+                    yield result;
                 }
-                // Return first result if any, otherwise None (wait for more data)
-                if results.is_empty() { None } else { Some(results.remove(0)) }
             }
-        });
+        };
 
         Ok(Box::pin(stream))
     }
@@ -449,8 +456,8 @@ impl FbClient {
         for line in full_text.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() { continue; }
-            if !trimmed.starts_with("data: ") { continue; }
-            let data = trimmed[6..].trim();
+            if !trimmed.starts_with("data:") { continue; }
+            let data = trimmed[5..].trim();
             if data.is_empty() || data == "[DONE]" { continue; }
             if let Ok(chunk) = serde_json::from_str::<ChatCompletionChunk>(data) {
                 if resp_id.is_empty() && !chunk.id.is_empty() { resp_id = chunk.id.clone(); }

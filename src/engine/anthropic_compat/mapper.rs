@@ -210,21 +210,21 @@ impl Mapper {
             AnthropicStreamEvent::MessageStart(e) => {
                 state.message_id = e.message.id.clone();
                 state.model = e.message.model.clone();
-                chunks.push(self._make_chunk(state, Delta { role: Some("assistant".into()), content: None, tool_calls: None }, None));
+                chunks.push(self._make_chunk(state, Delta { role: Some("assistant".into()), content: None, reasoning_content: None, tool_calls: None }, None));
             }
             AnthropicStreamEvent::ContentBlockStart(e) => {
                 match &e.content_block {
                     ResponseContentBlock::Text { text } => {
                         state.text_block_index = Some(e.index);
                         if !text.is_empty() {
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(text.clone()), tool_calls: None }, None));
+                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(text.clone()), reasoning_content: None, tool_calls: None }, None));
                         }
                     }
                     ResponseContentBlock::ToolUse { id, name, .. } => {
                         let idx = state.tool_call_index;
                         state.tool_call_index += 1;
                         chunks.push(self._make_chunk(state, Delta {
-                            role: None, content: None,
+                            role: None, content: None, reasoning_content: None,
                             tool_calls: Some(vec![ChunkToolCall {
                                 index: idx,
                                 id: Some(id.clone()),
@@ -236,15 +236,16 @@ impl Mapper {
                     }
                     ResponseContentBlock::Thinking { thinking, .. } => {
                         if !thinking.is_empty() {
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some("<think>".into()), tool_calls: None }, None));
+                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some("<think>".into()), reasoning_content: None, tool_calls: None }, None));
                             chunks.push(self._make_chunk(state, Delta {
                                 role: None,
+                                reasoning_content: None,
                                 content: None,
                                 tool_calls: None,
                             }, None));
                             // reasoning_content is not in Delta struct currently, so we put it inline
                             // Actually let's use content for simplicity
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(thinking.clone()), tool_calls: None }, None));
+                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(thinking.clone()), reasoning_content: None, tool_calls: None }, None));
                         }
                     }
                 }
@@ -252,12 +253,12 @@ impl Mapper {
             AnthropicStreamEvent::ContentBlockDelta(e) => {
                 match &e.delta {
                     ContentDelta::TextDelta { text } => {
-                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(text.clone()), tool_calls: None }, None));
+                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(text.clone()), reasoning_content: None, tool_calls: None }, None));
                     }
                     ContentDelta::InputJsonDelta { partial_json } => {
                         if let Some(tc_idx) = state.pending_tool_calls.get(&e.index) {
                             chunks.push(self._make_chunk(state, Delta {
-                                role: None, content: None,
+                                role: None, content: None, reasoning_content: None,
                                 tool_calls: Some(vec![ChunkToolCall {
                                     index: *tc_idx,
                                     id: None, type_: None,
@@ -267,7 +268,7 @@ impl Mapper {
                         }
                     }
                     ContentDelta::ThinkingDelta { thinking } => {
-                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(thinking.clone()), tool_calls: None }, None));
+                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(thinking.clone()), reasoning_content: None, tool_calls: None }, None));
                     }
                 }
             }
@@ -296,13 +297,13 @@ impl Mapper {
                     object: "chat.completion.chunk".into(),
                     created: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
                     model: state.model.clone(),
-                    choices: vec![ChunkChoice { index: 0, delta: Delta { role: None, content: None, tool_calls: None }, finish_reason: fr }],
+                    choices: vec![ChunkChoice { index: 0, delta: Delta { role: None, content: None, reasoning_content: None, tool_calls: None }, finish_reason: fr }],
                     usage,
                 });
             }
             AnthropicStreamEvent::MessageStop => {
                 if !state.finish_sent {
-                    chunks.push(self._make_chunk(state, Delta { role: None, content: None, tool_calls: None }, Some("stop".into())));
+                    chunks.push(self._make_chunk(state, Delta { role: None, content: None, reasoning_content: None, tool_calls: None }, Some("stop".into())));
                     state.finish_sent = true;
                 }
             }

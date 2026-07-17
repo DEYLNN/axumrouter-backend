@@ -68,7 +68,7 @@ impl CfClient {
             model: model.to_string(),
             choices: vec![ChunkChoice {
                 index: idx,
-                delta: Delta { role: None, content, tool_calls: None },
+                delta: Delta { role: None, content, reasoning_content: None, tool_calls: None },
                 finish_reason: finish,
             }],
             usage: usage.clone(),

@@ -137,7 +137,7 @@ impl XaiClient {
                                 model: model.clone(),
                                 choices: vec![ChunkChoice {
                                     index: idx,
-                                    delta: Delta { role, content, tool_calls },
+                                    delta: Delta { role, content, reasoning_content: None, tool_calls },
                                     finish_reason: finish,
                                 }],
                                 usage: collected_usage.clone(),

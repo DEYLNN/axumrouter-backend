@@ -17,12 +17,10 @@ fn agent_id_for_model(backend_model: &str) -> &str {
     match backend_model {
         "deepseek/deepseek-v4-flash" => "base2-free-deepseek-flash",
         "deepseek/deepseek-v4-pro" => "base2-free-deepseek",
-        "moonshotai/kimi-k2.6" => "base2-free-kimi",
-        "minimax/minimax-m2.7" => "base2-free",
         "minimax/minimax-m3" => "base2-free-minimax-m3",
         "mimo/mimo-v2.5" => "base2-free-mimo",
         "mimo/mimo-v2.5-pro" => "base2-free-mimo-pro",
-        _ => "base2-free",
+        _ => "base2-free-deepseek-flash",
     }
 }
 
@@ -123,6 +121,7 @@ impl AccumulatingToolCall {
 
 fn assemble_from_chunks(chunks: &[ChatCompletionChunk], model: &str) -> ChatCompletionResponse {
     let mut content = String::new();
+    let mut reasoning = String::new();
     let mut finish_reason = None;
     let mut usage = None;
     let mut resp_id = String::new();
@@ -137,7 +136,10 @@ fn assemble_from_chunks(chunks: &[ChatCompletionChunk], model: &str) -> ChatComp
         if let Some(u) = &chunk.usage { usage = Some(u.clone()); }
         for choice in &chunk.choices {
             if let Some(delta_content) = &choice.delta.content {
-                content.push_str(delta_content);
+                if !delta_content.is_empty() { content.push_str(delta_content); }
+            }
+            if let Some(rc) = &choice.delta.reasoning_content {
+                if !rc.is_empty() { reasoning.push_str(rc); }
             }
             if let Some(fr) = &choice.finish_reason {
                 finish_reason = Some(fr.clone());
@@ -149,10 +151,10 @@ fn assemble_from_chunks(chunks: &[ChatCompletionChunk], model: &str) -> ChatComp
                         tool_calls_acc.resize_with(idx + 1, AccumulatingToolCall::new);
                     }
                     let acc = &mut tool_calls_acc[idx];
-                    if let Some(id) = &tc.id { acc.id = id.clone(); }
+                    if let Some(id) = &tc.id { if !id.is_empty() { acc.id = id.clone(); } }
                     if let Some(t) = &tc.type_ { acc.tool_type = Some(t.clone()); }
                     if let Some(fn_name) = tc.function.as_ref().and_then(|f| f.name.as_ref()) {
-                        acc.fn_name.push_str(fn_name);
+                        if !fn_name.is_empty() { acc.fn_name.push_str(fn_name); }
                     }
                     if let Some(fn_args) = tc.function.as_ref().and_then(|f| f.arguments.as_ref()) {
                         acc.fn_args.push_str(fn_args);
@@ -171,17 +173,19 @@ fn assemble_from_chunks(chunks: &[ChatCompletionChunk], model: &str) -> ChatComp
         tool_calls_acc.clear();
     }
 
-    // If model returns empty content with no tool_calls after processing tool results,
-    // Hermes treats this as "no response". Inject a neutral placeholder.
-    let content_str = if content.is_empty() && tool_calls_acc.iter().all(|a| a.id.is_empty()) {
-        " ".to_string()
+    // OpenAI spec: content must be null (not "") when tool_calls present.
+    // Some clients reject content:"" + tool_calls.
+    let content_str = if content.is_empty() && tool_calls_acc.iter().any(|a| !a.id.is_empty()) {
+        None
+    } else if content.is_empty() && tool_calls_acc.iter().all(|a| a.id.is_empty()) {
+        Some(" ".to_string())
     } else {
-        content
+        Some(content)
     };
 
     let mut message = Message {
         role: "assistant".to_string(),
-        content: Some(content_str),
+        content: content_str,
         tool_calls: None,
         tool_call_id: None,
         name: None,
@@ -202,9 +206,10 @@ fn assemble_from_chunks(chunks: &[ChatCompletionChunk], model: &str) -> ChatComp
         }
     }
 
-    // Inject reasoning_content into the response via content prefix w/ separator, or via a custom field
-    // Official DeepSeek returns reasoning_content as a top-level field in the chunk delta
-    // We reconstruct it here as part of the final message
+    // Inject reasoning_content if present
+    if !reasoning.is_empty() {
+        message.reasoning_content = Some(reasoning);
+    }
 
     ChatCompletionResponse {
         id: if resp_id.is_empty() { format!("chatcmpl-freebuff-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()) } else { resp_id },

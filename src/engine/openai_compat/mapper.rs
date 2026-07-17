@@ -140,6 +140,7 @@ impl Mapper {
                 delta: crate::types::chat::Delta {
                     role: delta.role,
                     content: delta.content,
+                    reasoning_content: None,
                     tool_calls: delta.tool_calls,
                 },
                 finish_reason: chunk.choices.first().and_then(|c| c.finish_reason.clone()),

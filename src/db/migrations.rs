@@ -192,14 +192,6 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
     .await?;
 
     // Seed MiMo Code Free dummy key
-    match sqlx::query(
-        "INSERT OR IGNORE INTO api_keys (id, provider_id, key_value, label, is_active, key_type, created_at, updated_at) VALUES ('key_mcf_default', 'mcf', '{\"provider\":\"mimo-code-free\"}', 'MiMo Free', 1, 'apikey', datetime('now'), datetime('now'))"
-    )
-    .execute(pool)
-    .await {
-        Ok(_) => tracing::debug!("Seeded mcf dummy key"),
-        Err(e) => tracing::warn!("Seed mcf skipped: {}", e),
-    }
 
     tracing::info!("Database migrations complete");
     Ok(())

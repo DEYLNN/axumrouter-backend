@@ -12,8 +12,10 @@ port = 3000
 timeout_secs = 120
 
 [auth]
-api_key_header = "Author...n"
+api_key_header = "Authorization"
 api_key_prefix = "Bearer "
+# admin_password = "your-admin-password"   # Set untuk enable admin login
+# jwt_secret = "your-jwt-secret-change-me" # Optional, fallback ke default dev
 
 [database]
 url = "sqlite:data/axumrouter.db?mode=rwc"

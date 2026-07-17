@@ -29,15 +29,13 @@ pub const FREEBUFF_MAX_MESSAGE_CHARS: usize = 16000;
 pub const FREEBUFF_MAX_TOOL_CHARS: usize = 8000;
 pub const FREEBUFF_MAX_TOOL_ARG_CHARS: usize = 6000;
 pub const FREEBUFF_CONTEXT_PRUNER_AGENT: &str = "context-pruner";
-pub const FREEBUFF_DEFAULT_MAX_TOKENS: u32 = 400;
+pub const FREEBUFF_DEFAULT_MAX_TOKENS: u32 = 4000;
 
 pub const CONTEXT_PRUNER_AGENT_ID: &str = "context-pruner";
 
 pub const AGENT_BY_MODEL: &[(&str, &str)] = &[
     ("deepseek/deepseek-v4-flash", "base2-free-deepseek-flash"),
     ("deepseek/deepseek-v4-pro", "base2-free-deepseek"),
-    ("moonshotai/kimi-k2.6", "base2-free-kimi"),
-    ("minimax/minimax-m2.7", "base2-free"),
     ("minimax/minimax-m3", "base2-free-minimax-m3"),
     ("mimo/mimo-v2.5", "base2-free-mimo"),
     ("mimo/mimo-v2.5-pro", "base2-free-mimo-pro"),
@@ -81,8 +79,6 @@ pub struct ModelDef {
 pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", backend_model: "deepseek/deepseek-v4-flash", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", backend_model: "deepseek/deepseek-v4-pro", max_tokens: 1000000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "kimi-k2.6", name: "Kimi K2.6", backend_model: "moonshotai/kimi-k2.6", max_tokens: 128000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "minimax-m2.7", name: "MiniMax M2.7", backend_model: "minimax/minimax-m2.7", max_tokens: 128000, supports_vision: false, supports_tools: true },
     ModelDef { id: "minimax-m3", name: "MiniMax M3", backend_model: "minimax/minimax-m3", max_tokens: 128000, supports_vision: false, supports_tools: true },
     ModelDef { id: "mimo-v2.5", name: "MiMo V2.5", backend_model: "mimo/mimo-v2.5", max_tokens: 1000000, supports_vision: true, supports_tools: true },
     ModelDef { id: "mimo-v2.5-pro", name: "MiMo V2.5 Pro", backend_model: "mimo/mimo-v2.5-pro", max_tokens: 1000000, supports_vision: true, supports_tools: true },

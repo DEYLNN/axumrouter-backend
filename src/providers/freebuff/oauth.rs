@@ -65,6 +65,12 @@ pub async fn poll(device_code: &str, fingerprint_hash: &str, expires_at: &str) -
     let client = reqwest::Client::new();
     let resp = client.get(&url).header("Accept", "application/json")
         .send().await.map_err(|e| format!("HTTP: {}", e))?;
+
+    // 401 means not yet authorized (pending)
+    if resp.status().as_u16() == 401 {
+        return Ok(serde_json::json!({"error": "authorization_pending", "message": "Waiting for credentials"}));
+    }
+
     let text = resp.text().await.map_err(|e| format!("Body: {}", e))?;
     let data: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::json!({"error":"parse_failed"}));
 
@@ -81,7 +87,8 @@ pub async fn poll(device_code: &str, fingerprint_hash: &str, expires_at: &str) -
         }));
     }
 
-    Ok(data) // {error: "Authentication failed"} or similar
+    // Not yet authorized — return pending (not raw error)
+    Ok(serde_json::json!({"error": "authorization_pending", "message": "Waiting for credentials"}))
 }
 
 pub async fn save_token(state: &Arc<crate::state::AppState>, data: &serde_json::Value) -> Result<(), String> {
