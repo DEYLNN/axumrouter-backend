@@ -178,7 +178,7 @@ impl Provider for OpenAICompatibleProvider {
                                 buffer = buffer[frame_end + 2..].to_string();
                                 for line in frame.lines() {
                                     let line = line.trim();
-                                    if line.is_empty() || line == "data: [DONE]" { continue; }
+                                    if line.is_empty() || !line.starts_with("data: ") { continue; }
                                     match mapper.parse_stream_chunk(line) {
                                         Ok(sse_chunk) => {
                                             if !first_chunk_received {
