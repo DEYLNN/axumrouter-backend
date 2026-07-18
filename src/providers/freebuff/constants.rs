@@ -79,7 +79,7 @@ pub struct ModelDef {
 pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", backend_model: "deepseek/deepseek-v4-flash", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", backend_model: "deepseek/deepseek-v4-pro", max_tokens: 1000000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "minimax-m3", name: "MiniMax M3", backend_model: "minimax/minimax-m3", max_tokens: 128000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "minimax-m3", name: "MiniMax M3", backend_model: "minimax/minimax-m3", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "mimo-v2.5", name: "MiMo V2.5", backend_model: "mimo/mimo-v2.5", max_tokens: 1000000, supports_vision: true, supports_tools: true },
     ModelDef { id: "mimo-v2.5-pro", name: "MiMo V2.5 Pro", backend_model: "mimo/mimo-v2.5-pro", max_tokens: 1000000, supports_vision: true, supports_tools: true },
 ];

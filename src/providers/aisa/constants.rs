@@ -1,16 +1,16 @@
 use crate::engine::openai_compat::config::ModelDef;
 use crate::providers::spec::ProviderQuirks;
 
-pub const PROVIDER_ID: &str = "zyl";
-pub const PROVIDER_NAME: &str = "Zyloo";
-pub const MODEL_PREFIX: &str = "zyl";
-pub const BASE_URL: &str = "https://api.zyloo.com";
-pub const VALIDATE_URL: &str = "https://api.zyloo.com/v1/models";
+pub const PROVIDER_ID: &str = "aio";
+pub const PROVIDER_NAME: &str = "Aisa One";
+pub const MODEL_PREFIX: &str = "aio";
+pub const BASE_URL: &str = "https://api.aisa.one";
+pub const VALIDATE_URL: &str = "https://api.aisa.one/v1/models";
 pub const CATEGORY: &str = "apikey";
-pub const COLOR: &str = "#8B5CF6";
-pub const ICON_NAME: &str = "zyloo.png";
-pub const DOCS_URL: &str = "https://zyloo.com";
-pub const API_KEY_URL: &str = "https://zyloo.com";
+pub const COLOR: &str = "#F472B6";
+pub const ICON_NAME: &str = "aisa.png";
+pub const DOCS_URL: &str = "https://aisa.one";
+pub const API_KEY_URL: &str = "https://aisa.one";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 120;
 
 pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
@@ -34,8 +34,9 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
 }
 
 pub const MODELS: &[ModelDef] = &[
+    ModelDef { id: "tencent/hy3", name: "Tencent Hy3", max_tokens: 262144, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", max_tokens: 1000000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "kimi-k2", name: "Kimi K2", max_tokens: 262144, supports_vision: false, supports_tools: true },
+    ModelDef { id: "claude-sonnet-5", name: "Claude Sonnet 5", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "kimi-k3", name: "Kimi K3", max_tokens: 1000000, supports_vision: false, supports_tools: true },
 ];

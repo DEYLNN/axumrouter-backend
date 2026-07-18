@@ -15,7 +15,7 @@ pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
 
 pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "north-mini-code-free", name: "North Mini Code Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", max_tokens: 128000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "nemotron-3-ultra-free", name: "Nemotron 3 Ultra Free", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "mimo-v2.5-free", name: "MiMo V2.5 Free", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek-v4-flash-free", name: "DeepSeek V4 Flash Free", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "hy3-free", name: "Tencent Hy3 Free", max_tokens: 262144, supports_vision: false, supports_tools: true },

@@ -66,4 +66,8 @@ pub mod volcengine_ark;
 pub mod yunwu;
 pub mod zai;
 pub mod zenmux;
+pub mod concentrate;
+pub mod novita;
+pub mod cheaper_inference;
+pub mod aisa;
 pub mod zyloo;

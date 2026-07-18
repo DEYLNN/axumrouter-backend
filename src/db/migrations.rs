@@ -193,6 +193,14 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
 
     // Seed MiMo Code Free dummy key
 
+    // Migration v6: add min_context to combos
+    match sqlx::query(    "ALTER TABLE combos ADD COLUMN min_context INTEGER NOT NULL DEFAULT 0")
+    .execute(pool)
+    .await {
+        Ok(_) => tracing::debug!("Migration applied: combos.min_context"),
+        Err(e) => tracing::warn!("Migration skipped: {}", e),
+    }
+
     tracing::info!("Database migrations complete");
     Ok(())
 }

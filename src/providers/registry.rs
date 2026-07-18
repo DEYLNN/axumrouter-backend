@@ -53,6 +53,10 @@ impl ProviderRegistry {
         register_provider!(registry, "lc", crate::providers::longcat::new_with_keys);
         register_provider!(registry, "zyl", crate::providers::zyloo::new_with_keys);
         register_provider!(registry, "tr", crate::providers::tokenrouter::new_with_keys);
+        register_provider!(registry, "conc", crate::providers::concentrate::new_with_keys);
+        register_provider!(registry, "nov", crate::providers::novita::new_with_keys);
+        register_provider!(registry, "chi", crate::providers::cheaper_inference::new_with_keys);
+        register_provider!(registry, "aio", crate::providers::aisa::new_with_keys);
         register_provider!(registry, "0g", crate::providers::oglabs::new_with_keys);
         register_provider!(registry, "mrph", crate::providers::morph::new_with_keys);
         register_provider!(registry, "hus", crate::providers::husada::new_with_keys);

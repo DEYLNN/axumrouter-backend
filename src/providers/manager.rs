@@ -71,15 +71,40 @@ impl ProviderManager {
         Ok(())
     }
 
-    /// Aggregate models from all providers
+    /// Aggregate models from all providers (skips those with zero keys).
+    /// Also includes combo models from the combos table.
     pub async fn list_all_models(&self) -> Vec<Model> {
         let mut all = Vec::new();
         for (_name, provider) in &self.active {
+            if provider.total_keys() == 0 {
+                continue;
+            }
             if let Ok(models) = provider.list_models().await {
                 all.extend(models);
             }
         }
+        // Also load combo models for /v1/models visibility
+        let combo_models = Self::load_combo_models(&self.db).await;
+        all.extend(combo_models);
         all
+    }
+
+    /// Fetch combos from DB and represent as Model entries for /v1/models
+    async fn load_combo_models(db: &SqlitePool) -> Vec<Model> {
+        sqlx::query_as::<_, (String, bool, u64)>(
+            "SELECT name, is_active, min_context FROM combos ORDER BY name"
+        )
+        .fetch_all(db)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(name, _is_active, min_ctx)| Model {
+            id: format!("combo/{}", name),
+            object: "model".to_string(),
+            owned_by: "combo".to_string(),
+            context_length: Some(min_ctx as u32),
+        })
+        .collect()
     }
 
     /// List all provider metadata

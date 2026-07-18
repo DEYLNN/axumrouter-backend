@@ -34,11 +34,5 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "mimo-v2.5-pro", name: "MiMo V2.5 Pro", max_tokens: 131072, supports_vision: false, supports_tools: true },
-    ModelDef { id: "mimo-v2.5", name: "MiMo V2.5", max_tokens: 131072, supports_vision: false, supports_tools: true },
-    ModelDef { id: "mimo-v2-pro", name: "MiMo V2 Pro", max_tokens: 131072, supports_vision: false, supports_tools: true },
-    ModelDef { id: "mimo-v2-flash", name: "MiMo V2 Flash", max_tokens: 131072, supports_vision: false, supports_tools: true },
-    ModelDef { id: "mimo-v2-omni", name: "MiMo V2 Omni", max_tokens: 131072, supports_vision: false, supports_tools: true },
-    ModelDef { id: "google/gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite Preview", max_tokens: 1048576, supports_vision: true, supports_tools: true },
-    ModelDef { id: "zai-org/GLM-5.1-FP8", name: "GLM 5.1 FP8", max_tokens: 202752, supports_vision: false, supports_tools: true },
+    ModelDef { id: "tencent/hy3:free", name: "Tencent Hy3 Free", max_tokens: 262144, supports_vision: false, supports_tools: true },
 ];

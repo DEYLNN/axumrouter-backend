@@ -10,11 +10,13 @@ use crate::types::chat::ChatCompletionRequest;
 
 struct ComboConfig {
     tiers: Vec<serde_json::Value>,
+    round_robin: bool,
+    min_context: u64,
 }
 
 async fn fetch_combo(db: &sqlx::SqlitePool, combo_name: &str) -> Result<ComboConfig, GatewayError> {
-    let row = sqlx::query_as::<_, (String, String, String, bool, bool)>(
-        "SELECT id, name, tiers, round_robin, is_active FROM combos WHERE name = ? OR id = ?"
+    let row = sqlx::query_as::<_, (String, String, String, bool, bool, u64)>(
+        "SELECT id, name, tiers, round_robin, is_active, min_context FROM combos WHERE name = ? OR id = ?"
     )
     .bind(combo_name)
     .bind(combo_name)
@@ -26,7 +28,7 @@ async fn fetch_combo(db: &sqlx::SqlitePool, combo_name: &str) -> Result<ComboCon
         model: combo_name.to_string(),
     })?;
 
-    let (_id, _name, tiers_str, _round_robin, is_active) = row;
+    let (_id, _name, tiers_str, round_robin, is_active, min_context) = row;
     if !is_active {
         return Err(GatewayError::ModelNotFound {
             provider: "combo".to_string(),
@@ -36,10 +38,10 @@ async fn fetch_combo(db: &sqlx::SqlitePool, combo_name: &str) -> Result<ComboCon
 
     let tiers = serde_json::from_str(&tiers_str)
         .map_err(|_| GatewayError::Internal("Invalid combo tiers".into()))?;
-    Ok(ComboConfig { tiers })
+    Ok(ComboConfig { tiers, round_robin, min_context })
 }
 
-/// Handle combo/xxx requests — non-streaming.
+/// Handle combo/xxx requests �� non-streaming.
 pub(crate) async fn handle_combo_request(
     state: Arc<AppState>,
     request: ChatCompletionRequest,
@@ -50,7 +52,14 @@ pub(crate) async fn handle_combo_request(
     let pm = state.provider_manager.read().await;
     let mut last_error = None;
 
-    for tier_val in &cfg.tiers {
+    let mut tier_order: Vec<usize> = (0..cfg.tiers.len()).collect();
+    if cfg.round_robin {
+        use rand::seq::SliceRandom;
+        tier_order.shuffle(&mut rand::thread_rng());
+    }
+
+    for idx in tier_order {
+        let tier_val = &cfg.tiers[idx];
         let provider_id = tier_val["provider"].as_str().unwrap_or("");
         let model_id = tier_val["model"].as_str().unwrap_or("");
 
@@ -61,9 +70,17 @@ pub(crate) async fn handle_combo_request(
             None => continue,
         };
 
-        if model_id == request.model { continue; }
-
+        // Clamp max_tokens to min_context to prevent overflow on weakest tier
         let mut tier_req = request.clone();
+        if cfg.min_context > 0 {
+            if let Some(mt) = tier_req.max_tokens {
+                if mt as u64 > cfg.min_context {
+                    tier_req.max_tokens = Some(cfg.min_context as u32);
+                }
+            } else {
+                tier_req.max_tokens = Some(cfg.min_context as u32);
+            }
+        }
         tier_req.model = model_id.to_string();
 
         match provider.chat_completion(tier_req).await {
@@ -112,15 +129,31 @@ pub(crate) async fn handle_combo_request_stream(
     let pm = state.provider_manager.read().await;
     let mut last_error = None;
 
-    for tier_val in &cfg.tiers {
+    let mut tier_order: Vec<usize> = (0..cfg.tiers.len()).collect();
+    if cfg.round_robin {
+        use rand::seq::SliceRandom;
+        tier_order.shuffle(&mut rand::thread_rng());
+    }
+
+    for idx in tier_order {
+        let tier_val = &cfg.tiers[idx];
         let provider_id = tier_val["provider"].as_str().unwrap_or("");
         let model_id = tier_val["model"].as_str().unwrap_or("");
 
         if provider_id.is_empty() || model_id.is_empty() { continue; }
         let provider = match pm.get(provider_id) { Some(p) => p, None => continue };
-        if model_id == request.model { continue; }
 
+        // Clamp max_tokens to min_context
         let mut tier_req = request.clone();
+        if cfg.min_context > 0 {
+            if let Some(mt) = tier_req.max_tokens {
+                if mt as u64 > cfg.min_context {
+                    tier_req.max_tokens = Some(cfg.min_context as u32);
+                }
+            } else {
+                tier_req.max_tokens = Some(cfg.min_context as u32);
+            }
+        }
         tier_req.model = model_id.to_string();
 
         match provider.chat_completion_stream(tier_req).await {
