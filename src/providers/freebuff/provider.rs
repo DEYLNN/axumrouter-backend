@@ -262,6 +262,8 @@ impl Provider for FbProvider {
         let backend_model = resolve_backend_model(&request.model);
         let agent_id = agent_id_for_model(&backend_model);
 
+        let mut retried = false;
+        loop {
         let (run_id, _child_run_id, instance_id) = self.run_lifecycle(&cred, agent_id, &backend_model).await.map_err(|e| {
             self.keys.lock_key(&key.id, 500, e.to_string());
             e
@@ -410,10 +412,21 @@ impl Provider for FbProvider {
         let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("?");
         tracing::info!(target: "freebuff", "chat: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
 
-        let stream = self.client.send_stream(body, &cred).await.map_err(|e| {
-            self.keys.lock_key(&key.id, 500, e.to_string());
-            e
-        })?;
+        // ── retry on 409 (session_superseded) ──
+        let stream = match self.client.send_stream(body, &cred).await {
+            Ok(s) => s,
+            Err(e) => {
+                if !retried && e.to_string().contains("409") {
+                    if let Some(ref iid) = instance_id {
+                        let _ = self.client.delete_free_session(&cred, iid).await;
+                    }
+                    retried = true;
+                    continue;
+                }
+                self.keys.lock_key(&key.id, 500, e.to_string());
+                return Err(e);
+            }
+        };
 
         use futures::StreamExt;
         let chunks: Vec<ChatCompletionChunk> = stream
@@ -435,11 +448,12 @@ impl Provider for FbProvider {
         let _ = self.client.record_run_step(&cred, &run_id, 2, &[]).await;
         let _ = self.client.finish_run(&cred, &run_id).await;
 
-        Ok(ChatResult {
+        break Ok(ChatResult {
             response,
             used_key_id: Some(key.id),
             failed_keys: Vec::new(),
         })
+        } // end loop
     }
 
     async fn chat_completion_stream(
@@ -451,6 +465,8 @@ impl Provider for FbProvider {
         let backend_model = resolve_backend_model(&request.model);
         let agent_id = agent_id_for_model(&backend_model);
 
+        let mut retried = false;
+        loop {
         let (run_id, _child_run_id, instance_id) = self.run_lifecycle(&cred, agent_id, &backend_model).await.map_err(|e| {
             self.keys.lock_key(&key.id, 500, e.to_string());
             e
@@ -598,19 +614,31 @@ impl Provider for FbProvider {
         let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("?");
         tracing::info!(target: "freebuff", "stream: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
 
-        let result = self.client.send_stream(body, &cred).await.map_err(|e| {
-            self.keys.lock_key(&key.id, 500, e.to_string());
-            e
-        });
+        // ��─ retry on 409 (session_superseded) ──
+        let result = match self.client.send_stream(body, &cred).await {
+            Ok(s) => Ok(s),
+            Err(e) => {
+                if !retried && e.to_string().contains("409") {
+                    if let Some(ref iid) = instance_id {
+                        let _ = self.client.delete_free_session(&cred, iid).await;
+                    }
+                    retried = true;
+                    continue;
+                }
+                self.keys.lock_key(&key.id, 500, e.to_string());
+                Err(e)
+            }
+        };
 
         let _ = self.client.record_run_step(&cred, &run_id, 2, &[]).await;
         let _ = self.client.finish_run(&cred, &run_id).await;
 
-        result.map(|stream| ChatStreamResult {
+        break result.map(|stream| ChatStreamResult {
             stream,
             used_key_id: Some(key.id),
             failed_keys: Vec::new(),
         })
+        } // end loop
     }
 
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {

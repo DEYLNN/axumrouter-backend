@@ -26,7 +26,7 @@
 OpenAI-compatible AI Gateway di Rust (Axum). Multi-provider router. 69+ providers (API Key, OAuth auth_code, OAuth device_code).
 
 ## Workspace
-- Backend: `backend/` (Rust, Axum 0.7, port 3000)
+- Backend: `backend/` (Rust, Axum 0.7, port 7444)
 - Frontend: `../frontend/` (React/TypeScript, Vite, port 5173)
 - DB: `data/axumrouter.db` (SQLite)
 - Binary: `target/release/axumrouter`
@@ -62,7 +62,7 @@ src/
 │   ├── auth_files.rs # auth files CRUD
 │   ├── routes/     # settings, providers, keys, gateway_keys, etc.
 │   └── oauth/      # per-provider: cx.rs, xai.rs, fb.rs, np.rs
-├── providers/      # 15 providers
+├── providers/      # 12 providers
 └── services/       # Business logic
     ├── caveman.rs, gateway.rs, tool_normalizer.rs, usage_tracking.rs
     └── rtk/        # Real Token Killer (P1 split)
@@ -92,7 +92,7 @@ src/
     ├── Logs.tsx, Usage.tsx, Quota.tsx, ProxyPool.tsx
 ```
 
-## Providers (15)
+## Providers (12)
 
 | ID  | Name              | Type     | Auth          | OAuth Flow      |
 |-----|-------------------|----------|---------------|-----------------|
@@ -103,7 +103,6 @@ src/
 | nrak| Nous Research     | API Key  | Bearer        | — |
 | xak | xAI API Key       | API Key  | Bearer        | — |
 | cl  | Cline             | API Key  | X-Api-Key     | — |
-| mcf | MiMo Code Free    | API Key  | JWT bootstrap | — |
 | cf  | Cloudflare        | API Key  | Bearer        | — |
 | cx  | OpenAI Codex      | OAuth    | Bearer        | authorization_code |
 | xai | xAI               | OAuth    | Bearer        | authorization_code |
@@ -124,7 +123,7 @@ src/
 
 ### Backend (.env atau AXUM_ prefix)
 ```
-AXUM_SERVER__PORT=3000
+AXUM_SERVER__PORT=7444
 AXUM_DATABASE__URL=sqlite:data/axumrouter.db?mode=rwc
 RUST_LOG=info
 RUST_LOG_FORMAT=     # set to "json" for prod
