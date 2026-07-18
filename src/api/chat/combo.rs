@@ -5,6 +5,7 @@ use axum::Json;
 use axum::response::IntoResponse;
 
 use crate::error::GatewayError;
+use crate::services::usage_tracking::{estimate_prompt_tokens, estimate_tokens_from_chars};
 use crate::state::AppState;
 use crate::types::chat::ChatCompletionRequest;
 
@@ -159,7 +160,7 @@ pub(crate) async fn handle_combo_request_stream(
         match provider.chat_completion_stream(tier_req).await {
             Ok(result) => {
                 let latency = start.elapsed().as_millis() as i64;
-                let _ = crate::db::log_usage(
+                let usage_id = crate::db::log_usage(
                     &state.db, provider_id,
                     result.used_key_id.as_deref(),
                     &model_id, "streaming", Some(200),
@@ -167,23 +168,54 @@ pub(crate) async fn handle_combo_request_stream(
                     Some(serde_json::to_string(&request).unwrap_or_default()),
                     None,
                     None,
-                ).await;
+                ).await.unwrap_or_default();
 
                 use axum::response::sse::Event;
                 use futures::StreamExt;
                 use std::convert::Infallible;
 
-                let stream = result.stream.map(|chunk| {
-                    match chunk {
-                        Ok(c) => {
-                            let json = serde_json::to_string(&c).unwrap_or_default();
-                            Ok::<_, Infallible>(Event::default().data(json))
-                        }
-                        Err(e) => {
-                            let err_json = serde_json::json!({
-                                "error": {"message": e.to_string(), "type": "stream_error", "code": "stream_error"}
-                            });
-                            Ok::<_, Infallible>(Event::default().data(err_json.to_string()))
+                let db = state.db.clone();
+                let usage_id = std::sync::Arc::new(usage_id);
+                let prompt_tokens_est = estimate_prompt_tokens(&request);
+                let accumulated_content = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+
+                let stream = result.stream.then(move |chunk| {
+                    let db = db.clone();
+                    let usage_id = usage_id.clone();
+                    let accumulated_content = accumulated_content.clone();
+                    async move {
+                        match chunk {
+                            Ok(c) => {
+                                for choice in &c.choices {
+                                    if let Some(content) = &choice.delta.content {
+                                        if let Ok(mut acc) = accumulated_content.lock() {
+                                            acc.push_str(content);
+                                        }
+                                    }
+                                }
+
+                                let should_update = c.usage.is_some()
+                                    || c.choices.iter().any(|c| c.finish_reason.is_some());
+                                if should_update && !usage_id.is_empty() {
+                                    let (pt, ct) = if let Some(usage) = &c.usage {
+                                        (usage.prompt_tokens as i64, usage.completion_tokens as i64)
+                                    } else {
+                                        let content_len = accumulated_content.lock().map(|s| s.len()).unwrap_or(0);
+                                        (prompt_tokens_est, estimate_tokens_from_chars(content_len))
+                                    };
+                                    let response_body = serde_json::to_string(&c).ok();
+                                    let _ = crate::db::update_usage_tokens(&db, &usage_id, pt, ct, response_body).await;
+                                }
+
+                                let json = serde_json::to_string(&c).unwrap_or_default();
+                                Ok::<_, Infallible>(Event::default().data(json))
+                            }
+                            Err(e) => {
+                                let err_json = serde_json::json!({
+                                    "error": {"message": e.to_string(), "type": "stream_error", "code": "stream_error"}
+                                });
+                                Ok::<_, Infallible>(Event::default().data(err_json.to_string()))
+                            }
                         }
                     }
                 });

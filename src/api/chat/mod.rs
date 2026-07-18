@@ -113,6 +113,10 @@ async fn chat_completions(
     let mut provider_request = request.clone();
     provider_request.model = model_name.to_string();
     provider_request.stream = Some(is_streaming);
+    // Inject stream_options for streaming — upstream may return usage chunks
+    if is_streaming && provider_request.stream_options.is_none() {
+        provider_request.stream_options = Some(serde_json::json!({"include_usage": true}));
+    }
     normalize_tool_messages(&mut provider_request.messages);
 
     // RTK: compress tool_result content before routing
