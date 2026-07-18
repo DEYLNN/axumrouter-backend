@@ -91,6 +91,7 @@ fn combos_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/admin/api/combos", get(routes::combos::api_list_combos))
         .route("/admin/api/combos", post(routes::combos::api_create_combo))
+        .route("/admin/api/combos/:id", post(routes::combos::api_update_combo))
         .route("/admin/api/combos/:id", delete(routes::combos::api_delete_combo))
         .route("/admin/api/combos/:id/toggle", post(routes::combos::api_toggle_combo))
         .route("/admin/api/combos/:id/roundrobin", post(routes::combos::api_toggle_roundrobin))

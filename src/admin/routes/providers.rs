@@ -22,6 +22,7 @@ pub struct ProviderListItem {
     pub active_keys: i64,
     pub locked_keys: i64,
     pub oauth_flow: Option<String>,
+    pub model_count: usize,
 }
 
 pub async fn api_providers(State(state): State<Arc<AppState>>) -> Json<Vec<ProviderListItem>> {
@@ -48,6 +49,7 @@ pub async fn api_providers(State(state): State<Arc<AppState>>) -> Json<Vec<Provi
                 active_keys: active,
                 locked_keys: locked,
                 oauth_flow: meta.oauth_flow.clone(),
+                model_count: p.list_models().await.unwrap_or_default().len(),
             });
         }
     }
@@ -88,6 +90,7 @@ pub async fn api_provider_detail(
                         "name": model_name,
                         "available": true,
                         "blocked": blocked.contains(&model_name),
+                        "context_length": m.context_length,
                     })
                 }).collect()
             }

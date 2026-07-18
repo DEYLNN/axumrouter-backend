@@ -107,11 +107,46 @@ pub async fn api_create_combo(
 
 /// Look up context_length for a model from provider manager
 async fn find_model_context(pm: &ProviderManager, model_id: &str) -> Option<u64> {
-    let all = pm.list_all_models().await;
+    let all = pm.list_all_models_unfiltered().await;
     all.iter().find(|m| m.id == model_id).and_then(|m| m.context_length.map(|c| c as u64))
 }
 
-/// Delete combo
+/// Update combo tiers
+pub async fn api_update_combo(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateComboRequest>,
+) -> Json<serde_json::Value> {
+    let tiers_json = serde_json::to_string(&req.tiers).unwrap_or_default();
+
+    let pm = state.provider_manager.read().await;
+    let mut min_ctx = u64::MAX;
+    for tier in &req.tiers {
+        if let Some(ctx) = find_model_context(&pm, &tier.model).await {
+            min_ctx = min_ctx.min(ctx);
+        }
+    }
+    drop(pm);
+    if min_ctx == u64::MAX { min_ctx = 0; }
+
+    let result = sqlx::query(
+        "UPDATE combos SET name = ?, description = ?, tiers = ?, min_context = ?, updated_at = datetime('now') WHERE id = ?"
+    )
+    .bind(&req.name)
+    .bind(&req.description.unwrap_or_default())
+    .bind(&tiers_json)
+    .bind(min_ctx as i64)
+    .bind(&id)
+    .execute(&state.db)
+    .await;
+
+    match result {
+            Ok(_) => Json(serde_json::json!({"ok": true, "id": id, "name": req.name, "min_context": min_ctx})),
+            Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+        }
+    }
+
+    /// Delete combo
 pub async fn api_delete_combo(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,

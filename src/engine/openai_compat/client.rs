@@ -128,7 +128,7 @@ impl Client {
 
         let resp = self
             .http
-            .get(self.config.validate_url)
+            .get(&self.config.validate_url)
             .headers(headers)
             .send()
             .await

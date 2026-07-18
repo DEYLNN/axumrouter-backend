@@ -89,6 +89,18 @@ impl ProviderManager {
         all
     }
 
+    /// Like list_all_models but includes providers with zero keys.
+    /// Used by combo context detector (may run before keys are added).
+    pub async fn list_all_models_unfiltered(&self) -> Vec<Model> {
+        let mut all = Vec::new();
+        for (_name, provider) in &self.active {
+            if let Ok(models) = provider.list_models().await {
+                all.extend(models);
+            }
+        }
+        all
+    }
+
     /// Fetch combos from DB and represent as Model entries for /v1/models
     async fn load_combo_models(db: &SqlitePool) -> Vec<Model> {
         sqlx::query_as::<_, (String, bool, u64)>(

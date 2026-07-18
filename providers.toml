@@ -1,0 +1,2674 @@
+[[providers]]
+id = "ocg"
+name = "OpenCode Go"
+category = "apikey"
+color = "#E87040"
+icon = "ocg.webp"
+base_url = "https://opencode.ai/zen/go"
+validate_url = "https://opencode.ai/auth"
+api_type = "openai"
+docs_url = "https://opencode.ai/auth"
+api_key_url = "https://opencode.ai/auth"
+timeout = 180
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "qwen3.7-max"
+name = "Qwen 3.7 Max"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.7-plus"
+name = "Qwen 3.7 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-plus"
+name = "Qwen 3.6 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.2"
+name = "GLM 5.2"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m3"
+name = "MiniMax M3"
+ctx = 524288
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.7-code"
+name = "Kimi K2.7 Code"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5"
+name = "Mimo V2.5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5-pro"
+name = "Mimo V2.5 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "mst"
+name = "Mistral AI"
+category = "apikey"
+color = "#FF7000"
+icon = "mistral.png"
+base_url = "https://api.mistral.ai"
+validate_url = "https://api.mistral.ai/v1/models"
+api_type = "openai"
+docs_url = "https://docs.mistral.ai"
+api_key_url = "https://console.mistral.ai/api-keys"
+timeout = 60
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "mistral-large-latest"
+name = "Mistral Large 3"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mistral-medium-latest"
+name = "Mistral Medium 3"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mistral-small-latest"
+name = "Mistral Small 3"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers]]
+id = "nov"
+name = "Novita AI"
+category = "apikey"
+color = "#8B5CF6"
+icon = "novita.png"
+base_url = "https://api.novita.ai/openai"
+validate_url = "https://api.novita.ai/openai/v1/models"
+api_type = "openai"
+docs_url = "https://novita.ai"
+api_key_url = "https://novita.ai"
+timeout = 120
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "tencent/hy3"
+name = "Tencent Hy3"
+ctx = 260000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "moonshotai/kimi-k3"
+name = "Moonshotai Kimi K3"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "zai-org/glm-5.2"
+name = "ZAI GLM 5.2"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "moonshotai/kimi-k2.7-code"
+name = "Moonshotai Kimi K2.7 Code"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek/deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek/deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax/minimax-m3"
+name = "MiniMax M3"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "ags"
+name = "Agnes AI"
+category = "apikey"
+color = "#8B5CF6"
+icon = "ags.png"
+base_url = "https://apihub.agnes-ai.com"
+validate_url = "https://apihub.agnes-ai.com/v1/models"
+api_type = "openai"
+docs_url = "https://agnes.ai"
+api_key_url = "https://agnes.ai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "agnes-2.0-flash"
+name = "Agnes 2.0 Flash"
+ctx = 500000
+vision = false
+tools = true
+
+[[providers]]
+id = "aio"
+name = "Aisa One"
+category = "apikey"
+color = "#F472B6"
+icon = "aisa.png"
+base_url = "https://api.aisa.one"
+validate_url = "https://api.aisa.one/v1/models"
+api_type = "openai"
+docs_url = "https://aisa.one"
+api_key_url = "https://aisa.one"
+timeout = 120
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "tencent/hy3"
+name = "Tencent Hy3"
+ctx = 260000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-sonnet-5"
+name = "Claude Sonnet 5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k3"
+name = "Kimi K3"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "ocf"
+name = "OpenCode Free"
+category = "apikey"
+color = "#E87040"
+icon = "ocf.webp"
+base_url = "https://opencode.ai/zen"
+validate_url = "https://opencode.ai/zen/v1/models"
+api_type = "openai"
+docs_url = "https://opencode.ai"
+api_key_url = "https://opencode.ai"
+timeout = 60
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "north-mini-code-free"
+name = "North Mini Code Free"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "nemotron-3-ultra-free"
+name = "Nemotron 3 Ultra Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5-free"
+name = "MiMo V2.5 Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash-free"
+name = "DeepSeek V4 Flash Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "hy3-free"
+name = "Tencent Hy3 Free"
+ctx = 260000
+vision = false
+tools = true
+[[providers]]
+id = "am"
+name = "AIMux"
+category = "apikey"
+color = "#6366F1"
+icon = "aimux.png"
+base_url = "https://aimux.id"
+validate_url = "https://aimux.id/v1/models"
+api_type = "openai"
+docs_url = "https://aimux.id"
+api_key_url = "https://aimux.id"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "am/claude-opus-4.7"
+name = "Claude Opus 4.7"
+ctx = 1000000
+vision = true
+tools = true
+
+[[providers.models]]
+id = "am/claude-opus-4.8"
+name = "Claude Opus 4.8"
+ctx = 1000000
+vision = true
+tools = true
+
+[[providers.models]]
+id = "am/glm-5"
+name = "GLM 5"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers]]
+id = "al"
+name = "Alibaba"
+category = "apikey"
+color = "#FF6A00"
+icon = "alibaba.png"
+base_url = "https://coding.dashscope.aliyuncs.com"
+validate_url = "https://coding.dashscope.aliyuncs.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "qwen3.5-plus"
+name = "Qwen 3.5 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.5"
+name = "Kimi K2.5"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5"
+name = "GLM 5"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "MiniMax-M2.5"
+name = "MiniMax M2.5"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-max"
+name = "Qwen 3 Max"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-next"
+name = "Qwen 3 Coder Next"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-plus"
+name = "Qwen 3 Coder Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-4.7"
+name = "GLM 4.7"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers]]
+id = "alc"
+name = "Alibaba Cloud"
+category = "apikey"
+color = "#FF6A00"
+icon = "alibaba-studio.png"
+base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode"
+validate_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models"
+api_type = "openai"
+docs_url = "https://modelstudio.console.alibabacloud.com"
+api_key_url = "https://modelstudio.console.alibabacloud.com/?apiKey=1"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "qwen3.7-plus"
+name = "Qwen3.7 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.7-max"
+name = "Qwen3.7 Max"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.1"
+name = "GLM 5.1"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v3.2"
+name = "DeepSeek V3.2"
+ctx = 163840
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-flash"
+name = "Qwen3.6 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-plus"
+name = "Qwen3.6 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.5-flash"
+name = "Qwen3.5 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-next"
+name = "Qwen3 Coder Next"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-plus"
+name = "Qwen3 Coder Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-235b-a22b"
+name = "Qwen3 235B A22B"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen-plus-latest"
+name = "Qwen Plus Latest"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen-max-2026-01-23"
+name = "Qwen Max"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "alin"
+name = "Alibaba Intl"
+category = "apikey"
+color = "#FF6A00"
+icon = "alibaba-intl.png"
+base_url = "https://coding-intl.dashscope.aliyuncs.com"
+validate_url = "https://coding-intl.dashscope.aliyuncs.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "qwen3.5-plus"
+name = "Qwen 3.5 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.5"
+name = "Kimi K2.5"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5"
+name = "GLM 5"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "MiniMax-M2.5"
+name = "MiniMax M2.5"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-next"
+name = "Qwen 3 Coder Next"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-plus"
+name = "Qwen 3 Coder Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-4.7"
+name = "GLM 4.7"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers]]
+id = "amb"
+name = "Ambient"
+category = "apikey"
+color = "#111827"
+icon = "ambient.png"
+base_url = "https://api.ambient.xyz"
+validate_url = "https://api.ambient.xyz/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "zai-org/GLM-5.1-FP8"
+name = "GLM 5.1 FP8"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers]]
+id = "btl"
+name = "Badtheory Labs"
+category = "apikey"
+color = "#8B5CF6"
+icon = "btl.jpg"
+base_url = "https://api.badtheorylabs.com"
+validate_url = "https://api.badtheorylabs.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1
+vision = false
+tools = true
+
+[[providers]]
+id = "bai"
+name = "B.AI"
+category = "apikey"
+color = "#000000"
+icon = "bai.png"
+base_url = "https://api.b.ai"
+validate_url = "https://api.b.ai/v1/models"
+api_type = "openai"
+docs_url = "https://b.ai"
+api_key_url = "https://b.ai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "glm-5.1"
+name = "GLM 5.1"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m3"
+name = "MiniMax M3"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m2.7"
+name = "MiniMax M2.7"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m2.5"
+name = "MiniMax M2.5"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.5"
+name = "Kimi K2.5"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5"
+name = "GLM 5"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v3.2"
+name = "DeepSeek V3.2"
+ctx = 163840
+vision = false
+tools = true
+
+[[providers]]
+id = "bmc"
+name = "BigModel China"
+category = "apikey"
+color = "#DC2626"
+icon = "glm.png"
+base_url = "https://open.bigmodel.cn/api/coding/paas/v4"
+validate_url = "https://open.bigmodel.cn/api/coding/paas/v4/models"
+api_type = "openai"
+docs_url = "https://open.bigmodel.cn"
+api_key_url = "https://open.bigmodel.cn/usercenter/apikeys"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "glm-5.1"
+name = "GLM 5.1"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5"
+name = "GLM 5"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-4.7"
+name = "GLM 4.7"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-4.6"
+name = "GLM 4.6"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-4.5-air"
+name = "GLM 4.5 Air"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "cwv"
+name = "CanopyWave"
+category = "apikey"
+color = "#15B8A6"
+icon = "canopywave.png"
+base_url = "https://inference.canopywave.io"
+validate_url = "https://inference.canopywave.io/v1/models"
+api_type = "openai"
+docs_url = "https://canopywave.io"
+api_key_url = "https://canopywave.io"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "minimax/minimax-m2.5"
+name = "MiniMax M2.5"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "moonshotai/kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "xiaomimimo/mimo-v2.5"
+name = "MiMo V2.5"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "cv"
+name = "Cavoti"
+category = "apikey"
+color = "#10B981"
+icon = "cavoti.png"
+base_url = "https://cavoti.com"
+validate_url = "https://cavoti.com/v1/models"
+api_type = "openai"
+docs_url = "https://cavoti.com"
+api_key_url = "https://cavoti.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "gpt-5.5"
+name = "GPT 5.5"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "cer"
+name = "Cerebras"
+category = "apikey"
+color = "#FF4F00"
+icon = "cerebras.png"
+base_url = "https://api.cerebras.ai"
+validate_url = "https://api.cerebras.ai/v1/models"
+api_type = "openai"
+docs_url = "https://www.cerebras.ai"
+api_key_url = "https://cloud.cerebras.ai/platform"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "qwen-3-coder-480b"
+name = "Qwen3 Coder 480B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-4-maverick-17b-128e-instruct"
+name = "Llama 4 Maverick"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers.models]]
+id = "gpt-oss-120b"
+name = "GPT OSS 120B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "zai-glm-4.7"
+name = "ZAI GLM 4.7"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.3-70b"
+name = "Llama 3.3 70B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-4-scout-17b-16e-instruct"
+name = "Llama 4 Scout"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers.models]]
+id = "qwen-3-235b-a22b-instruct-2507"
+name = "Qwen3 235B A22B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen-3-32b"
+name = "Qwen3 32B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama3.1-8b"
+name = "Llama 3.1 8B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "chi"
+name = "Cheaper Inference"
+category = "apikey"
+color = "#10B981"
+icon = "cheaper_inference.png"
+base_url = "https://api.cheaperinference.com"
+validate_url = "https://api.cheaperinference.com/v1/models"
+api_type = "openai"
+docs_url = "https://cheaperinference.com"
+api_key_url = "https://cheaperinference.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "hy3"
+name = "Tencent Hy3"
+ctx = 260000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-sonnet-5"
+name = "Claude Sonnet 5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.2"
+name = "GLM 5.2"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gpt-5.6-sol"
+name = "GPT 5.6 Sol"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-opus-4.8"
+name = "Claude Opus 4.8"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-fable-5"
+name = "Claude Fable 5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "cl"
+name = "Cline"
+category = "apikey"
+color = "#5B9BD5"
+icon = "cl.png"
+base_url = "https://api.cline.bot/api"
+validate_url = "https://api.cline.bot/api/v1/models"
+api_type = "openai"
+docs_url = "https://cline.bot"
+api_key_url = "https://cline.bot"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "tencent/hy3"
+name = "Tencent Hy3"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers]]
+id = "conc"
+name = "Concentrate AI"
+category = "apikey"
+color = "#3B82F6"
+icon = "concentrate.png"
+base_url = "https://api.concentrate.ai"
+validate_url = "https://api.concentrate.ai/v1/models"
+api_type = "openai"
+docs_url = "https://concentrate.ai"
+api_key_url = "https://concentrate.ai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "hy3"
+name = "Tencent Hy3"
+ctx = 260000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gpt-oss-20b"
+name = "GPT OSS 20B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gpt-oss-120b"
+name = "GPT OSS 120B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1040000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m3"
+name = "MiniMax M3"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5"
+name = "MiMo V2.5"
+ctx = 1000000
+vision = true
+tools = true
+
+[[providers.models]]
+id = "claude-sonnet-5"
+name = "Claude Sonnet 5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-haiku-4-5"
+name = "Claude Haiku 4.5"
+ctx = 200000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-opus-4-5"
+name = "Claude Opus 4.5"
+ctx = 200000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-fable-5"
+name = "Claude Fable 5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gpt-5.6-sol"
+name = "GPT 5.6 Sol"
+ctx = 1050000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "grok-4.5"
+name = "Grok 4.5"
+ctx = 500000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gemini-3.5-flash"
+name = "Gemini 3.5 Flash"
+ctx = 1048576
+vision = true
+tools = true
+
+[[providers]]
+id = "co"
+name = "Conduit Ozdoev"
+category = "apikey"
+color = "#0EA5E9"
+icon = "conduit.jpg"
+base_url = "https://conduit.ozdoev.net/api"
+validate_url = "https://conduit.ozdoev.net/api/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "anthropic/claude-sonnet-4-6"
+name = "Claude Sonnet 4.6"
+ctx = 1
+vision = true
+tools = true
+
+[[providers.models]]
+id = "claude-haiku-4-5"
+name = "Claude Haiku 4.5"
+ctx = 256
+vision = true
+tools = true
+
+[[providers]]
+id = "evo"
+name = "Evomap"
+category = "apikey"
+color = "#111827"
+icon = "evomap.svg"
+base_url = "https://api.evomap.ai"
+validate_url = "https://api.evomap.ai/v1/models"
+api_type = "openai"
+docs_url = "https://evomap.ai"
+api_key_url = "https://evomap.ai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "evomap-gemini-3.1-pro-preview"
+name = "Gemini 3.1 Pro Preview"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers.models]]
+id = "evomap-deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "evomap-claude-opus-4-7"
+name = "Claude Opus 4.7"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers.models]]
+id = "evomap-glm-5.1"
+name = "GLM 5.1"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "evomap-gpt-5.5"
+name = "GPT 5.5"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "evomap-kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "glb"
+name = "Gitlawb"
+category = "apikey"
+color = "#111827"
+icon = "gitlawb.png"
+base_url = "https://opengateway.gitlawb.com"
+validate_url = "https://opengateway.gitlawb.com/v1/models"
+api_type = "openai"
+docs_url = "https://gitlawb.com/opengateway"
+api_key_url = "https://gitlawb.com/opengateway/dashboard"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "tencent/hy3:free"
+name = "Tencent Hy3 Free"
+ctx = 260000
+vision = false
+tools = true
+
+[[providers]]
+id = "gmi"
+name = "GMI Cloud"
+category = "apikey"
+color = "#0EA5E9"
+icon = "gmi-cloud.jpg"
+base_url = "https://api.gmi-serving.com"
+validate_url = "https://api.gmi-serving.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "x-ai/grok-4.5"
+name = "Grok 4.5"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "tencent/Hy3"
+name = "Hy3"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers]]
+id = "gq"
+name = "Groq"
+category = "apikey"
+color = "#F55036"
+icon = "groq.png"
+base_url = "https://api.groq.com/openai"
+validate_url = "https://api.groq.com/openai/v1/models"
+api_type = "openai"
+docs_url = "https://groq.com"
+api_key_url = "https://console.groq.com/keys"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "groq/compound"
+name = "Compound"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "groq/compound-mini"
+name = "Compound Mini"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.3-70b-versatile"
+name = "Llama 3.3 70B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "meta-llama/llama-4-maverick-17b-128e-instruct"
+name = "Llama 4 Maverick"
+ctx = 1048576
+vision = true
+tools = true
+
+[[providers.models]]
+id = "qwen/qwen3-32b"
+name = "Qwen3 32B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "openai/gpt-oss-120b"
+name = "GPT-OSS 120B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "openai/gpt-oss-20b"
+name = "GPT-OSS 20B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.1-8b-instant"
+name = "Llama 3.1 8B Instant"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "hus"
+name = "Husada"
+category = "apikey"
+color = "#10B981"
+icon = "husada.jpg"
+base_url = "https://husada.net"
+validate_url = "https://husada.net/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "gemini-3.5-flash-extra-low"
+name = "Gemini 3.5 Flash Extra Low"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gemini-3.5-flash-low"
+name = "Gemini 3.5 Flash Low"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gemini-3.1-pro-low"
+name = "Gemini 3.1 Pro Low"
+ctx = 2097152
+vision = false
+tools = true
+
+[[providers]]
+id = "kim"
+name = "Kimchi"
+category = "apikey"
+color = "#FF5A3D"
+icon = "kimchi.jpg"
+base_url = "https://llm.kimchi.dev/openai"
+validate_url = "https://llm.kimchi.dev/openai/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 262
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m3"
+name = "MiniMax M3"
+ctx = 1
+vision = false
+tools = true
+
+[[providers]]
+id = "kimi"
+name = "Kimi"
+category = "apikey"
+color = "#1E3A8A"
+icon = "kimi.png"
+base_url = "https://api.kimi.com/coding"
+validate_url = "https://api.kimi.com/coding/v1/messages"
+api_type = "anthropic"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2.5"
+name = "Kimi K2.5"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers]]
+id = "llm7"
+name = "LLM7"
+category = "apikey"
+color = "#0EA5E9"
+icon = "llm7.png"
+base_url = "https://api.llm7.io"
+validate_url = "https://api.llm7.io/v1/models"
+api_type = "openai"
+docs_url = "https://llm7.io"
+api_key_url = "https://llm7.io"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "gpt-oss-20b"
+name = "GPT OSS 20B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "codestral-latest"
+name = "Codestral"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "GLM-4.6V-Flash"
+name = "GLM 4.6V Flash"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers.models]]
+id = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+name = "Llama 3.1 8B Turbo"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "ministral-8b-2512"
+name = "Ministral 8B"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "devstral-small-2:24b-cloud"
+name = "Devstral Small 2 24B"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v3.1:671b-terminus"
+name = "DeepSeek V3.1 Terminus"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "lc"
+name = "LongCat"
+category = "apikey"
+color = "#FF8C00"
+icon = "longcat.png"
+base_url = "https://api.longcat.chat/openai"
+validate_url = "https://api.longcat.chat/openai/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "LongCat-2.0-Preview"
+name = "LongCat 2.0 Preview"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers]]
+id = "mmx"
+name = "MiniMax"
+category = "apikey"
+color = "#7C3AED"
+icon = "minimax.png"
+base_url = "https://api.minimax.io/anthropic"
+validate_url = "https://api.minimax.io/anthropic/v1/messages"
+api_type = "anthropic"
+docs_url = "https://www.minimaxi.com"
+api_key_url = "https://www.minimaxi.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "MiniMax-M2.7"
+name = "MiniMax M2.7"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "MiniMax-M2.5"
+name = "MiniMax M2.5"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "MiniMax-M2.1"
+name = "MiniMax M2.1"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers]]
+id = "mmxcn"
+name = "MiniMax China"
+category = "apikey"
+color = "#DC2626"
+icon = "minimax-cn.png"
+base_url = "https://api.minimaxi.com/anthropic"
+validate_url = "https://api.minimaxi.com/anthropic/v1/messages"
+api_type = "anthropic"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "MiniMax-M2.7"
+name = "MiniMax M2.7"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "MiniMax-M2.5"
+name = "MiniMax M2.5"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "MiniMax-M2.1"
+name = "MiniMax M2.1"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers]]
+id = "mrph"
+name = "Morph LLM"
+category = "apikey"
+color = "#6B4FBB"
+icon = "morph.png"
+base_url = "https://api.morphllm.com"
+validate_url = "https://api.morphllm.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "morph-minimax3-428b"
+name = "Morph MiniMax3 428B"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "morph-dsv4flash"
+name = "Morph DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "morph-qwen35-397b"
+name = "Morph Qwen3.5 397B"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "morph-qwen36-27b"
+name = "Morph Qwen3.6 27B"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "nzc"
+name = "Nabz Clan"
+category = "apikey"
+color = "#FF6B35"
+icon = "nabz-clan.jpg"
+base_url = "https://lumyx-ai.site/api"
+validate_url = "https://lumyx-ai.site/api/v1/models"
+api_type = "openai"
+docs_url = "https://lumyx-ai.site"
+api_key_url = "https://lumyx-ai.site"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "minimax-m3"
+name = "MiniMax M3"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers]]
+id = "nry"
+name = "Naraya AI"
+category = "apikey"
+color = "#8B5CF6"
+icon = "naraya-ai.png"
+base_url = "https://router.bynara.id"
+validate_url = "https://router.bynara.id/v1/models"
+api_type = "openai"
+docs_url = "https://bynara.id"
+api_key_url = "https://bynara.id"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "mistral-medium-3-5"
+name = "Mistral Medium 3.5"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mistral-large"
+name = "Mistral Large"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5-pro-free"
+name = "MiMo V2.5 Pro Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5-free"
+name = "MiMo V2.5 Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "nak"
+name = "Nous"
+category = "apikey"
+color = "#2563EB"
+icon = "nrak.png"
+base_url = "https://inference-api.nousresearch.com/v1"
+validate_url = "https://inference-api.nousresearch.com/v1/models"
+api_type = "openai"
+docs_url = "https://portal.nousresearch.com/help"
+api_key_url = "https://portal.nousresearch.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "Hermes-4-70B"
+name = "Hermes 4 70B"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "Hermes-3-Llama-3.1-70B"
+name = "Hermes 3 70B"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "Hermes-3-Llama-3.1-8B"
+name = "Hermes 3 8B"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "Hermes-3-Llama-3.2-3B"
+name = "Hermes 3 3B"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers]]
+id = "ocz"
+name = "Ocenza"
+category = "apikey"
+color = "#0EA5E9"
+icon = "ocenza.jpg"
+base_url = "https://ocenza.com"
+validate_url = "https://ocenza.com/v1/models"
+api_type = "openai"
+docs_url = "https://ocenza.com"
+api_key_url = "https://ocenza.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "gpt-oss-120b"
+name = "GPT OSS 120B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "step-3.5-flash-2603"
+name = "Step 3.5 Flash"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers]]
+id = "0g"
+name = "0G Labs"
+category = "apikey"
+color = "#111827"
+icon = "0g-labs.jpg"
+base_url = "https://router-api.0g.ai"
+validate_url = "https://router-api.0g.ai/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "minimax-m3"
+name = "MiniMax M3"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "claude-fable-5"
+name = "Claude Fable 5"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "om"
+name = "OpenModel"
+category = "apikey"
+color = "#6366F1"
+icon = "openmodel.jpg"
+base_url = "https://api.openmodel.app"
+validate_url = "https://api.openmodel.app/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1
+vision = false
+tools = true
+
+[[providers]]
+id = "or"
+name = "OpenRouter"
+category = "apikey"
+color = "#F97316"
+icon = "openrouter.png"
+base_url = "https://openrouter.ai/api"
+validate_url = "https://openrouter.ai/api/v1/models"
+api_type = "openai"
+docs_url = "https://openrouter.ai"
+api_key_url = "https://openrouter.ai/settings/keys"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "poolside/laguna-m.1:free"
+name = "Poolside Laguna M.1 (Free)"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "openai/gpt-oss-120b:free"
+name = "OpenAI GPT OSS 120B (Free)"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "nvidia/nemotron-3-super-120b-a12b:free"
+name = "NVIDIA Nemotron 3 Super (Free)"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax/minimax-m2.5:free"
+name = "MiniMax M2.5 (Free)"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers]]
+id = "poll"
+name = "Pollinations"
+category = "apikey"
+color = "#22C55E"
+icon = "pollinations.png"
+base_url = "https://text.pollinations.ai/openai/v1"
+validate_url = "https://text.pollinations.ai/openai/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "openai-fast"
+name = "GPT-OSS 20B (Pollinations)"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "qiniu"
+name = "Qiniu"
+category = "apikey"
+color = "#3B82F6"
+icon = "qiniu.png"
+base_url = "https://api.qnaigc.com"
+validate_url = "https://api.qnaigc.com/v1/models"
+api_type = "openai"
+docs_url = "https://portal.qiniu.com"
+api_key_url = "https://portal.qiniu.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v3"
+name = "DeepSeek V3"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "qc"
+name = "Qwen Cloud"
+category = "apikey"
+color = "#1677FF"
+icon = "qwencloud.png"
+base_url = "https://dashscope-intl.aliyuncs.com/compatible-mode"
+validate_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models"
+api_type = "openai"
+docs_url = "https://dashscope.console.aliyun.com"
+api_key_url = "https://dashscope.console.aliyun.com/apiKey"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "qwen3.7-max"
+name = "Qwen3.7 Max"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.7-plus"
+name = "Qwen3.7 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-max-preview"
+name = "Qwen3.6 Max Preview"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-plus"
+name = "Qwen3.6 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-flash"
+name = "Qwen3.6 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-27b"
+name = "Qwen3.6 27B"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.6-35b-a3b"
+name = "Qwen3.6 35B A3B"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.5-plus"
+name = "Qwen3.5 Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3.5-flash"
+name = "Qwen3.5 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-max"
+name = "Qwen3 Max"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-235b-a22b"
+name = "Qwen3 235B A22B"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-32b"
+name = "Qwen3 32B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-plus"
+name = "Qwen3 Coder Plus"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "qwen3-coder-flash"
+name = "Qwen3 Coder Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.2"
+name = "GLM 5.2"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.1"
+name = "GLM 5.1"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v3.2"
+name = "DeepSeek V3.2"
+ctx = 163840
+vision = false
+tools = true
+
+[[providers]]
+id = "rwy"
+name = "Routeway AI"
+category = "apikey"
+color = "#6366F1"
+icon = "routeway.png"
+base_url = "https://api.routeway.ai"
+validate_url = "https://api.routeway.ai/v1/models"
+api_type = "openai"
+docs_url = "https://routeway.ai"
+api_key_url = "https://routeway.ai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "ling-2.6-flash:free"
+name = "Ling 2.6 Flash Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gemma-4-31b-it:free"
+name = "Gemma 4 31B IT Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "step-3.5-flash:free"
+name = "Step 3.5 Flash Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "nemotron-3-nano-30b-a3b:free"
+name = "Nemotron 3 Nano 30B A3B Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "minimax-m2:free"
+name = "MiniMax M2 Free"
+ctx = 204800
+vision = false
+tools = true
+
+[[providers.models]]
+id = "laguna-xs.2:free"
+name = "Laguna XS.2 Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "laguna-m.1:free"
+name = "Laguna M.1 Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "nemotron-nano-9b-v2:free"
+name = "Nemotron Nano 9B V2 Free"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gpt-oss-120b:free"
+name = "GPT OSS 120B Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-4.5-air:free"
+name = "GLM 4.5 Air Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.2-3b-instruct:free"
+name = "Llama 3.2 3B Instruct Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.2-1b-instruct:free"
+name = "Llama 3.2 1B Instruct Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.1-8b-instruct:free"
+name = "Llama 3.1 8B Instruct Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "llama-3.3-70b-instruct:free"
+name = "Llama 3.3 70B Instruct Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mistral-nemo-instruct:free"
+name = "Mistral Nemo Instruct Free"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "sn"
+name = "SambaNova"
+category = "apikey"
+color = "#7C3AED"
+icon = "sambanova.png"
+base_url = "https://api.sambanova.ai"
+validate_url = "https://api.sambanova.ai/v1/models"
+api_type = "openai"
+docs_url = "https://cloud.sambanova.ai"
+api_key_url = "https://cloud.sambanova.ai/apis"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "DeepSeek-V3.2"
+name = "DeepSeek V3.2"
+ctx = 163840
+vision = false
+tools = true
+
+[[providers.models]]
+id = "DeepSeek-V3.1"
+name = "DeepSeek V3.1"
+ctx = 163840
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gpt-oss-120b"
+name = "GPT OSS 120B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "Llama-4-Maverick-17B-128E-Instruct"
+name = "Llama 4 Maverick"
+ctx = 1048576
+vision = true
+tools = true
+
+[[providers.models]]
+id = "Meta-Llama-3.3-70B-Instruct"
+name = "Llama 3.3 70B"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "gemma-3-12b-it"
+name = "Gemma 3 12B IT"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers]]
+id = "sr"
+name = "SwiftRouter"
+category = "apikey"
+color = "#0EA5E9"
+icon = "swiftrouter.png"
+base_url = "https://api.swiftrouter.com"
+validate_url = "https://api.swiftrouter.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "tbay"
+name = "TokenBay"
+category = "apikey"
+color = "#6366F1"
+icon = "tbay.png"
+base_url = "https://api.tokenbay.com"
+validate_url = "https://api.tokenbay.com/v1/models"
+api_type = "openai"
+docs_url = "https://tokenbay.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers]]
+id = "tr"
+name = "TokenRouter"
+category = "apikey"
+color = "#111827"
+icon = "tokenrouter.jpg"
+base_url = "https://api.tokenrouter.com"
+validate_url = "https://api.tokenrouter.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "MiniMax-M3"
+name = "MiniMax M3"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek/deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek/deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "z-ai/glm-5.2-free"
+name = "Z-AI GLM 5.2 Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers]]
+id = "um"
+name = "Unimodel"
+category = "apikey"
+color = "#8B5CF6"
+icon = "unimodel.jpg"
+base_url = "https://www.unimodel.ai"
+validate_url = "https://www.unimodel.ai/v1/models"
+api_type = "openai"
+docs_url = "https://unimodel.ai"
+api_key_url = "https://unimodel.ai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.2"
+name = "GLM 5.2"
+ctx = 1048576
+vision = false
+tools = true
+
+[[providers.models]]
+id = "glm-5.1"
+name = "GLM 5.1"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers]]
+id = "vk"
+name = "Vikey"
+category = "apikey"
+color = "#6366F1"
+icon = "vikey.svg"
+base_url = "https://api.vikey.ai"
+validate_url = "https://api.vikey.ai/v1/models"
+api_type = "openai"
+docs_url = "https://vikey.ai"
+api_key_url = "https://vikey.ai/dashboard"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "vikey/vclaw"
+name = "Vikey VCLaw"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "xak"
+name = "xAI"
+category = "apikey"
+color = "#1DA1F2"
+icon = "xai.png"
+base_url = "https://api.x.ai"
+validate_url = "https://api.x.ai/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "grok-4.5"
+name = "Grok 4.5"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "grok-4.5-fast-reasoning"
+name = "Grok 4.5 Fast Reasoning"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "grok-4"
+name = "Grok 4"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "grok-4-fast-reasoning"
+name = "Grok 4 Fast Reasoning"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "grok-code-fast-1"
+name = "Grok Code Fast"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "grok-3"
+name = "Grok 3"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "mimo"
+name = "Xiaomi MiMo"
+category = "apikey"
+color = "#FF6900"
+icon = "xiaomi-mimo.png"
+base_url = "https://api.xiaomimimo.com"
+validate_url = "https://api.xiaomimimo.com/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "mimo-v2.5-pro-ultraspeed"
+name = "MiMo V2.5 Pro Ultrasped"
+ctx = 131000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5-pro"
+name = "MiMo V2.5 Pro"
+ctx = 131000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5"
+name = "MiMo V2.5"
+ctx = 131000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2-omni"
+name = "MiMo V2 Omni"
+ctx = 131000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2-flash"
+name = "MiMo V2 Flash"
+ctx = 131000
+vision = false
+tools = true
+
+[[providers]]
+id = "mimosg"
+name = "Xiaomi MiMo SG"
+category = "apikey"
+color = "#2563EB"
+icon = "mimo-sg.png"
+base_url = "https://token-plan-sgp.xiaomimimo.com"
+validate_url = "https://token-plan-sgp.xiaomimimo.com/v1/models"
+api_type = "openai"
+docs_url = "https://xiaomimimo.com"
+api_key_url = "https://platform.xiaomimimo.com/token-plan"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "mimo-v2.5-pro"
+name = "MiMo V2.5 Pro"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5"
+name = "MiMo V2.5"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2-pro"
+name = "MiMo V2 Pro"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2-omni"
+name = "MiMo V2 Omni"
+ctx = 131072
+vision = true
+tools = true
+
+[[providers.models]]
+id = "mimo-v2-flash"
+name = "MiMo V2 Flash"
+ctx = 131072
+vision = false
+tools = true
+
+[[providers]]
+id = "yun"
+name = "Yunwu AI"
+category = "apikey"
+color = "#6366F1"
+icon = "yunwu.png"
+base_url = "https://yunwu.ai"
+validate_url = "https://yunwu.ai/v1/models"
+api_type = "openai"
+docs_url = "https://yunwu.ai"
+api_key_url = "https://yunwu.ai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1
+vision = false
+tools = true
+
+[[providers]]
+id = "zmx"
+name = "Zenmux"
+category = "apikey"
+color = "#7C3AED"
+icon = "zenmux.png"
+base_url = "https://zenmux.ai"
+validate_url = "https://zenmux.ai/api/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "stepfun/step-3.7-flash-free"
+name = "Step 3.7 Flash Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers]]
+id = "zyl"
+name = "Zyloo"
+category = "apikey"
+color = "#8B5CF6"
+icon = "zyloo.png"
+base_url = "https://api.zyloo.com"
+validate_url = "https://api.zyloo.com/v1/models"
+api_type = "openai"
+docs_url = "https://zyloo.com"
+api_key_url = "https://zyloo.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k2"
+name = "Kimi K2"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "kimi-k3"
+name = "Kimi K3"
+ctx = 1000000
+vision = false
+tools = true
+
+
+[[providers]]
+id = "volc"
+name = "Volcengine Ark"
+category = "apikey"
+color = "#1677FF"
+icon = "volcengine.png"
+base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
+validate_url = "https://ark.cn-beijing.volces.com/api/coding/v3/v1/models"
+api_type = "openai"
+timeout = 60
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "kimi-k2.6"
+name = "Kimi K2.6"
+ctx = 262000
+vision = false
+tools = true
+
+[[providers]]
+id = "zai"
+name = "Z.AI"
+category = "apikey"
+color = "#2563EB"
+icon = "glm.png"
+base_url = "https://api.z.ai/api/anthropic"
+validate_url = "https://api.z.ai/api/anthropic/v1/messages"
+api_type = "anthropic"
+docs_url = "https://open.bigmodel.cn"
+api_key_url = "https://open.bigmodel.cn/usercenter/apikeys"
+timeout = 60
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "zai-org/glm-5.1"
+name = "GLM 5.1"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "zai-org/glm-5"
+name = "GLM 5"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "zai-org/glm-4.7"
+name = "GLM 4.7"
+ctx = 202752
+vision = false
+tools = true
+
+[[providers.models]]
+id = "zai-org/glm-4.6"
+name = "GLM 4.6"
+ctx = 202752
+vision = false
+tools = true

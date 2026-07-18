@@ -92,7 +92,7 @@ impl Client {
         let url = format!("{}/v1/messages", self.config.base_url);
         // Lightweight validation: send a minimal request with max_tokens=1
         let body = serde_json::json!({
-            "model": self.config.models.first().map(|m| m.id).unwrap_or("unknown"),
+            "model": self.config.models.first().map(|m| m.id.as_str()).unwrap_or("unknown"),
             "max_tokens": 1,
             "messages": [{"role": "user", "content": "hi"}]
         });

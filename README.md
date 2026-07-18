@@ -8,7 +8,7 @@ Lightweight AI Gateway — **Rust + Axum 0.7**. Multi-provider LLM router with a
 |-----|----------|
 | **Full Guide** | `docs/GUIDE.md` — setup, config, run, deploy, troubleshooting |
 | **Project Rules** | `AGENTS.md` — arsitektur, conventions |
-| **Provider Guide** | `docs/API_KEY_PROVIDER_GUIDE.md` — cara tambah provider baru |
+| **Provider Guide** | `docs/API_KEY_PROVIDER_GUIDE.md` — cara tambah provider baru (TOML-based) |
 | **Provider Templates** | `docs/provider_templates/apikey/` — template siap copy |
 
 ## Quick Start
