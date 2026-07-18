@@ -34,7 +34,7 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "hy3", name: "Tencent Hy3", max_tokens: 262144, supports_vision: false, supports_tools: true },
+    ModelDef { id: "hy3", name: "Tencent Hy3", max_tokens: 260000, supports_vision: false, supports_tools: true },
     ModelDef { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "claude-sonnet-5", name: "Claude Sonnet 5", max_tokens: 1000000, supports_vision: false, supports_tools: true },
     ModelDef { id: "glm-5.2", name: "GLM 5.2", max_tokens: 1000000, supports_vision: false, supports_tools: true },

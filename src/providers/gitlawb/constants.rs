@@ -34,5 +34,5 @@ pub fn config() -> crate::engine::openai_compat::config::OpenAIConfig {
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "tencent/hy3:free", name: "Tencent Hy3 Free", max_tokens: 262144, supports_vision: false, supports_tools: true },
+    ModelDef { id: "tencent/hy3:free", name: "Tencent Hy3 Free", max_tokens: 260000, supports_vision: false, supports_tools: true },
 ];

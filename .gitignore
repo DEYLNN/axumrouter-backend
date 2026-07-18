@@ -37,3 +37,6 @@ Thumbs.db
 
 # Temp
 backups/
+
+# Hermes agent rules
+AGENTS.md

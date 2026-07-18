@@ -24,6 +24,7 @@
 
 ## Project
 OpenAI-compatible AI Gateway di Rust (Axum). Multi-provider router. 69+ providers (API Key, OAuth auth_code, OAuth device_code).
+Git repo: `DEYLNN/axumrouter-backend`
 
 ## Workspace
 - Backend: `backend/` (Rust, Axum 0.7, port 7444)
