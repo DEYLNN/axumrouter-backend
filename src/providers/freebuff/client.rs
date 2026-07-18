@@ -267,7 +267,8 @@ impl FbClient {
         cred: &FbAuthCredentials,
         backend_model: &str,
     ) -> Result<String, GatewayError> {
-        // Try to create
+        let mut retried = false;
+        loop {
         let instance_id = match self.create_free_session(cred, backend_model).await {
             Ok(id) => id,
             Err(e) => {
@@ -288,9 +289,19 @@ impl FbClient {
         };
 
         // Wait for it to become active
-        self.wait_for_free_session(cred, &instance_id, backend_model).await?;
-
-        Ok(instance_id)
+        match self.wait_for_free_session(cred, &instance_id, backend_model).await {
+            Ok(()) => return Ok(instance_id),
+            Err(e) => {
+                if retried {
+                    return Err(e);
+                }
+                // Superseded/ended — cleanup and retry once
+                let _ = self.delete_free_session(cred, &instance_id).await;
+                retried = true;
+                continue;
+            }
+        }
+        } // end loop
     }
 
     /// Build codebuff_metadata block
