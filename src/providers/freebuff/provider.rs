@@ -412,11 +412,11 @@ impl Provider for FbProvider {
         let model_name = body.get("model").and_then(|m| m.as_str()).unwrap_or("?");
         tracing::info!(target: "freebuff", "chat: model={} tools={} messages={}", model_name, orig_tool_count, orig_msg_count);
 
-        // ── retry on 409 (session_superseded) ──
+        // ── retry on 409 (session_superseded) / 428 (session expired) ──
         let stream = match self.client.send_stream(body, &cred).await {
             Ok(s) => s,
             Err(e) => {
-                if !retried && e.to_string().contains("409") {
+                if !retried && (e.to_string().contains("409") || e.to_string().contains("428")) {
                     if let Some(ref iid) = instance_id {
                         let _ = self.client.delete_free_session(&cred, iid).await;
                     }
@@ -618,7 +618,7 @@ impl Provider for FbProvider {
         let result = match self.client.send_stream(body, &cred).await {
             Ok(s) => Ok(s),
             Err(e) => {
-                if !retried && e.to_string().contains("409") {
+                if !retried && (e.to_string().contains("409") || e.to_string().contains("428")) {
                     if let Some(ref iid) = instance_id {
                         let _ = self.client.delete_free_session(&cred, iid).await;
                     }
