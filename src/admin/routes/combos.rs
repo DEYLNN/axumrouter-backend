@@ -73,7 +73,7 @@ pub async fn api_create_combo(
     let pm = state.provider_manager.read().await;
     let mut min_ctx = u64::MAX;
     for tier in &req.tiers {
-        if let Some(ctx) = find_model_context(&pm, &tier.model).await {
+        if let Some(ctx) = find_model_context(&pm, &tier.provider, &tier.model).await {
             min_ctx = min_ctx.min(ctx);
         }
     }
@@ -106,9 +106,12 @@ pub async fn api_create_combo(
 }
 
 /// Look up context_length for a model from provider manager
-async fn find_model_context(pm: &ProviderManager, model_id: &str) -> Option<u64> {
+async fn find_model_context(pm: &ProviderManager, provider_id: &str, model_id: &str) -> Option<u64> {
+    let full_id = format!("{}/{}", provider_id, model_id);
     let all = pm.list_all_models_unfiltered().await;
-    all.iter().find(|m| m.id == model_id).and_then(|m| m.context_length.map(|c| c as u64))
+    // Try full ID first, then bare model ID (for backward compat)
+    all.iter().find(|m| m.id == full_id || m.id == model_id)
+        .and_then(|m| m.context_length.map(|c| c as u64))
 }
 
 /// Update combo tiers
@@ -122,7 +125,7 @@ pub async fn api_update_combo(
     let pm = state.provider_manager.read().await;
     let mut min_ctx = u64::MAX;
     for tier in &req.tiers {
-        if let Some(ctx) = find_model_context(&pm, &tier.model).await {
+        if let Some(ctx) = find_model_context(&pm, &tier.provider, &tier.model).await {
             min_ctx = min_ctx.min(ctx);
         }
     }

@@ -24,7 +24,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
         // FreeBuff OAuth
         .route("/admin/api/oauth/fb/start", get(fb::start))
         .route("/admin/api/oauth/fb/poll", post(fb::poll))
-        // Grok CLI OAuth
+        // Grok Build OAuth (PKCE)
         .route("/admin/api/oauth/gb/start", get(gb::start))
         .route("/admin/api/oauth/gb/callback", get(gb::exchange))
         .route("/admin/api/oauth/gb/exchange", post(gb::manual))

@@ -5,8 +5,6 @@ pub struct AnthropicConfig {
     pub model_prefix: String,
     pub base_url: String,
     pub validate_url: String,
-    pub docs_url: String,
-    pub api_key_url: String,
     pub category: String,
     pub color: String,
     pub icon_name: String,

@@ -1,0 +1,21 @@
+# AxumRouter Backend — Example Config
+# Copy to config/config.toml and fill in your values.
+# All values can be overridden via env vars with AXUM_ prefix.
+# Example: AXUM_DATABASE__URL=sqlite:data/prod.db?mode=rwc
+
+[server]
+host = "0.0.0.0"
+port = 7444
+# public_url = "http://your-vps-ip:7444"
+
+[gateway]
+timeout_secs = 120
+
+[auth]
+api_key_header = "Authorization"
+api_key_prefix = "Bearer "
+admin_password = "admin"
+jwt_secret = "dev-secret-axumrouter-2026"
+
+[database]
+url = "sqlite:data/dev.db?mode=rwc"

@@ -52,6 +52,7 @@ impl FbProvider {
             icon_name: constants::ICON_NAME.to_string(),
             color: constants::COLOR.to_string(),
             oauth_flow: Some("device_code".to_string()),
+            validate_url: constants::VALIDATE_URL.to_string(),
         };
         Self {
             metadata,

@@ -34,6 +34,7 @@ impl XaiProvider {
             icon_name: constants::ICON_NAME.to_string(),
             color: constants::COLOR.to_string(),
             oauth_flow: Some("authorization_code".to_string()),
+            validate_url: constants::provider_spec().validate_url.to_string(),
         };
         Self {
             metadata,

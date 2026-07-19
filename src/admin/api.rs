@@ -24,6 +24,7 @@ fn providers_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/admin/api/providers", get(routes::providers::api_providers))
         .route("/admin/api/providers/:id", get(routes::providers::api_provider_detail))
+        .route("/admin/api/providers/:id/validate-models", get(routes::providers::api_validate_models))
         .route("/admin/api/providers/:id/test", post(routes::providers::api_test_model))
         .route("/admin/api/providers/:id/block", post(routes::providers::api_block_model))
         .route("/admin/api/providers/:id/unblock", post(routes::providers::api_unblock_model))

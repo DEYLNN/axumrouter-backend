@@ -19,8 +19,6 @@ pub struct ProviderDef {
     pub api_type: String,
 
     // Optional
-    pub docs_url: Option<String>,
-    pub api_key_url: Option<String>,
     pub timeout: Option<u64>,
     pub first_chunk_timeout: Option<u64>,
     pub stall_timeout: Option<u64>,
@@ -97,8 +95,6 @@ pub fn build_openai_config(p: &ProviderDef) -> OpenAIConfig {
         model_prefix: p.id.clone(),
         base_url: p.base_url.clone(),
         validate_url: p.validate_url.clone(),
-        docs_url: p.docs_url.clone().unwrap_or_default(),
-        api_key_url: p.api_key_url.clone().unwrap_or_default(),
         category: p.category.clone(),
         color: p.color.clone(),
         icon_name: p.icon.clone(),
@@ -118,8 +114,6 @@ pub fn build_anthropic_config(p: &ProviderDef) -> AnthropicConfig {
         model_prefix: p.id.clone(),
         base_url: p.base_url.clone(),
         validate_url: p.validate_url.clone(),
-        docs_url: p.docs_url.clone().unwrap_or_default(),
-        api_key_url: p.api_key_url.clone().unwrap_or_default(),
         category: p.category.clone(),
         color: p.color.clone(),
         icon_name: p.icon.clone(),

@@ -38,6 +38,7 @@ impl AnthropicCompatibleProvider {
             icon_name: config.icon_name.to_string(),
             color: config.color.to_string(),
             oauth_flow: None,
+            validate_url: config.validate_url.clone(),
         };
 
         Self {

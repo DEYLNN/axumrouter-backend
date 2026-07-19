@@ -4,3 +4,4 @@ pub mod constants;
 pub mod mapper;
 pub mod oauth;
 pub mod provider;
+pub mod usage;

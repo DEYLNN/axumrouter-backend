@@ -12,4 +12,7 @@ pub struct ProviderMetadata {
     pub color: String,
     /// OAuth flow type: "device_code" | "authorization_code" | null
     pub oauth_flow: Option<String>,
+    /// URL to validate API keys and list models (e.g. /v1/models)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub validate_url: String,
 }

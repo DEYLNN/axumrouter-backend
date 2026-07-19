@@ -70,64 +70,103 @@ impl GcliClient {
                 let bytes = chunk_result.map_err(|e| GatewayError::ProviderError(format!("grok-cli stream read error: {}", e)))?;
                 buffer.push_str(&String::from_utf8_lossy(&bytes));
 
-                // Parse SSE frames: data: {...}
+                // Parse SSE frames: event: <type>\ndata: {...}\n\n
                 while let Some(frame_end) = buffer.find("\n\n") {
                     let frame = buffer[..frame_end].to_string();
                     buffer = buffer[frame_end + 2..].to_string();
+
+                    let mut event_type = "";
+                    let mut data_str = "";
+
                     for line in frame.lines() {
                         let line = line.trim();
-                        if line.is_empty() || !line.starts_with("data:") { continue; }
-                        let data = line.strip_prefix("data:").map(|s| s.trim()).unwrap_or("");
-                        if data.is_empty() || data == "[DONE]" { continue; }
-
-                        let Ok(v) = serde_json::from_str::<Value>(data) else { continue; };
-                        if let Some(err) = v.get("error") {
-                            Err(GatewayError::ProviderError(format!("grok-cli stream error: {}", err)))?;
+                        if line.starts_with("event:") {
+                            event_type = line.strip_prefix("event:").map(|s| s.trim()).unwrap_or("");
+                        } else if line.starts_with("data:") {
+                            data_str = line.strip_prefix("data:").map(|s| s.trim()).unwrap_or("");
                         }
+                    }
 
-                        // Responses API → ChatCompletionChunk
-                        // Responses SSE events: response.output_text.delta, response.output_item.added, response.done
-                        let event_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                    if data_str.is_empty() || data_str == "[DONE]" { continue; }
 
-                        match event_type {
-                            "response.output_text.delta" => {
-                                let content = v.get("delta").and_then(|d| d.as_str()).unwrap_or("");
-                                yield ChatCompletionChunk {
-                                    id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
-                                    object: "chat.completion.chunk".to_string(),
-                                    created: chrono::Utc::now().timestamp() as u64,
-                                    model: model.clone(),
-                                    choices: vec![ChunkChoice {
-                                        index: 0,
-                                        delta: Delta { role: None, content: Some(content.to_string()), reasoning_content: None, tool_calls: None },
-                                        finish_reason: None,
-                                    }],
-                                    usage: None,
-                                };
-                            }
-                            "response.done" => {
-                                // Final event — collect usage from response
-                                let resp = v.get("response");
-                                let usage = resp.and_then(|r| r.get("usage")).map(|u| Usage {
-                                    prompt_tokens: u.get("input_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-                                    completion_tokens: u.get("output_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-                                    total_tokens: 0,
-                                });
-                                yield ChatCompletionChunk {
-                                    id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
-                                    object: "chat.completion.chunk".to_string(),
-                                    created: chrono::Utc::now().timestamp() as u64,
-                                    model: model.clone(),
-                                    choices: vec![ChunkChoice {
-                                        index: 0,
-                                        delta: Delta { role: Some("assistant".to_string()), content: None, reasoning_content: None, tool_calls: None },
-                                        finish_reason: Some("stop".to_string()),
-                                    }],
-                                    usage,
-                                };
-                            }
-                            _ => { /* skip other events */ }
+                    let Ok(v) = serde_json::from_str::<Value>(data_str) else { continue; };
+                    if let Some(err) = v.get("error") {
+                        Err(GatewayError::ProviderError(format!("grok-cli stream error: {}", err)))?;
+                    }
+
+                    // If event_type is empty, try falling back to the "type" field inside data
+                    let ev = if !event_type.is_empty() { event_type } else { v.get("type").and_then(|t| t.as_str()).unwrap_or("") };
+
+                    match ev {
+                        "response.output_text.delta" => {
+                            let content = v.get("delta").and_then(|d| d.as_str()).unwrap_or("");
+                            yield ChatCompletionChunk {
+                                id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
+                                object: "chat.completion.chunk".to_string(),
+                                created: chrono::Utc::now().timestamp() as u64,
+                                model: model.clone(),
+                                choices: vec![ChunkChoice {
+                                    index: 0,
+                                    delta: Delta { role: None, content: Some(content.to_string()), reasoning_content: None, tool_calls: None },
+                                    finish_reason: None,
+                                }],
+                                usage: None,
+                            };
                         }
+                        "response.output_text.done" => {
+                            let text = v.get("text").and_then(|d| d.as_str()).unwrap_or("");
+                            yield ChatCompletionChunk {
+                                id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
+                                object: "chat.completion.chunk".to_string(),
+                                created: chrono::Utc::now().timestamp() as u64,
+                                model: model.clone(),
+                                choices: vec![ChunkChoice {
+                                    index: 0,
+                                    delta: Delta { role: None, content: Some(text.to_string()), reasoning_content: None, tool_calls: None },
+                                    finish_reason: None,
+                                }],
+                                usage: None,
+                            };
+                        }
+                        "response.completed" | "response.done" => {
+                            // For response.completed, the full response is at v["response"] 
+                            // For response.done, it's also at v["response"]
+                            // Fallback: use v itself
+                            let resp = v.get("response").or(Some(&v));
+                            let usage = resp.and_then(|r| r.get("usage")).map(|u| Usage {
+                                prompt_tokens: u.get("input_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
+                                completion_tokens: u.get("output_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
+                                total_tokens: 0,
+                            });
+
+                            // Collect final output text from response.output array
+                            let output_text = resp
+                                .and_then(|r| r.get("output"))
+                                .and_then(|o| o.as_array())
+                                .map(|arr| {
+                                    arr.iter().filter_map(|item| {
+                                        let content = item.get("content").and_then(|c| c.as_array())?;
+                                        Some(content.iter().filter_map(|part| {
+                                            part.get("text").and_then(|t| t.as_str()).map(String::from)
+                                        }).collect::<Vec<_>>().concat())
+                                    }).collect::<Vec<_>>().concat()
+                                })
+                                .unwrap_or_default();
+
+                            yield ChatCompletionChunk {
+                                id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
+                                object: "chat.completion.chunk".to_string(),
+                                created: chrono::Utc::now().timestamp() as u64,
+                                model: model.clone(),
+                                choices: vec![ChunkChoice {
+                                    index: 0,
+                                    delta: Delta { role: Some("assistant".to_string()), content: Some(output_text), reasoning_content: None, tool_calls: None },
+                                    finish_reason: Some("stop".to_string()),
+                                }],
+                                usage,
+                            };
+                        }
+                        _ => { /* skip other events */ }
                     }
                 }
             }
@@ -139,6 +178,7 @@ impl GcliClient {
         let mut stream = self.send_stream(body, cred).await?;
         let mut out = String::new();
         let mut last_finish = None;
+        let mut usage = Usage { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
         while let Some(item) = stream.next().await {
             let chunk = item?;
             for choice in chunk.choices {
@@ -148,6 +188,9 @@ impl GcliClient {
                 if choice.finish_reason.is_some() {
                     last_finish = choice.finish_reason;
                 }
+            }
+            if let Some(u) = chunk.usage {
+                usage = u;
             }
         }
 
@@ -170,7 +213,7 @@ impl GcliClient {
                 message: msg,
                 finish_reason: last_finish.or(Some("stop".to_string())),
             }],
-            usage: Some(Usage { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }),
+            usage: Some(usage),
         })
     }
 }

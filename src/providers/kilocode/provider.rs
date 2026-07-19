@@ -34,6 +34,7 @@ impl KlProvider {
             icon_name: constants::ICON_NAME.to_string(),
             color: constants::COLOR.to_string(),
             oauth_flow: Some("device_code".to_string()),
+            validate_url: format!("{}/v1/models", constants::API_BASE_URL),
         };
         Self {
             metadata,

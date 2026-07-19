@@ -36,7 +36,7 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
         supports_vision: false,
         color: COLOR,
         icon_name: ICON_NAME,
-        usage_url: None,
+        usage_url: Some("https://cli-chat-proxy.grok.com/v1/billing?format=credits"),
         quirks: Default::default(),
     }
 }

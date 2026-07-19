@@ -61,6 +61,12 @@ pub async fn api_usage_quota(
                 } else {
                     (vec![], None)
                 }
+            } else if provider_id == "gb" {
+                if let Some(token) = kv["access_token"].as_str() {
+                    crate::providers::grok_cli::usage::fetch_grok_usage(token).await
+                } else {
+                    (vec![], None)
+                }
             } else {
                 (vec![], None)
             };

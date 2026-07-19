@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -69,10 +70,9 @@ pub async fn api_provider_detail(
             .bind(&provider_id).fetch_one(&state.db).await.unwrap_or(0);
         let locked_keys: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys WHERE provider_id=? AND is_active=0")
             .bind(&provider_id).fetch_one(&state.db).await.unwrap_or(0);
-        let key_type: String = meta.category.clone(); // Use provider metadata, not DB query
+        let key_type: String = meta.category.clone();
         let models: Vec<serde_json::Value> = match p.list_models().await {
             Ok(list) => {
-                // Batch-fetch blocked models for this provider
                 let blocked: std::collections::HashSet<String> = sqlx::query_scalar(
                     "SELECT model_id FROM blocked_models WHERE provider_id = ?"
                 )
@@ -121,7 +121,6 @@ pub async fn api_provider_detail(
         })
         .collect();
 
-        // Runtime cooldown locks from key_manager — merge into key entries
         let runtime_locked: std::collections::HashMap<String, (u64, String)> = p.locked_keys()
             .into_iter()
             .map(|(k, s, r)| (k, (s, r)))
@@ -143,6 +142,7 @@ pub async fn api_provider_detail(
             "icon_name": meta.icon_name,
             "category": meta.category,
             "base_url": meta.version,
+            "validate_url": meta.validate_url,
             "total_keys": total_keys,
             "active_keys": active_keys,
             "locked_keys": locked_keys,
@@ -155,6 +155,124 @@ pub async fn api_provider_detail(
     } else {
         Json(serde_json::json!({"error": "Provider not found"}))
     }
+}
+
+// ���─ Validate models — proxy to validate_url with first active API key ──
+
+pub async fn api_validate_models(
+    State(state): State<Arc<AppState>>,
+    Path(provider_id): Path<String>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let key_id = params.get("key_id").map(|s| s.as_str());
+
+    // Get specific key or first active
+    let key_row = if let Some(kid) = key_id {
+        sqlx::query_as::<_, (String,)>(
+            "SELECT key_value FROM api_keys WHERE id = ? AND provider_id = ? AND is_active = 1 LIMIT 1"
+        )
+        .bind(kid).bind(&provider_id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None)
+    } else {
+        sqlx::query_as::<_, (String,)>(
+            "SELECT key_value FROM api_keys WHERE provider_id = ? AND is_active = 1 LIMIT 1"
+        )
+        .bind(&provider_id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None)
+    };
+
+    let key_value = match key_row {
+        Some((kv,)) => kv,
+        None => return Json(serde_json::json!({"ok": false, "error": "No active API key"})),
+    };
+
+    // Look up validate_url from provider metadata
+    let pm = state.provider_manager.read().await;
+    let meta = pm.get(&provider_id).map(|p| p.metadata());
+    let validate_url = meta.as_ref().map(|m| m.validate_url.clone()).unwrap_or_default();
+    drop(pm);
+
+    if validate_url.is_empty() {
+        return Json(serde_json::json!({"ok": false, "error": "No validate_url for this provider"}));
+    }
+
+    let client = reqwest::Client::new();
+    let resp = match client.get(&validate_url)
+        .header("Authorization", format!("Bearer {}", key_value))
+        .header("User-Agent", "AxumRouter/1.0")
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("HTTP error: {}", e)})),
+    };
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Json(serde_json::json!({"ok": false, "error": format!("HTTP {}: {}", status, body)}));
+    }
+
+    let body = match resp.text().await {
+        Ok(b) => b,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("Read body: {}", e)})),
+    };
+
+    let parsed = serde_json::from_str::<serde_json::Value>(&body);
+    match parsed {
+        Ok(json) => {
+            let models = try_extract_models(&json);
+            Json(serde_json::json!({
+                "ok": true,
+                "models": models,
+                "raw": json,
+            }))
+        }
+        Err(_) => {
+            Json(serde_json::json!({
+                "ok": true,
+                "models": [],
+                "raw": body,
+            }))
+        }
+    }
+}
+
+/// Try to extract model list from various JSON response shapes.
+fn try_extract_models(v: &serde_json::Value) -> Vec<serde_json::Value> {
+    // OpenAI format: { "data": [{ "id": "...", ... }] }
+    // Also handles { "object": "list", "data": [...] }
+    if let Some(arr) = v.get("data").and_then(|d| d.as_array()) {
+        let has_id = arr.iter().any(|m| m.get("id").is_some());
+        if has_id {
+            return arr.iter().map(normalize_model).collect();
+        }
+    }
+    // { "models": [...] }
+    if let Some(arr) = v.get("models").and_then(|d| d.as_array()) {
+        return arr.iter().map(normalize_model).collect();
+    }
+    // Plain array: [{ "id": "...", ... }]
+    if let Some(arr) = v.as_array() {
+        if arr.iter().any(|m| m.get("id").is_some()) {
+            return arr.iter().map(normalize_model).collect();
+        }
+    }
+    vec![]
+}
+
+fn normalize_model(m: &serde_json::Value) -> serde_json::Value {
+    let id = m.get("id").and_then(|s| s.as_str()).unwrap_or("?");
+    serde_json::json!({
+        "id": id,
+        "name": m.get("name").and_then(|s| s.as_str()).unwrap_or(id),
+        "owned_by": m.get("owned_by").and_then(|s| s.as_str()),
+        "context_length": m.get("context_length").or_else(|| m.get("max_tokens")),
+    })
 }
 
 // ── Test model endpoint ──
@@ -212,7 +330,6 @@ pub async fn api_test_model(
 
     let start = std::time::Instant::now();
 
-    // Snapshot active key IDs for error logging (runtime lock may miss non-retryable errors)
     let known_keys: Vec<String> = sqlx::query_scalar(
         "SELECT id FROM api_keys WHERE provider_id=? AND is_active=1 ORDER BY created_at DESC LIMIT 1"
     )
@@ -231,14 +348,12 @@ pub async fn api_test_model(
             let usage = result.response.usage.unwrap_or(crate::types::chat::Usage {
                 prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
             });
-            // Log usage
             let _ = crate::db::log_usage(
                 &state.db, &provider_id, result.used_key_id.as_deref(),
                 &req.model, "success", Some(200),
                 usage.prompt_tokens as i64, usage.completion_tokens as i64,
                 Some(latency), None, None, None, None,
             ).await;
-            // Log failed key attempts
             for failed in &result.failed_keys {
                 let _ = crate::db::log_usage(
                     &state.db, &provider_id, Some(&failed.key_id),

@@ -7,10 +7,11 @@ pub struct GcliMapper;
 impl GcliMapper {
     pub fn to_response_request(&self, request: ChatCompletionRequest) -> Value {
         // Convert OpenAI chat completion → OpenAI Responses API
+        // Always stream=true — Grok Responses API is always SSE
         let mut body = json!({
             "model": request.model.trim_start_matches("gcli/").trim_start_matches("gb/"),
             "input": request.messages,
-            "stream": request.stream.unwrap_or(true),
+            "stream": true,
         });
 
         if let Some(max_tokens) = request.max_tokens {
