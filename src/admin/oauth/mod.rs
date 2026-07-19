@@ -4,11 +4,11 @@ use axum::Router;
 use crate::state::AppState;
 
 mod cx;
-mod xai;
 mod fb;
-mod np;
-
+mod gb;
 mod kc;
+mod np;
+mod xai;
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
@@ -24,6 +24,10 @@ pub fn routes(state: Arc<AppState>) -> Router {
         // FreeBuff OAuth
         .route("/admin/api/oauth/fb/start", get(fb::start))
         .route("/admin/api/oauth/fb/poll", post(fb::poll))
+        // Grok CLI OAuth
+        .route("/admin/api/oauth/gb/start", get(gb::start))
+        .route("/admin/api/oauth/gb/callback", get(gb::exchange))
+        .route("/admin/api/oauth/gb/exchange", post(gb::manual))
         // Nous Portal OAuth
         .route("/admin/api/oauth/np/start", get(np::start))
         .route("/admin/api/oauth/np/poll", get(np::poll_get))

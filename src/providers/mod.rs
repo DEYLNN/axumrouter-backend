@@ -9,6 +9,7 @@ pub mod traits;
 
 pub mod cloudflare;
 pub mod freebuff;
+pub mod grok_cli;
 pub mod kilocode;
 pub mod nous_portal;
 pub mod openai_codex;
