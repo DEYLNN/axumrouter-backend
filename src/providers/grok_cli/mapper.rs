@@ -71,12 +71,16 @@ impl GcliMapper {
             body["top_p"] = json!(top_p);
         }
         if let Some(tools) = &request.tools {
-            // Convert OpenAI tools format → Responses API tools format
             let converted: Vec<Value> = tools.iter().map(|t| {
+                let params = t.function.parameters.clone().unwrap_or(serde_json::json!({
+                    "type": "object",
+                    "properties": {}
+                }));
                 json!({
+                    "type": "function",
                     "name": t.function.name,
                     "description": t.function.description.as_deref().unwrap_or(""),
-                    "input_schema": t.function.parameters,
+                    "parameters": params,
                 })
             }).collect();
             body["tools"] = json!(converted);
