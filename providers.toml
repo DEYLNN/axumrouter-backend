@@ -212,6 +212,13 @@ ctx = 500000
 vision = false
 tools = true
 
+[[providers.models]]
+id = "agnes-2.5-flash"
+name = "Agnes 2.5 Flash"
+ctx = 500000
+vision = false
+tools = true
+
 [[providers]]
 id = "aio"
 name = "Aisa One"
