@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use sqlx::SqlitePool;
+use std::sync::Arc;
 
 use crate::db::models::ApiKey;
 use crate::engine::helpers::lock_key_on_error;
@@ -14,16 +16,18 @@ use super::auth::GrokCliOAuthCredential;
 use super::client::GcliClient;
 use super::constants;
 use super::mapper::GcliMapper;
+use super::oauth;
 
 pub struct GcliProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
     client: GcliClient,
     mapper: GcliMapper,
+    db: Arc<SqlitePool>,
 }
 
 impl GcliProvider {
-    pub fn new_with_keys(keys: Vec<ApiKey>) -> Self {
+    pub fn new_with_keys(keys: Vec<ApiKey>, db: Arc<SqlitePool>) -> Self {
         let metadata = ProviderMetadata {
             name: constants::PROVIDER_ID.to_string(),
             display_name: constants::PROVIDER_NAME.to_string(),
@@ -41,6 +45,7 @@ impl GcliProvider {
             keys: KeyManager::new(keys),
             client: GcliClient::new(constants::DEFAULT_TIMEOUT_SECS),
             mapper: GcliMapper,
+            db,
         }
     }
 
@@ -65,6 +70,50 @@ impl GcliProvider {
             format!("All Grok Build OAuth credentials exhausted — {}", lock_summary)
         })
     }
+
+    /// Try to refresh a credential in-place. Returns Ok(true) if refreshed, Ok(false) if not needed, Err if permanent fail.
+    async fn try_refresh(&self, cred: &mut GrokCliOAuthCredential, key_id: &str) -> Result<bool, GatewayError> {
+        if !cred.needs_refresh() {
+            return Ok(false);
+        }
+        tracing::info!("grok-cli key '{}' needs refresh, attempting...", key_id);
+        match oauth::refresh_access_token(&cred.refresh_token).await {
+            Ok(new_token) => {
+                // Update credential in-place
+                if let Some(at) = new_token.get("access_token").and_then(|v| v.as_str()) {
+                    cred.access_token = at.to_string();
+                }
+                if let Some(rt) = new_token.get("refresh_token").and_then(|v| v.as_str()) {
+                    if !rt.is_empty() {
+                        cred.refresh_token = rt.to_string();
+                    }
+                }
+                if let Some(exp) = new_token.get("expires_in").and_then(|v| v.as_u64()) {
+                    cred.expires_in = exp;
+                    let exp_at = chrono::Utc::now() + chrono::Duration::seconds(exp as i64);
+                    cred.expires_at = Some(exp_at.to_rfc3339());
+                }
+                // Re-serialize and update DB
+                if let Ok(updated_json) = serde_json::to_string(cred) {
+                    let _ = sqlx::query("UPDATE api_keys SET key_value = ?1, updated_at = datetime('now') WHERE id = ?2")
+                        .bind(&updated_json).bind(key_id)
+                        .execute(&*self.db).await;
+                }
+                tracing::info!("grok-cli key '{}' refreshed successfully", key_id);
+                Ok(true)
+            }
+            Err(e) => {
+                if e.starts_with("permanent:") {
+                    tracing::error!("grok-cli key '{}' refresh permanent fail: {}", key_id, e);
+                    Err(GatewayError::ProviderError(format!("grok-cli token refresh permanent: {}", e)))
+                } else {
+                    tracing::warn!("grok-cli key '{}' refresh temporary fail: {}", key_id, e);
+                    // Temporary — let retry handle it
+                    Err(GatewayError::ProviderError(format!("grok-cli token refresh failed: {}", e)))
+                }
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -77,7 +126,7 @@ impl Provider for GcliProvider {
         for attempt in 0..total.max(1) {
             let key = match self.keys.next() { Ok(k) => k, Err(_) => break };
             let key_id = key.id.clone();
-            let cred = match GrokCliOAuthCredential::parse(&key.key_value) {
+            let mut cred = match GrokCliOAuthCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     self.keys.lock_key(&key.id, 401, e.to_string());
@@ -85,7 +134,17 @@ impl Provider for GcliProvider {
                     continue;
                 }
             };
-            // Convert ChatCompletionRequest → Responses API request
+
+            // Auto-refresh if needed
+            if let Err(e) = self.try_refresh(&mut cred, &key_id).await {
+                if e.to_string().contains("permanent") {
+                    self.keys.lock_key(&key.id, 401, e.to_string());
+                    failed.push(FailedKeyAttempt { key_id: key_id.clone(), error: e });
+                    continue;
+                }
+                // Temporary — try anyway, might work
+            }
+
             let body = self.mapper.to_response_request(request.clone());
             match self.client.send_collect(body, &cred).await {
                 Ok(response) => {
@@ -112,7 +171,7 @@ impl Provider for GcliProvider {
         for attempt in 0..total.max(1) {
             let key = match self.keys.next() { Ok(k) => k, Err(_) => break };
             let key_id = key.id.clone();
-            let cred = match GrokCliOAuthCredential::parse(&key.key_value) {
+            let mut cred = match GrokCliOAuthCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     self.keys.lock_key(&key.id, 401, e.to_string());
@@ -120,6 +179,16 @@ impl Provider for GcliProvider {
                     continue;
                 }
             };
+
+            // Auto-refresh if needed
+            if let Err(e) = self.try_refresh(&mut cred, &key_id).await {
+                if e.to_string().contains("permanent") {
+                    self.keys.lock_key(&key.id, 401, e.to_string());
+                    failed.push(FailedKeyAttempt { key_id: key_id.clone(), error: e });
+                    continue;
+                }
+            }
+
             let body = self.mapper.to_response_request(request.clone());
             match self.client.send_stream(body, &cred).await {
                 Ok(stream) => {

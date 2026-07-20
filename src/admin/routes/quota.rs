@@ -120,7 +120,7 @@ pub async fn api_refresh_token(
     };
 
     let (token_url, client_id) = match provider_id.as_str() {
-        "xai" => ("https://auth.x.ai/oauth2/token", "b1a00492-073a-47ea-816f-4c329264a828"),
+        "xai" | "gb" => ("https://auth.x.ai/oauth2/token", "b1a00492-073a-47ea-816f-4c329264a828"),
         "cx"  => ("https://auth.openai.com/oauth/token", "app_EMoamEEZ73f0CkXaXp7hrann"),
         "np"  => ("https://portal.nousresearch.com/api/oauth/token", "hermes-cli"),
         "fb"  => ("https://www.codebuff.com/api/auth/cli/refresh", ""),

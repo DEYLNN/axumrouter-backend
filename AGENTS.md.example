@@ -1,0 +1,120 @@
+# AGENTS.md — AxumRouter Backend
+
+## Project
+AxumRouter — OpenAI-compatible API Gateway di Rust (Axum).
+Multi-provider router. 7 providers (API Key, OAuth auth_code, OAuth device_code/PKCE).
+2 engines: OpenAI-compatible + Anthropic-compatible.
+
+## Workspace
+- Backend: `backend/` (Rust, Axum 0.7, port **7444**)
+- Frontend: `frontend/` (React/TypeScript, Vite, port 5173)
+- DB: `data/dev.db` (SQLite) — **SATU-SATUNYA DB yg boleh disentuh**
+- Binary: `target/release/axumrouter`
+- Config: `config/config.toml`
+
+## Build & Run
+```bash
+# BE
+cargo build --release
+cargo run --release
+
+# FE (dev)
+cd ../frontend && npm run dev
+
+# FE (build)
+cd ../frontend && npx vite build
+```
+
+## Architecture
+
+### Backend
+```
+src/
+├── main.rs, app.rs, state.rs, error.rs
+├── config/         # App config (loader, models)
+├── db/             # SQLite (migrations, models, queries)
+├── types/          # Shared structs (chat, model, provider)
+├── middleware/     # Auth + logging
+├── api/            # /v1/* endpoints
+│   ├── chat/       # pipeline: normalize → RTK → caveman → route
+│   ├── models.rs   # /v1/models
+│   └── responses.rs # Responses API
+├── engine/         # Generic provider engines
+│   ├── openai_compat/   # OpenAI-compatible engine (7 files)
+│   └── anthropic_compat/ # Anthropic-compatible engine (7 files)
+├── admin/          # Admin dashboard
+│   ├── api.rs      # thin router → routes/
+│   ├── auth_files.rs # auth files CRUD
+│   ├── login.rs    # auth
+│   ├── routes/     # settings, providers, keys, gateway_keys, combos, logs, usage, quota, models, database
+│   └── oauth/      # per-provider: cx.rs, fb.rs, gb.rs, kc.rs, np.rs, xai.rs
+├── providers/      # 7 providers
+│   ├── cloudflare/ # cf — API Key
+│   ├── freebuff/   # fb — OAuth device_code
+│   ├── grok_cli/   # gb — OAuth PKCE (Responses API)
+│   ├── kilocode/   # kc — OAuth auth_code
+│   ├── nous_portal/ # np — OAuth device_code + auto-refresh
+│   ├── openai_codex/ # cx — OAuth auth_code
+│   ├── xai/        # xai — OAuth auth_code
+│   ├── manager.rs, registry.rs, key_manager.rs
+│   ├── traits.rs, spec.rs, toml_provider.rs
+│   ├── error_classifier.rs, result.rs
+│   └── mod.rs
+└── services/       # Business logic
+    ├── caveman.rs, gateway.rs, tool_normalizer.rs, usage_tracking.rs
+    ├── ponytail.rs # Deliberate simplifications tracker
+    ├── rtk_filters.rs # RTK entry point
+    └── rtk/        # Real Token Killer (modular)
+        ├── mod.rs
+        └── filters/  # 12 files: build_output, dedup_log, find, git_diff, git_status, grep, ls, read_numbered, search_list, smart_truncate, tree
+```
+
+## Providers (7)
+
+| ID  | Name          | Type     | Auth          | OAuth Flow              |
+|-----|---------------|----------|---------------|-------------------------|
+| cf  | Cloudflare    | API Key  | Bearer        | —                       |
+| fb  | FreeBuff      | OAuth    | Bearer        | device_code             |
+| gb  | Grok Build    | OAuth    | Bearer        | PKCE (Responses API)    |
+| kc  | Kilocode      | OAuth    | Bearer        | authorization_code      |
+| np  | Nous Portal   | OAuth    | Bearer        | device_code + auto-refresh |
+| cx  | OpenAI Codex  | OAuth    | Bearer        | authorization_code      |
+| xai | xAI           | OAuth    | Bearer        | authorization_code      |
+
+## Key Features
+- **2 engines**: openai_compat (chat completions) + anthropic_compat (messages API)
+- **Responses API**: `/v1/responses` endpoint for grok_cli
+- **apiFetch**: FE global helper — all `fetch('/admin/...')` → `apiFetch('/...')` via VITE_API_BASE
+- **Modal component**: universal `fixed inset-0 z-50` wrapper
+- **useProviderDetail hook**: extracted state + handlers from ProviderDetail page
+- **AuthFileCard**: extracted card UI from AuthFiles page
+- **OAuth meta**: `oauth_flow` field in provider metadata — FE auto-detects device_code vs auth_code vs PKCE
+- **BE logging**: `RUST_LOG` env, `EnvFilter`, optional JSON format (`RUST_LOG_FORMAT=json`)
+- **DB export/import**: real column names, excludes `request_logs` + `usage` only
+- **Port config**: `AXUM_SERVER__PORT` via `.env` or `AXUM_` env vars (dev: 7444)
+- **ponytail.rs**: deliberate simplifications tracker — names ceiling + upgrade path
+
+## Env Vars
+
+### Backend (.env atau AXUM_ prefix)
+```
+AXUM_SERVER__PORT=7444
+AXUM_DATABASE__URL=sqlite:data/dev.db?mode=rwc
+RUST_LOG=info
+RUST_LOG_FORMAT=     # set to "json" for prod
+```
+
+### Frontend (.env)
+```
+VITE_API_BASE=
+VITE_GATEWAY_BACKEND_URL=http://157.173.124.46:7444
+```
+
+## Code Conventions
+- `cargo build --release` after every Rust edit
+- `tsc --noEmit` after every FE edit
+- PATCH small sections, `write_file` for full rewrites
+- Raw string `r#\"...\"#` for JSON in Rust
+- File < 500 baris — gede? pecah
+- No commented code
+- Commit terpisah per logical change

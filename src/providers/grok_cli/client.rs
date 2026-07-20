@@ -4,9 +4,72 @@ use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use super::auth::GrokCliOAuthCredential;
 use super::constants;
+use uuid::Uuid;
+
+// Per-session monotonic turn index store
+fn session_turn_store() -> &'static Mutex<HashMap<String, (u32, std::time::Instant)>> {
+    static STORE: OnceLock<Mutex<HashMap<String, (u32, std::time::Instant)>>> = OnceLock::new();
+    STORE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+const TURN_STORE_MAX: usize = 5000;
+const SESSION_TTL_SECS: u64 = 1800; // 30 min
+
+fn count_user_turns(input: &Value) -> u32 {
+    let arr = match input.as_array() {
+        Some(a) => a,
+        None => return 1,
+    };
+    let mut n = 0u32;
+    for item in arr {
+        if let Some(obj) = item.as_object() {
+            let role = obj.get("role").and_then(|v| v.as_str()).unwrap_or("");
+            let type_ = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            // user messages: role=user and (no type or type="message")
+            if role == "user" && (type_.is_empty() || type_ == "message") {
+                n += 1;
+            }
+        }
+    }
+    n.max(1)
+}
+
+fn resolve_turn_idx(session_id: &str, input: &Value) -> u32 {
+    if session_id.is_empty() {
+        return count_user_turns(input);
+    }
+
+    let from_input = count_user_turns(input);
+    let mut store = session_turn_store().lock().unwrap();
+
+    // Evict expired entries
+    let now = std::time::Instant::now();
+    store.retain(|_, (_, last_used)| now.duration_since(*last_used).as_secs() < SESSION_TTL_SECS);
+
+    let prev = store.get(session_id)
+        .filter(|(_, last_used)| now.duration_since(*last_used).as_secs() < SESSION_TTL_SECS)
+        .map(|(turn, _)| *turn)
+        .unwrap_or(0);
+
+    let turn = if prev > 0 { prev.max(from_input) } else { from_input };
+
+    // Evict oldest if at capacity
+    while store.len() >= TURN_STORE_MAX {
+        if let Some(oldest_key) = store.iter()
+            .min_by_key(|(_, (_, t))| *t)
+            .map(|(k, _)| k.clone())
+        {
+            store.remove(&oldest_key);
+        }
+    }
+
+    store.insert(session_id.to_string(), (turn, now));
+    turn
+}
 
 pub struct GcliClient {
     http: Client,
@@ -26,14 +89,28 @@ impl GcliClient {
         }
     }
 
-    fn headers(&self, builder: reqwest::RequestBuilder, cred: &GrokCliOAuthCredential) -> reqwest::RequestBuilder {
-        builder
+    fn build_headers(&self, builder: reqwest::RequestBuilder, cred: &GrokCliOAuthCredential, body: &Value, session_id: &str) -> reqwest::RequestBuilder {
+        let req_id = Uuid::new_v4().to_string();
+        let turn_idx = resolve_turn_idx(session_id, body.get("input").unwrap_or(&json!([])));
+
+        let mut b = builder
             .header("Authorization", format!("Bearer {}", cred.access_token))
             .header("Content-Type", "application/json")
             .header("User-Agent", constants::USER_AGENT)
             .header("x-grok-client-identifier", constants::CLIENT_IDENTIFIER)
             .header("x-grok-client-version", constants::CLIENT_VERSION)
             .header("x-xai-token-auth", "xai-grok-cli")
+            .header("x-grok-session-id", session_id)
+            .header("x-grok-conv-id", session_id)
+            .header("x-grok-turn-idx", turn_idx.to_string())
+            .header("x-grok-req-id", &req_id);
+
+        // Identity headers
+        if !cred.email.is_empty() {
+            b = b.header("x-email", &cred.email);
+        }
+
+        b
     }
 
     pub async fn send_stream(&self, body: Value, cred: &GrokCliOAuthCredential) -> Result<BoxStream<'static, Result<ChatCompletionChunk, GatewayError>>, GatewayError> {
@@ -41,7 +118,14 @@ impl GcliClient {
             return Err(GatewayError::ProviderError("grok-cli access_token missing".into()));
         }
 
-        let response = self.headers(self.http.post(constants::BASE_URL), cred)
+        // Resolve stable session ID from email or generate
+        let session_id = if !cred.email.is_empty() {
+            format!("grok-cli-{}", cred.email)
+        } else {
+            Uuid::new_v4().to_string()
+        };
+
+        let response = self.build_headers(self.http.post(constants::BASE_URL), cred, &body, &session_id)
             .json(&body)
             .send()
             .await
@@ -61,9 +145,7 @@ impl GcliClient {
         let parsed = async_stream::try_stream! {
             let mut buffer = String::new();
             let mut first = true;
-            // Track pending tool calls across SSE frames
             let mut pending_tc: HashMap<String, PendingToolCall> = HashMap::new();
-            // Track known tool call IDs so we emit the "role + name" header once per ID
             let mut emitted_tc_id = false;
 
             loop {
@@ -117,22 +199,9 @@ impl GcliClient {
                             };
                         }
                         "response.output_text.done" => {
-                            let text = v.get("text").and_then(|d| d.as_str()).unwrap_or("");
-                            yield ChatCompletionChunk {
-                                id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
-                                object: "chat.completion.chunk".to_string(),
-                                created: chrono::Utc::now().timestamp() as u64,
-                                model: model.clone(),
-                                choices: vec![ChunkChoice {
-                                    index: 0,
-                                    delta: Delta { role: None, content: Some(text.to_string()), reasoning_content: None, tool_calls: None },
-                                    finish_reason: None,
-                                }],
-                                usage: None,
-                            };
+                            // no content — delta already delivered incremental content
                         }
                         "response.output_item.added" => {
-                            // New item in output — could be text or function_call
                             if v.get("item").and_then(|i| i.get("type")).and_then(|t| t.as_str()) == Some("function_call") {
                                 let id = v["item"].get("id").and_then(|s| s.as_str()).unwrap_or("fc_unknown").to_string();
                                 let name = v["item"].get("name").and_then(|s| s.as_str()).unwrap_or("").to_string();
@@ -146,7 +215,6 @@ impl GcliClient {
                             if let Some(tc) = pending_tc.get_mut(&tid) {
                                 tc.arguments.push_str(delta);
                             }
-                            // Emit chunk with accumulating arguments
                             if let Some(tc) = pending_tc.get(&tid) {
                                 let mut tcs = Vec::new();
                                 if !emitted_tc_id {
@@ -192,24 +260,6 @@ impl GcliClient {
                                 total_tokens: 0,
                             });
 
-                            // Collect final output text from response.output array
-                            let output_text: String = resp
-                                .and_then(|r| r.get("output"))
-                                .and_then(|o| o.as_array())
-                                .map(|arr| {
-                                    arr.iter().filter_map(|item| {
-                                        item.get("type").and_then(|t| t.as_str()).and_then(|ty| {
-                                            if ty == "function_call" { return None; }
-                                            Some(())
-                                        })?;
-                                        let content = item.get("content").and_then(|c| c.as_array())?;
-                                        Some(content.iter().filter_map(|part| {
-                                            part.get("text").and_then(|t| t.as_str()).map(String::from)
-                                        }).collect::<Vec<_>>().concat())
-                                    }).collect::<Vec<_>>().concat()
-                                })
-                                .unwrap_or_default();
-
                             // Collect final tool calls from output array
                             let tool_calls: Vec<ChunkToolCall> = resp
                                 .and_then(|r| r.get("output"))
@@ -232,10 +282,6 @@ impl GcliClient {
                                 })
                                 .unwrap_or_default();
 
-                            let delta_has_tool = !tool_calls.is_empty();
-                            let delta_content = if delta_has_tool { None } else { Some(output_text) };
-                            let delta_role = if delta_has_tool { Some("assistant".to_string()) } else { None };
-
                             yield ChatCompletionChunk {
                                 id: format!("chatcmpl-grok-{}", chrono::Utc::now().timestamp()),
                                 object: "chat.completion.chunk".to_string(),
@@ -243,7 +289,12 @@ impl GcliClient {
                                 model: model.clone(),
                                 choices: vec![ChunkChoice {
                                     index: 0,
-                                    delta: Delta { role: delta_role, content: delta_content, reasoning_content: None, tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) } },
+                                    delta: Delta {
+                                        role: if !tool_calls.is_empty() { Some("assistant".to_string()) } else { None },
+                                        content: None,
+                                        reasoning_content: None,
+                                        tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+                                    },
                                     finish_reason: Some("stop".to_string()),
                                 }],
                                 usage,
@@ -253,8 +304,6 @@ impl GcliClient {
                     }
                 }
             }
-
-            // Drain any remaining pending tool calls
         };
         Ok(parsed.boxed())
     }

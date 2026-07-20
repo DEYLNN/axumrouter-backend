@@ -87,6 +87,38 @@ pub async fn exchange_code(code: &str, oauth_state: &str) -> Result<serde_json::
     Ok(token)
 }
 
+/// Refresh xAI access token using refresh_token
+pub async fn refresh_access_token(refresh_token: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("HTTP client: {}", e))?;
+
+    let resp = client.post("https://auth.x.ai/oauth2/token")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", "b1a00492-073a-47ea-816f-4c329264a828"),
+            ("refresh_token", refresh_token),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("HTTP: {}", e))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        let text = resp.text().await.unwrap_or_default();
+        // Detect permanent errors
+        let lower = text.to_lowercase();
+        if lower.contains("invalid_grant") || lower.contains("refresh_token_expired") || lower.contains("refresh_token_reused") {
+            return Err(format!("permanent: {}", text));
+        }
+        return Err(format!("HTTP {}: {}", status, text));
+    }
+
+    let token: serde_json::Value = resp.json().await.map_err(|e| format!("Parse: {}", e))?;
+    Ok(token)
+}
+
 pub async fn save_token(state: &Arc<crate::state::AppState>, token: &serde_json::Value) -> Result<(), String> {
     let kid = format!("key_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
     let now = chrono::Utc::now().to_rfc3339();
