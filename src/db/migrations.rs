@@ -201,6 +201,14 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
         Err(e) => tracing::warn!("Migration skipped: {}", e),
     }
 
+    // Migration v7: add gateway_key_id index for usage per-key aggregation
+    match sqlx::query(    "CREATE INDEX IF NOT EXISTS idx_usage_gateway_key ON usage(gateway_key_id)")
+    .execute(pool)
+    .await {
+        Ok(_) => tracing::debug!("Migration applied: idx_usage_gateway_key"),
+        Err(e) => tracing::warn!("Migration skipped: {}", e),
+    }
+
     tracing::info!("Database migrations complete");
     Ok(())
 }

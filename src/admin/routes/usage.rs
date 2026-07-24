@@ -32,36 +32,20 @@ pub async fn api_usage_oauth_keys(State(state): State<Arc<AppState>>) -> Json<Ve
 }
 
 pub async fn api_usage_stats(State(state): State<Arc<AppState>>) -> Json<UsageStats> {
-    let total_requests: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM usage")
-        .fetch_one(&state.db).await.unwrap_or(0);
-    let total_prompt_tokens: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(prompt_tokens), 0) FROM usage"
+    let row: (i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(total_tokens),0), COALESCE(SUM(CASE WHEN status='success' OR status='streaming' THEN 1 ELSE 0 END),0), COALESCE(SUM(CASE WHEN status='error' THEN 1 ELSE 0 END),0) FROM usage"
     )
-    .fetch_one(&state.db).await.unwrap_or(0);
-    let total_completion_tokens: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(completion_tokens), 0) FROM usage"
-    )
-    .fetch_one(&state.db).await.unwrap_or(0);
-    let total_tokens: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(total_tokens), 0) FROM usage"
-    )
-    .fetch_one(&state.db).await.unwrap_or(0);
-    let success_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM usage WHERE status='success'"
-    )
-    .fetch_one(&state.db).await.unwrap_or(0);
-    let error_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM usage WHERE status='error'"
-    )
-    .fetch_one(&state.db).await.unwrap_or(0);
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or((0,0,0,0,0,0));
 
     Json(UsageStats {
-        total_requests,
-        total_prompt_tokens,
-        total_completion_tokens,
-        total_tokens,
-        success_count,
-        error_count,
+        total_requests: row.0,
+        total_prompt_tokens: row.1,
+        total_completion_tokens: row.2,
+        total_tokens: row.3,
+        success_count: row.4,
+        error_count: row.5,
     })
 }
 

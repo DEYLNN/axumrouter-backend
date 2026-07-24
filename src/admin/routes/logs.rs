@@ -28,8 +28,6 @@ pub struct LogEntryJson {
     pub total_tokens: i64,
     pub latency_ms: Option<i64>,
     pub error_message: Option<String>,
-    pub request_body: Option<String>,
-    pub response_body: Option<String>,
     pub created_at: String,
 }
 
@@ -56,11 +54,11 @@ pub async fn api_logs(
 
     let total_pages = ((total as f64) / (limit as f64)).ceil() as i64;
 
-    let rows = sqlx::query_as::<_, (String, String, Option<String>, String, String, Option<i64>, i64, i64, i64, Option<i64>, Option<String>, Option<String>, Option<String>, String, Option<String>)>(
+    let rows = sqlx::query_as::<_, (String, String, Option<String>, String, String, Option<i64>, i64, i64, i64, Option<i64>, Option<String>, String, Option<String>)>(
         r#"
         SELECT u.id, u.provider_id, u.api_key_id, u.model_id, u.status,
                u.status_code, u.prompt_tokens, u.completion_tokens, u.total_tokens,
-               u.latency_ms, u.error_message, u.request_body, u.response_body, u.created_at,
+               u.latency_ms, u.error_message, u.created_at,
                ak.label
         FROM usage u
         LEFT JOIN api_keys ak ON u.api_key_id = ak.id
@@ -76,7 +74,7 @@ pub async fn api_logs(
 
     let logs = rows
         .into_iter()
-        .map(|(id, provider_id, api_key_id, model_id, status, status_code, prompt_tokens, completion_tokens, total_tokens, latency_ms, error_message, request_body, response_body, created_at, key_label)| LogEntryJson {
+        .map(|(id, provider_id, api_key_id, model_id, status, status_code, prompt_tokens, completion_tokens, total_tokens, latency_ms, error_message, created_at, key_label)| LogEntryJson {
             id,
             provider_id,
             api_key_id,
@@ -89,8 +87,6 @@ pub async fn api_logs(
             total_tokens,
             latency_ms,
             error_message,
-            request_body,
-            response_body,
             created_at,
         })
         .collect();
