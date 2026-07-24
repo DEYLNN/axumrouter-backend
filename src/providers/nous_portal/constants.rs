@@ -4,7 +4,6 @@ pub const CATEGORY: &str = "oauth";
 pub const COLOR: &str = "#2563EB";
 pub const ICON_NAME: &str = "np.png";
 
-pub const PORTAL_URL: &str = "https://portal.nousresearch.com";
 pub const INFERENCE_URL: &str = "https://inference-api.nousresearch.com/v1";
 pub const CLIENT_ID: &str = "hermes-cli";
 pub const SCOPE: &str = "inference:invoke";

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -51,10 +50,6 @@ pub enum GatewayError {
     #[error("Token limit reached: {used}/{max} tokens used")]
     TokenLimitExceeded { used: i64, max: i64 },
 
-    // ---- 501 (Not Implemented) ----
-    #[error("Streaming is not supported by AxumRouter yet. Set `stream: false`.")]
-    StreamingUnsupported,
-
     // ---- 502/503/504 (Upstream issues) ----
     #[error("Upstream HTTP {status}: {body}")]
     ProviderHttpError { status: u16, body: String, provider: String },
@@ -95,9 +90,6 @@ impl GatewayError {
             // 429
             Self::AllKeysRateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, "rate_limit_error", "all_keys_rate_limited"),
             Self::TokenLimitExceeded { .. } => (StatusCode::TOO_MANY_REQUESTS, "token_limit_error", "token_limit_exceeded"),
-
-            // 501
-            Self::StreamingUnsupported => (StatusCode::NOT_IMPLEMENTED, "not_implemented_error", "streaming_unsupported"),
 
             // 502/503/504
             Self::ProviderHttpError { status, .. } => (

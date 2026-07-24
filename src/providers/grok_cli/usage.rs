@@ -1,5 +1,5 @@
 use reqwest::Client;
-use serde_json::{Value, Map};
+use serde_json::Value;
 
 /// Fetch Grok CLI billing + user info (same pattern as official CLI)
 /// Response: (Vec<quota_objects>, Option<plan_name>)

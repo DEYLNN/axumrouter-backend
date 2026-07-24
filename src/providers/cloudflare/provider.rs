@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use crate::db::models::ApiKey;
 use crate::error::GatewayError;
 use crate::engine::helpers::lock_key_on_error;
-use crate::providers::error_classifier::classify_provider_error;
 use crate::providers::key_manager::KeyManager;
 use crate::providers::result::{ChatResult, ChatStreamResult, FailedKeyAttempt};
 use crate::providers::traits::Provider;

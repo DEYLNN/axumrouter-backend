@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use axum::{Json, Router, routing::post};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use crate::state::AppState;
 use jsonwebtoken::{encode, Header, EncodingKey};
@@ -9,12 +9,6 @@ use chrono::Utc;
 #[derive(Deserialize)]
 pub struct LoginRequest {
     pub password: String,
-}
-
-#[derive(Serialize)]
-#[allow(dead_code)]
-pub struct LoginResponse {
-    pub token: String,
 }
 
 pub fn routes(state: Arc<AppState>) -> Router {

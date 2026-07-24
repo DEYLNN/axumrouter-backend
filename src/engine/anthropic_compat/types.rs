@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 
 /// Request body sent to /v1/messages (Claude format)

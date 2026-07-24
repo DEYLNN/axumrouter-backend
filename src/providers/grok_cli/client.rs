@@ -4,7 +4,7 @@ use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock};
 
 use super::auth::GrokCliOAuthCredential;
 use super::constants;

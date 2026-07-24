@@ -147,7 +147,7 @@ pub async fn update_usage_tokens(
     sqlx::query(
         r#"
         UPDATE usage
-        SET prompt_tokens = ?, completion_tokens = ?, total_tokens = ?, response_body = ?
+        SET prompt_tokens = ?, completion_tokens = ?, total_tokens = ?, response_body = ?, status = 'success'
         WHERE id = ?
         "#
     )

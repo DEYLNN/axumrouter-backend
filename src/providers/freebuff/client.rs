@@ -1,8 +1,7 @@
 use crate::error::GatewayError;
-use crate::types::chat::{ChatCompletionChunk, ChatCompletionResponse};
+use crate::types::chat::ChatCompletionChunk;
 use futures::stream::BoxStream;
 use futures::StreamExt;
-use futures::FutureExt;
 use reqwest::Client;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -428,86 +427,5 @@ impl FbClient {
         };
 
         Ok(Box::pin(stream))
-    }
-
-    pub async fn send_collect(
-        &self,
-        body: Value,
-        cred: &FbAuthCredentials,
-    ) -> Result<ChatCompletionResponse, GatewayError> {
-        if cred.access_token.trim().is_empty() {
-            return Err(GatewayError::ProviderError("FreeBuff: missing access_token".into()));
-        }
-
-        let url = format!("{}/api/v1/chat/completions", constants::API_BASE_URL);
-        let response = self
-            .headers(self.http.post(&url), cred)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| GatewayError::ProviderError(format!("FreeBuff HTTP: {}", e)))?;
-
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let text = response.text().await.unwrap_or_default();
-            return Err(GatewayError::ProviderError(format!("FreeBuff HTTP {}: {}", status, text.chars().take(200).collect::<String>())));
-        }
-
-        let full_text = response.text().await
-            .map_err(|e| GatewayError::ProviderError(format!("FreeBuff read body: {}", e)))?;
-
-        // Parse SSE from full text
-        let mut content = String::new();
-        let mut finish_reason = None;
-        let mut usage = None;
-        let mut resp_id = String::new();
-        let mut resp_created: u64 = 0;
-        let mut resp_model = String::new();
-
-        for line in full_text.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() { continue; }
-            if !trimmed.starts_with("data:") { continue; }
-            let data = trimmed[5..].trim();
-            if data.is_empty() || data == "[DONE]" { continue; }
-            if let Ok(chunk) = serde_json::from_str::<ChatCompletionChunk>(data) {
-                if resp_id.is_empty() && !chunk.id.is_empty() { resp_id = chunk.id.clone(); }
-                if resp_created == 0 && chunk.created > 0 { resp_created = chunk.created; }
-                if resp_model.is_empty() && !chunk.model.is_empty() { resp_model = chunk.model.clone(); }
-                if let Some(u) = &chunk.usage { usage = Some(u.clone()); }
-                for choice in &chunk.choices {
-                    if let Some(delta_content) = &choice.delta.content {
-                        content.push_str(delta_content);
-                    }
-                    if let Some(fr) = &choice.finish_reason {
-                        finish_reason = Some(fr.clone());
-                    }
-                }
-            }
-        }
-
-        let finish = finish_reason.unwrap_or_else(|| "stop".to_string());
-
-        Ok(ChatCompletionResponse {
-            id: if resp_id.is_empty() { format!("chatcmpl-freebuff-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()) } else { resp_id },
-            object: "chat.completion".to_string(),
-            created: if resp_created == 0 { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() } else { resp_created },
-            model: if resp_model.is_empty() { "freebuff".to_string() } else { resp_model },
-            choices: vec![
-                crate::types::chat::Choice {
-                    index: 0,
-                    message: crate::types::chat::Message {
-                        role: "assistant".to_string(),
-                        content: Some(content),
-                        tool_calls: None,
-                        tool_call_id: None,
-                        name: None,
-                        reasoning_content: None,
-                    },
-                    finish_reason: Some(finish),
-                }
-            ],
-            usage,
-        })
     }
 }

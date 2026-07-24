@@ -8,7 +8,6 @@ use crate::engine::anthropic_compat::client::Client;
 use crate::engine::anthropic_compat::config::AnthropicConfig;
 use crate::engine::anthropic_compat::mapper::{Mapper, StreamState};
 use crate::error::GatewayError;
-use crate::providers::error_classifier::classify_provider_error;
 use crate::engine::helpers::lock_key_on_error;
 use crate::providers::key_manager::KeyManager;
 use crate::providers::result::{ChatResult, ChatStreamResult};

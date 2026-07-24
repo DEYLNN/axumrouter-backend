@@ -2,11 +2,6 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-fn store() -> &'static Mutex<String> {
-    static STORE: OnceLock<Mutex<String>> = OnceLock::new();
-    STORE.get_or_init(|| Mutex::new(String::new()))
-}
-
 // Track current fingerprint hash/expiry for polling
 fn poll_state() -> &'static Mutex<HashMap<String, String>> {
     static STORE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 /// Provider metadata and behavior flags used to keep provider implementations stable.
 /// Inspired by 9router provider registry + quirks model.
 #[derive(Debug, Clone)]
