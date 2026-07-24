@@ -995,6 +995,13 @@ ctx = 128000
 vision = false
 tools = true
 
+[[providers.models]]
+id = "cline-pass/deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
+
 [[providers]]
 id = "conc"
 name = "Concentrate AI"
