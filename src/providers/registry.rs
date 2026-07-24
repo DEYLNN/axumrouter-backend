@@ -58,6 +58,7 @@ impl ProviderRegistry {
 
         // --- Custom providers (manual) ---
         register_provider!(registry, "cf", crate::providers::cloudflare::provider::CfProvider::new_with_keys);
+        register_provider!(registry, "cl", crate::providers::cline::provider::ClProvider::new_with_keys);
         register_provider!(registry, "fb", crate::providers::freebuff::provider::FbProvider::new_with_keys);
         register_provider!(registry, "gb", crate::providers::grok_cli::provider::GcliProvider::new_with_keys, db);
         register_provider!(registry, "np", crate::providers::nous_portal::provider::NpProvider::new_with_keys, db);
