@@ -974,35 +974,6 @@ vision = false
 tools = true
 
 [[providers]]
-id = "cl"
-name = "Cline"
-category = "apikey"
-color = "#5B9BD5"
-icon = "cl.png"
-base_url = "https://api.cline.bot/api"
-validate_url = "https://api.cline.bot/api/v1/models"
-api_type = "openai"
-docs_url = "https://cline.bot"
-api_key_url = "https://cline.bot"
-timeout = 64
-first_chunk_timeout = 120
-stall_timeout = 120
-
-[[providers.models]]
-id = "tencent/hy3"
-name = "Tencent Hy3"
-ctx = 128000
-vision = false
-tools = true
-
-[[providers.models]]
-id = "cline-pass/deepseek-v4-flash"
-name = "DeepSeek V4 Flash"
-ctx = 1000000
-vision = false
-tools = true
-
-[[providers]]
 id = "conc"
 name = "Concentrate AI"
 category = "apikey"
