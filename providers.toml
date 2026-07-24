@@ -313,9 +313,9 @@ vision = false
 tools = true
 
 [[providers.models]]
-id = "hy3-free"
-name = "Tencent Hy3 Free"
-ctx = 260000
+id = "ling-3.0-flash-free"
+name = "Ling 3.0 Flash Free"
+ctx = 262144
 vision = false
 tools = true
 [[providers]]

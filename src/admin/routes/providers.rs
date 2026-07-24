@@ -410,7 +410,8 @@ pub async fn api_block_model(
     Path(provider_id): Path<String>,
     Json(req): Json<BlockModelRequest>,
 ) -> Json<BlockModelResponse> {
-    match crate::db::block_model(&state.db, &provider_id, &req.model).await {
+    let model_name = req.model.strip_prefix(&format!("{}/", provider_id)).unwrap_or(&req.model).to_string();
+    match crate::db::block_model(&state.db, &provider_id, &model_name).await {
         Ok(_) => Json(BlockModelResponse { ok: true, message: "Blocked".into() }),
         Err(e) => Json(BlockModelResponse { ok: false, message: e.to_string() }),
     }
@@ -421,7 +422,8 @@ pub async fn api_unblock_model(
     Path(provider_id): Path<String>,
     Json(req): Json<BlockModelRequest>,
 ) -> Json<BlockModelResponse> {
-    match crate::db::unblock_model(&state.db, &provider_id, &req.model).await {
+    let model_name = req.model.strip_prefix(&format!("{}/", provider_id)).unwrap_or(&req.model).to_string();
+    match crate::db::unblock_model(&state.db, &provider_id, &model_name).await {
         Ok(_) => Json(BlockModelResponse { ok: true, message: "Unblocked".into() }),
         Err(e) => Json(BlockModelResponse { ok: false, message: e.to_string() }),
     }

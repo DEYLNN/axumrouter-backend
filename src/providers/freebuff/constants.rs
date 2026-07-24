@@ -28,15 +28,16 @@ pub const AGENT_BY_MODEL: &[(&str, &str)] = &[
 pub struct ModelDef {
     pub id: &'static str,
     pub backend_model: &'static str,
-    pub max_tokens: u32,
+    pub max_tokens: Option<u32>,
+    pub context_length: u32,
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "deepseek-v4-flash", backend_model: "deepseek/deepseek-v4-flash", max_tokens: 1000000 },
-    ModelDef { id: "deepseek-v4-pro", backend_model: "deepseek/deepseek-v4-pro", max_tokens: 1000000 },
-    ModelDef { id: "minimax-m3", backend_model: "minimax/minimax-m3", max_tokens: 1000000 },
-    ModelDef { id: "mimo-v2.5", backend_model: "mimo/mimo-v2.5", max_tokens: 1000000 },
-    ModelDef { id: "mimo-v2.5-pro", backend_model: "mimo/mimo-v2.5-pro", max_tokens: 1000000 },
+    ModelDef { id: "deepseek-v4-flash", backend_model: "deepseek/deepseek-v4-flash", max_tokens: None, context_length: 1000000 },
+    ModelDef { id: "deepseek-v4-pro", backend_model: "deepseek/deepseek-v4-pro", max_tokens: None, context_length: 1000000 },
+    ModelDef { id: "minimax-m3", backend_model: "minimax/minimax-m3", max_tokens: None, context_length: 1000000 },
+    ModelDef { id: "mimo-v2.5", backend_model: "mimo/mimo-v2.5", max_tokens: None, context_length: 1000000 },
+    ModelDef { id: "mimo-v2.5-pro", backend_model: "mimo/mimo-v2.5-pro", max_tokens: None, context_length: 1000000 },
 ];
 
 /// Only fields actually consulted by body builder.

@@ -23,17 +23,19 @@ pub struct OpenAIConfig {
 pub struct ModelDef {
     pub id: String,
     pub name: String,
-    pub max_tokens: u32,
+    pub max_tokens: Option<u32>,
+    pub context_length: u32,
     pub supports_vision: bool,
     pub supports_tools: bool,
 }
 
 impl ModelDef {
-    pub fn new(id: &str, name: &str, max_tokens: u32, supports_vision: bool, supports_tools: bool) -> Self {
+    pub fn new(id: &str, name: &str, context_length: u32, supports_vision: bool, supports_tools: bool) -> Self {
         Self {
             id: id.to_string(),
             name: name.to_string(),
-            max_tokens,
+            max_tokens: None,
+            context_length,
             supports_vision,
             supports_tools,
         }

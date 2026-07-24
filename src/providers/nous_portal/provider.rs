@@ -161,7 +161,7 @@ impl Provider for NpProvider {
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
         Ok(constants::models().iter().map(|m| Model {
             id: format!("np/{}", m.id), object: "model".to_string(), owned_by: "nous".to_string(),
-            context_length: Some(m.max_tokens),
+            context_length: Some(m.context_length),
         }).collect())
     }
 

@@ -328,7 +328,7 @@ impl Mapper {
             id: format!("{}/{}", self.config.model_prefix, m.id),
             object: "model".to_string(),
             owned_by: self.config.provider_name.to_string(),
-            context_length: Some(m.max_tokens),
+            context_length: Some(m.context_length),
         }).collect()
     }
 }

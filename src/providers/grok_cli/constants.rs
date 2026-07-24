@@ -45,12 +45,13 @@ pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
 pub struct ModelDef {
     pub id: &'static str,
     pub name: &'static str,
-    pub max_tokens: u32,
+    pub max_tokens: Option<u32>,
+    pub context_length: u32,
     pub supports_vision: bool,
     pub supports_tools: bool,
 }
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "grok-build", name: "Grok Build", max_tokens: 500000, supports_vision: false, supports_tools: true },
-    ModelDef { id: "grok-4.5", name: "Grok 4.5", max_tokens: 500000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "grok-build", name: "Grok Build", max_tokens: None, context_length: 500000, supports_vision: false, supports_tools: true },
+    ModelDef { id: "grok-4.5", name: "Grok 4.5", max_tokens: None, context_length: 500000, supports_vision: false, supports_tools: true },
 ];

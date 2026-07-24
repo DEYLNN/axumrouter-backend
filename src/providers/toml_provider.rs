@@ -82,7 +82,7 @@ fn build_quirks(p: &ProviderDef) -> ProviderQuirks {
 
 fn build_models(p: &ProviderDef) -> Vec<EngineModelDef> {
     p.models.iter().map(|m| EngineModelDef {
-        id: m.id.clone(), name: m.name.clone(), max_tokens: m.ctx as u32,
+        id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
         supports_vision: m.vision, supports_tools: m.tools,
     }).collect()
 }
@@ -121,7 +121,7 @@ pub fn build_anthropic_config(p: &ProviderDef) -> AnthropicConfig {
         stream_first_chunk_timeout_secs: p.first_chunk_timeout.unwrap_or(200),
         stream_stall_timeout_secs: p.stall_timeout.unwrap_or(360),
         models: p.models.iter().map(|m| AnthropicModelDef {
-            id: m.id.clone(), name: m.name.clone(), max_tokens: m.ctx as u32,
+            id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
             supports_vision: m.vision, supports_tools: m.tools,
         }).collect(),
         quirks: build_quirks(p),
