@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use axum::extract::{State, Path};
+use axum::extract::{State, Path, Query};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -15,74 +15,130 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+// ── Query params for server-side pagination ──
+
+#[derive(Deserialize, Default)]
+pub struct AuthFilesQuery {
+    page: Option<i64>,
+    per_page: Option<i64>,
+    query: Option<String>,
+    provider_id: Option<String>,
+    only_problem: Option<bool>,
+    only_disabled: Option<bool>,
+}
+
 // ── JSON API for React FE ──
 
 async fn get_auth_files_json(
     State(state): State<Arc<AppState>>,
+    Query(q): Query<AuthFilesQuery>,
 ) -> Json<serde_json::Value> {
-    let rows: Vec<(String, String, Option<String>, i64, String, String, String)> = sqlx::query_as(
-        "SELECT id, key_value, label, is_active, created_at, provider_id, COALESCE(key_type, 'apikey') FROM api_keys ORDER BY created_at DESC"
-    )
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+    let page = q.page.unwrap_or(1).max(1);
+    let per_page = q.per_page.unwrap_or(50).clamp(1, 200);
+    let offset = (page - 1) * per_page;
 
-    // Latest usage per api_key_id — only keep if that latest row is still an error
-    #[derive(sqlx::FromRow)]
-    struct KeyErr {
-        api_key_id: String,
-        status: String,
-        status_code: Option<i64>,
-        error_message: Option<String>,
-        model_id: String,
-        created_at: String,
-        error_count: i64,
-    }
-    let err_rows: Vec<KeyErr> = sqlx::query_as(
-        r#"
-        SELECT u.api_key_id,
-               u.status,
-               u.status_code,
-               u.error_message,
-               u.model_id,
-               u.created_at,
-               COALESCE(ec.error_count, 0) AS error_count
-        FROM usage u
-        INNER JOIN (
-            SELECT api_key_id, MAX(created_at) AS max_created
-            FROM usage
-            WHERE api_key_id IS NOT NULL AND api_key_id != ''
-            GROUP BY api_key_id
-        ) latest ON u.api_key_id = latest.api_key_id AND u.created_at = latest.max_created
-        LEFT JOIN (
-            SELECT api_key_id, COUNT(*) AS error_count
-            FROM usage
-            WHERE status = 'error' AND api_key_id IS NOT NULL AND api_key_id != ''
-            GROUP BY api_key_id
-        ) ec ON u.api_key_id = ec.api_key_id
-        WHERE u.status = 'error'
-        "#
-    )
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
-    let mut err_map = std::collections::HashMap::new();
-    for e in err_rows {
-        // only last request is error → surface it
-        if e.status == "error" {
-            err_map.insert(e.api_key_id.clone(), e);
+    // Build WHERE clauses
+    let mut where_clauses: Vec<String> = Vec::new();
+    if let Some(ref provider_id) = q.provider_id {
+        if provider_id != "all" {
+            where_clauses.push(format!("provider_id = '{}'", provider_id.replace('\'', "''")));
         }
     }
+    // only_disabled: exclude active
+    if q.only_disabled.unwrap_or(false) {
+        where_clauses.push("is_active = 0".to_string());
+    }
+    if let Some(ref query_str) = q.query {
+        if !query_str.is_empty() {
+            let safe = query_str.replace('\'', "''");
+            where_clauses.push(format!(
+                "(provider_id LIKE '%{}%' OR label LIKE '%{}%' OR key_type LIKE '%{}%')",
+                safe, safe, safe
+            ));
+        }
+    }
+    let where_sql = if where_clauses.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", where_clauses.join(" AND "))
+    };
 
-    let entries: Vec<serde_json::Value> = rows.iter().map(|(id, kv, label, active, created, prov, kt)| {
+    // Count total matching
+    let total: i64 = sqlx::query_scalar(
+        &format!("SELECT COUNT(*) FROM api_keys {}", where_sql)
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+
+    // Fetch page
+    let rows: Vec<(String, String, Option<String>, i64, String, String, String)> = sqlx::query_as(
+        &format!(
+            "SELECT id, key_value, label, is_active, created_at, provider_id, COALESCE(key_type, 'apikey') FROM api_keys {} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            where_sql
+        )
+    )
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    // Optimize: fetch errors only for current page's IDs instead of all keys
+    let err_map = if rows.is_empty() {
+        std::collections::HashMap::new()
+    } else {
+        let id_list: Vec<String> = rows.iter().map(|r| format!("'{}'", r.0.replace('\'', "''"))).collect();
+        #[derive(sqlx::FromRow)]
+        struct KeyErr {
+            api_key_id: String,
+            status: String,
+            status_code: Option<i64>,
+            error_message: Option<String>,
+            model_id: String,
+            created_at: String,
+            error_count: i64,
+        }
+        let err_rows: Vec<KeyErr> = sqlx::query_as(
+            &format!(
+                r#"SELECT u.api_key_id, u.status, u.status_code, u.error_message, u.model_id, u.created_at,
+                    COALESCE(ec.error_count, 0) AS error_count
+                FROM usage u
+                INNER JOIN (
+                    SELECT api_key_id, MAX(created_at) AS max_created
+                    FROM usage
+                    WHERE api_key_id IS NOT NULL AND api_key_id != ''
+                    GROUP BY api_key_id
+                ) latest ON u.api_key_id = latest.api_key_id AND u.created_at = latest.max_created
+                LEFT JOIN (
+                    SELECT api_key_id, COUNT(*) AS error_count
+                    FROM usage
+                    WHERE status = 'error' AND api_key_id IS NOT NULL AND api_key_id != ''
+                    GROUP BY api_key_id
+                ) ec ON u.api_key_id = ec.api_key_id
+                WHERE u.status = 'error' AND u.api_key_id IN ({})"#,
+                id_list.join(",")
+            )
+        )
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
+        let mut m = std::collections::HashMap::new();
+        for e in err_rows {
+            if e.status == "error" {
+                m.insert(e.api_key_id.clone(), e);
+            }
+        }
+        m
+    };
+
+    let mut entries: Vec<serde_json::Value> = rows.iter().map(|(id, kv, label, active, created, prov, kt)| {
         let parsed: serde_json::Value = serde_json::from_str(kv).unwrap_or_default();
         let preview = if kt == "apikey" {
-            // API key: try to extract from JSON or show raw
             let key_str = parsed.get("apiKey").or(parsed.get("apiToken")).or(parsed.get("key"))
                 .and_then(|v| v.as_str()).unwrap_or(kv);
             key_str.chars().take(16).collect::<String>() + "..." + &key_str.chars().last().map(|c| c.to_string()).unwrap_or_default()
         } else {
-            // OAuth: show access token preview
             if let Some(at) = parsed.get("access_token").and_then(|v| v.as_str()) {
                 at.chars().take(16).collect::<String>() + "..." + &at.chars().last().map(|c| c.to_string()).unwrap_or_default()
             } else {
@@ -90,10 +146,8 @@ async fn get_auth_files_json(
             }
         };
         let expires_at: String = {
-            // Try string fields first: expires_at, expiresIn, expires_in
             if let Some(v) = parsed.get("expires_at").or(parsed.get("expiresIn")).or(parsed.get("expires_in")) {
                 if let Some(s) = v.as_str() { s.to_string() }
-                // Fallback: numeric expires_in → compute absolute from created_at
                 else if let Some(secs) = v.as_u64() {
                     if let Ok(ct) = chrono::DateTime::parse_from_rfc3339(created) {
                         (ct + chrono::Duration::seconds(secs as i64)).to_rfc3339()
@@ -102,23 +156,53 @@ async fn get_auth_files_json(
             } else { String::new() }
         };
         let last_err = err_map.get(id);
+        let has_access = parsed.get("access_token").and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false);
+        let error_count = last_err.map(|e| e.error_count).unwrap_or(0);
+        let is_oauth = kt.to_lowercase() == "oauth";
+        let is_problem = (is_oauth && (!has_access || *active != 1)) || error_count > 0 || last_err.is_some();
         serde_json::json!({
             "id": id, "key_value": kv, "label": label, "is_active": active,
             "created_at": created, "provider_id": prov, "key_type": kt,
             "key_preview": preview,
             "email": parsed.get("email").and_then(|v| v.as_str()).unwrap_or(""),
             "plan": parsed.get("chatgptPlanType").or(parsed.get("codex_plan")).and_then(|v| v.as_str()).unwrap_or(""),
-            "has_access": parsed.get("access_token").and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false),
+            "has_access": has_access,
             "has_refresh": !parsed.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").is_empty(),
             "expires_at": expires_at,
             "last_error_status": last_err.and_then(|e| e.status_code),
             "last_error_message": last_err.and_then(|e| e.error_message.clone()),
             "last_error_model": last_err.map(|e| e.model_id.clone()),
             "last_error_at": last_err.map(|e| e.created_at.clone()),
-            "error_count": last_err.map(|e| e.error_count).unwrap_or(0),
+            "error_count": error_count,
+            "is_problem": is_problem,
         })
+    }).filter(|entry| {
+        if q.only_problem.unwrap_or(false) {
+            entry.get("is_problem").and_then(|v| v.as_bool()).unwrap_or(false)
+        } else {
+            true
+        }
     }).collect();
-    Json(serde_json::json!({ "files": entries }))
+
+    // Recompute total after Rust-side filter (only_problem)
+    let actual_total = if q.only_problem.unwrap_or(false) {
+        entries.len() as i64
+    } else {
+        total
+    };
+    let total_pages = if per_page > 0 {
+        (actual_total.max(0) + per_page - 1) / per_page
+    } else {
+        0
+    };
+
+    Json(serde_json::json!({
+        "files": entries,
+        "total": actual_total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }))
 }
 
 async fn download_auth_file(

@@ -197,6 +197,13 @@ ctx = 262144
 vision = false
 tools = true
 
+[[providers.models]]
+id = "mindai/macaron-v1-venti"
+name = "MindAI Macaron V1 Venti"
+ctx = 1000000
+vision = false
+tools = true
+
 [[providers]]
 id = "ags"
 name = "Agnes AI"
