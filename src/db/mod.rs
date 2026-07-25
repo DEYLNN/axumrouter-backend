@@ -209,3 +209,78 @@ pub async fn unblock_model(pool: &SqlitePool, provider_id: &str, model_id: &str)
         .await?;
     Ok(result.rows_affected() > 0)
 }
+
+// ── Custom providers ──
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct CustomProviderRow {
+    pub id: String,
+    pub name: String,
+    pub prefix: String,
+    pub base_url: String,
+    pub validate_url: String,
+    pub color: String,
+    pub timeout_secs: i64,
+    pub first_chunk_timeout_secs: i64,
+    pub stall_timeout_secs: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct CustomProviderModelRow {
+    pub provider_id: String,
+    pub model_id: String,
+    pub ctx: i64,
+    pub vision: i64,
+    pub tools: i64,
+}
+
+pub async fn list_custom_providers(pool: &SqlitePool) -> anyhow::Result<Vec<CustomProviderRow>> {
+    Ok(sqlx::query_as::<_, CustomProviderRow>(
+        "SELECT * FROM custom_providers ORDER BY created_at"
+    ).fetch_all(pool).await?)
+}
+
+pub async fn get_custom_provider(pool: &SqlitePool, id: &str) -> anyhow::Result<Option<CustomProviderRow>> {
+    Ok(sqlx::query_as::<_, CustomProviderRow>(
+        "SELECT * FROM custom_providers WHERE id = ?"
+    ).bind(id).fetch_optional(pool).await?)
+}
+
+pub async fn list_custom_provider_models(pool: &SqlitePool, provider_id: &str) -> anyhow::Result<Vec<CustomProviderModelRow>> {
+    Ok(sqlx::query_as::<_, CustomProviderModelRow>(
+        "SELECT * FROM custom_provider_models WHERE provider_id = ? ORDER BY model_id"
+    ).bind(provider_id).fetch_all(pool).await?)
+}
+
+pub async fn create_custom_provider(
+    pool: &SqlitePool, id: &str, name: &str, prefix: &str,
+    base_url: &str, validate_url: &str, color: &str,
+    timeout: i64, fc_timeout: i64, stall_timeout: i64,
+) -> anyhow::Result<()> {
+    sqlx::query(
+        "INSERT INTO custom_providers (id, name, prefix, base_url, validate_url, color, timeout_secs, first_chunk_timeout_secs, stall_timeout_secs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id).bind(name).bind(prefix).bind(base_url).bind(validate_url).bind(color).bind(timeout).bind(fc_timeout).bind(stall_timeout)
+    .execute(pool).await?;
+    Ok(())
+}
+
+pub async fn delete_custom_provider(pool: &SqlitePool, id: &str) -> anyhow::Result<bool> {
+    let r = sqlx::query("DELETE FROM custom_providers WHERE id = ?").bind(id).execute(pool).await?;
+    Ok(r.rows_affected() > 0)
+}
+
+pub async fn add_custom_provider_model(pool: &SqlitePool, provider_id: &str, model_id: &str, ctx: i64, vision: i64, tools: i64) -> anyhow::Result<()> {
+    sqlx::query(
+        "INSERT OR REPLACE INTO custom_provider_models (provider_id, model_id, ctx, vision, tools) VALUES (?, ?, ?, ?, ?)"
+    ).bind(provider_id).bind(model_id).bind(ctx).bind(vision).bind(tools)
+    .execute(pool).await?;
+    Ok(())
+}
+
+pub async fn remove_custom_provider_model(pool: &SqlitePool, provider_id: &str, model_id: &str) -> anyhow::Result<bool> {
+    let r = sqlx::query(
+        "DELETE FROM custom_provider_models WHERE provider_id = ? AND model_id = ?"
+    ).bind(provider_id).bind(model_id).execute(pool).await?;
+    Ok(r.rows_affected() > 0)
+}

@@ -17,6 +17,9 @@ use crate::engine::openai_compat::config::ModelDef;
 
 pub fn models() -> Vec<ModelDef> {
     vec![
+        ModelDef::new("poolside/laguna-s-2.1:free", "Poolside Laguna S 2.1 Free", 1000000, false, true),
+        ModelDef::new("poolside/laguna-xs-2.1:free", "Poolside Laguna XS 2.1 Free", 262144, false, true),
+        ModelDef::new("inclusionai/ling-3.0-flash:free", "Inclusion AI Ling 3.0 Flash Free", 262144, false, true),
         ModelDef::new("stepfun/step-3.7-flash:free", "StepFun Step 3.7 Flash Free", 256000, false, true),
         ModelDef::new("tencent/hy3:free", "Tencent Hy3 Free", 260000, false, true),
     ]

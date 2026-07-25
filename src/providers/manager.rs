@@ -7,6 +7,9 @@ use crate::providers::registry::ProviderRegistry;
 use crate::providers::traits::Provider;
 use crate::types::model::Model;
 use crate::types::provider::ProviderMetadata;
+use crate::engine::openai_compat::config::OpenAIConfig;
+use crate::engine::openai_compat::config::ModelDef;
+use crate::providers::spec::ProviderQuirks;
 
 /// Runtime manager — stores ALL registered providers from registry.
 /// Keys are loaded from DB but providers are always available (even with 0 keys).
@@ -21,6 +24,7 @@ impl ProviderManager {
         let registry = ProviderRegistry::new();
         let mut active = HashMap::new();
 
+        // Load TOML-defined + OAuth providers from registry
         let provider_ids: Vec<String> = registry.provider_ids().iter().map(|s| s.to_string()).collect();
 
         for provider_id in &provider_ids {
@@ -37,6 +41,43 @@ impl ProviderManager {
             } _ => {
                 tracing::warn!("Provider '{}' failed to build", provider_id);
             }}
+        }
+
+        // Load custom (DB-defined) providers
+        if let Ok(custom) = crate::db::list_custom_providers(db).await {
+            for cp in &custom {
+                let prefix = if cp.prefix.is_empty() { cp.id.clone() } else { cp.prefix.clone() };
+                let models = crate::db::list_custom_provider_models(db, &cp.id).await.unwrap_or_default();
+                let engine_models: Vec<ModelDef> = models.iter().map(|m| ModelDef {
+                    id: m.model_id.clone(), name: m.model_id.clone(),
+                    max_tokens: None, context_length: m.ctx as u32,
+                    supports_vision: m.vision != 0, supports_tools: m.tools != 0,
+                }).collect();
+
+                let config = OpenAIConfig {
+                    provider_id: cp.id.clone(),
+                    provider_name: cp.name.clone(),
+                    model_prefix: prefix.clone(),
+                    base_url: cp.base_url.clone(),
+                    validate_url: cp.validate_url.clone(),
+                    category: "custom".to_string(),
+                    color: cp.color.clone(),
+                    icon_name: "custom-provider.jpg".to_string(),
+                    default_timeout_secs: cp.timeout_secs as u64,
+                    stream_first_chunk_timeout_secs: cp.first_chunk_timeout_secs as u64,
+                    stream_stall_timeout_secs: cp.stall_timeout_secs as u64,
+                    models: engine_models,
+                    quirks: ProviderQuirks::default(),
+                    chat_path: "/chat/completions".into(),
+                };
+
+                let keys = crate::db::load_provider_keys(db, &cp.id).await?;
+                let key_count = keys.len();
+
+                let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config, keys);
+                tracing::info!("Custom provider '{}' loaded with {} key(s)", cp.id, key_count);
+                active.insert(cp.id.clone(), Box::new(provider));
+            }
         }
 
         Ok(Self { active, registry, db: db.clone() })
@@ -68,6 +109,37 @@ impl ProviderManager {
             tracing::warn!("Provider '{}' failed to rebuild after reload", provider_id);
         }}
 
+        Ok(())
+    }
+
+    /// Rebuild a custom (DB-defined) provider from scratch
+    pub async fn reload_custom_provider(&mut self, id: &str, db: &SqlitePool) -> anyhow::Result<()> {
+        let cp = match crate::db::get_custom_provider(db, id).await? {
+            Some(p) => p,
+            None => { self.active.remove(id); return Ok(()); }
+        };
+        let prefix = if cp.prefix.is_empty() { cp.id.clone() } else { cp.prefix.clone() };
+        let models = crate::db::list_custom_provider_models(db, id).await.unwrap_or_default();
+        let engine_models: Vec<ModelDef> = models.iter().map(|m| ModelDef {
+            id: m.model_id.clone(), name: m.model_id.clone(),
+            max_tokens: None, context_length: m.ctx as u32,
+            supports_vision: m.vision != 0, supports_tools: m.tools != 0,
+        }).collect();
+
+        let config = OpenAIConfig {
+            provider_id: cp.id.clone(), provider_name: cp.name.clone(), model_prefix: prefix,
+            base_url: cp.base_url, validate_url: cp.validate_url, category: "custom".into(),
+            color: cp.color, icon_name: "custom-provider.jpg".into(),
+            default_timeout_secs: cp.timeout_secs as u64,
+            stream_first_chunk_timeout_secs: cp.first_chunk_timeout_secs as u64,
+            stream_stall_timeout_secs: cp.stall_timeout_secs as u64,
+            models: engine_models,
+            quirks: ProviderQuirks::default(),
+            chat_path: "/chat/completions".into(),
+        };
+        let keys = crate::db::load_provider_keys(db, id).await?;
+        let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config, keys);
+        self.active.insert(id.to_string(), Box::new(provider));
         Ok(())
     }
 

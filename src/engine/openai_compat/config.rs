@@ -17,6 +17,8 @@ pub struct OpenAIConfig {
     pub stream_stall_timeout_secs: u64,
     pub models: Vec<ModelDef>,
     pub quirks: crate::providers::spec::ProviderQuirks,
+    /// Path suffix for chat completions endpoint. Default: "/v1/chat/completions"
+    pub chat_path: String,
 }
 
 #[derive(Clone)]

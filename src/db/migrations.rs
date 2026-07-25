@@ -209,6 +209,34 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
         Err(e) => tracing::warn!("Migration skipped: {}", e),
     }
 
+    // Migration v8: custom OpenAI-compatible providers
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS custom_providers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            prefix TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            validate_url TEXT NOT NULL DEFAULT '',
+            color TEXT NOT NULL DEFAULT '#6366F1',
+            timeout_secs INTEGER NOT NULL DEFAULT 120,
+            first_chunk_timeout_secs INTEGER NOT NULL DEFAULT 200,
+            stall_timeout_secs INTEGER NOT NULL DEFAULT 360,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    "#).execute(pool).await?;
+
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS custom_provider_models (
+            provider_id TEXT NOT NULL REFERENCES custom_providers(id) ON DELETE CASCADE,
+            model_id TEXT NOT NULL,
+            ctx INTEGER NOT NULL DEFAULT 4096,
+            vision INTEGER NOT NULL DEFAULT 0,
+            tools INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(provider_id, model_id)
+        )
+    "#).execute(pool).await?;
+
     tracing::info!("Database migrations complete");
     Ok(())
 }

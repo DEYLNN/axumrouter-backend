@@ -55,7 +55,7 @@ impl Client {
     ) -> Result<ChatResponse, GatewayError> {
         let mut headers = reqwest::header::HeaderMap::new();
         self.add_auth_header(&mut headers, auth);
-        let url = format!("{}/v1/chat/completions", self.config.base_url);
+        let url = format!("{}{}", self.config.base_url, self.config.chat_path);
 
         let resp = self
             .http
@@ -96,7 +96,7 @@ impl Client {
     ) -> Result<reqwest::Response, GatewayError> {
         let mut headers = reqwest::header::HeaderMap::new();
         self.add_auth_header(&mut headers, auth);
-        let url = format!("{}/v1/chat/completions", self.config.base_url);
+        let url = format!("{}{}", self.config.base_url, self.config.chat_path);
 
         let req = self
             .http

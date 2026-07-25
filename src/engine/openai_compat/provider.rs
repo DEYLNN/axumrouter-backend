@@ -31,7 +31,7 @@ impl OpenAICompatibleProvider {
         let metadata = ProviderMetadata {
             name: config.provider_id.to_string(),
             display_name: config.provider_name.to_string(),
-            version: format!("{}/v1/chat/completions", config.base_url),
+            version: format!("{}{}", config.base_url, config.chat_path),
             capabilities: vec!["chat".to_string(), "models".to_string(), "streaming".to_string()],
             icon_path: format!("/public/providers/{}.png", config.provider_id),
             category: config.category.to_string(),

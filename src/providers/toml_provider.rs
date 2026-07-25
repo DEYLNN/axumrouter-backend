@@ -103,6 +103,7 @@ pub fn build_openai_config(p: &ProviderDef) -> OpenAIConfig {
         stream_stall_timeout_secs: p.stall_timeout.unwrap_or(360),
         models: build_models(p),
         quirks: build_quirks(p),
+        chat_path: "/v1/chat/completions".into(),
     }
 }
 

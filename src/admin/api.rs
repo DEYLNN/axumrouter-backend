@@ -8,6 +8,7 @@ use super::routes;
 pub fn admin_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .merge(providers_routes(state.clone()))
+        .merge(custom_providers_routes(state.clone()))
         .merge(logs_routes(state.clone()))
         .merge(usage_routes(state.clone()))
         .merge(settings_routes(state.clone()))
@@ -28,6 +29,17 @@ fn providers_routes(state: Arc<AppState>) -> Router {
         .route("/admin/api/providers/:id/test", post(routes::providers::api_test_model))
         .route("/admin/api/providers/:id/block", post(routes::providers::api_block_model))
         .route("/admin/api/providers/:id/unblock", post(routes::providers::api_unblock_model))
+        .with_state(state)
+}
+
+fn custom_providers_routes(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/admin/api/custom-providers", get(routes::custom_providers::api_list_custom_providers))
+        .route("/admin/api/custom-providers", post(routes::custom_providers::api_create_custom_provider))
+        .route("/admin/api/custom-providers/:id", get(routes::custom_providers::api_get_custom_provider))
+        .route("/admin/api/custom-providers/:id", delete(routes::custom_providers::api_delete_custom_provider))
+        .route("/admin/api/custom-providers/:id/models", post(routes::custom_providers::api_add_custom_model))
+        .route("/admin/api/custom-providers/:id/models/:model_id", delete(routes::custom_providers::api_remove_custom_model))
         .with_state(state)
 }
 

@@ -190,6 +190,13 @@ ctx = 1000000
 vision = false
 tools = true
 
+[[providers.models]]
+id = "inclusionai/ling-3.0-flash"
+name = "Inclusion AI Ling 3.0 Flash"
+ctx = 262144
+vision = false
+tools = true
+
 [[providers]]
 id = "ags"
 name = "Agnes AI"
@@ -1821,6 +1828,20 @@ ctx = 204800
 vision = false
 tools = true
 
+[[providers.models]]
+id = "poolside/laguna-s-2.1:free"
+name = "Poolside Laguna S 2.1 (Free)"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers.models]]
+id = "inclusionai/ling-3.0-flash:free"
+name = "Inclusion AI Ling 3.0 Flash (Free)"
+ctx = 262144
+vision = false
+tools = true
+
 [[providers]]
 id = "poll"
 name = "Pollinations"
@@ -2655,5 +2676,34 @@ tools = true
 id = "zai-org/glm-4.6"
 name = "GLM 4.6"
 ctx = 202752
+vision = false
+tools = true
+
+[[providers]]
+id = "ver"
+name = "Vercel"
+category = "apikey"
+color = "#000000"
+icon = "ver.png"
+base_url = "https://ai-gateway.vercel.sh/v1"
+validate_url = "https://ai-gateway.vercel.sh/v1/models"
+api_type = "openai"
+docs_url = "https://vercel.com"
+api_key_url = "https://vercel.com"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "inclusionai/ling-3.0-flash-free"
+name = "Inclusion AI Ling 3.0 Flash"
+ctx = 256000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "poolside/laguna-s-2.1-free"
+name = "Poolside Laguna S 2.1"
+ctx = 256000
 vision = false
 tools = true

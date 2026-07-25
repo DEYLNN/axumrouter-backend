@@ -26,6 +26,54 @@ async fn get_auth_files_json(
     .fetch_all(&state.db)
     .await
     .unwrap_or_default();
+
+    // Latest usage per api_key_id — only keep if that latest row is still an error
+    #[derive(sqlx::FromRow)]
+    struct KeyErr {
+        api_key_id: String,
+        status: String,
+        status_code: Option<i64>,
+        error_message: Option<String>,
+        model_id: String,
+        created_at: String,
+        error_count: i64,
+    }
+    let err_rows: Vec<KeyErr> = sqlx::query_as(
+        r#"
+        SELECT u.api_key_id,
+               u.status,
+               u.status_code,
+               u.error_message,
+               u.model_id,
+               u.created_at,
+               COALESCE(ec.error_count, 0) AS error_count
+        FROM usage u
+        INNER JOIN (
+            SELECT api_key_id, MAX(created_at) AS max_created
+            FROM usage
+            WHERE api_key_id IS NOT NULL AND api_key_id != ''
+            GROUP BY api_key_id
+        ) latest ON u.api_key_id = latest.api_key_id AND u.created_at = latest.max_created
+        LEFT JOIN (
+            SELECT api_key_id, COUNT(*) AS error_count
+            FROM usage
+            WHERE status = 'error' AND api_key_id IS NOT NULL AND api_key_id != ''
+            GROUP BY api_key_id
+        ) ec ON u.api_key_id = ec.api_key_id
+        WHERE u.status = 'error'
+        "#
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    let mut err_map = std::collections::HashMap::new();
+    for e in err_rows {
+        // only last request is error → surface it
+        if e.status == "error" {
+            err_map.insert(e.api_key_id.clone(), e);
+        }
+    }
+
     let entries: Vec<serde_json::Value> = rows.iter().map(|(id, kv, label, active, created, prov, kt)| {
         let parsed: serde_json::Value = serde_json::from_str(kv).unwrap_or_default();
         let preview = if kt == "apikey" {
@@ -53,6 +101,7 @@ async fn get_auth_files_json(
                 } else { String::new() }
             } else { String::new() }
         };
+        let last_err = err_map.get(id);
         serde_json::json!({
             "id": id, "key_value": kv, "label": label, "is_active": active,
             "created_at": created, "provider_id": prov, "key_type": kt,
@@ -62,6 +111,11 @@ async fn get_auth_files_json(
             "has_access": parsed.get("access_token").and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false),
             "has_refresh": !parsed.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").is_empty(),
             "expires_at": expires_at,
+            "last_error_status": last_err.and_then(|e| e.status_code),
+            "last_error_message": last_err.and_then(|e| e.error_message.clone()),
+            "last_error_model": last_err.map(|e| e.model_id.clone()),
+            "last_error_at": last_err.map(|e| e.created_at.clone()),
+            "error_count": last_err.map(|e| e.error_count).unwrap_or(0),
         })
     }).collect();
     Json(serde_json::json!({ "files": entries }))
