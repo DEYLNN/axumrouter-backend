@@ -22,10 +22,11 @@ impl Client {
     }
 
     fn headers(&self, auth: &ApiKeyAuth) -> reqwest::header::HeaderMap {
-        use reqwest::header::{HeaderValue, AUTHORIZATION};
+        use reqwest::header::HeaderValue;
         let mut h = reqwest::header::HeaderMap::new();
-        let (_k, v) = auth.to_header(self.config.quirks.auth_header);
-        h.insert(AUTHORIZATION, HeaderValue::from_str(&v).expect("auth header value"));
+        let (k, v) = auth.to_header(self.config.quirks.auth_header);
+        h.insert(reqwest::header::HeaderName::from_bytes(k.as_bytes()).expect("auth header name"),
+            HeaderValue::from_str(&v).expect("auth header value"));
         h.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
         h.insert("content-type", HeaderValue::from_static("application/json"));
         h
@@ -38,6 +39,8 @@ impl Client {
         request: &AnthropicRequest,
     ) -> Result<crate::engine::anthropic_compat::types::AnthropicResponse, GatewayError> {
         let url = format!("{}/v1/messages", self.config.base_url);
+        let body_str = serde_json::to_string(request).unwrap_or_default();
+        tracing::debug!("[mmx] request body: {}", &body_str[..body_str.len().min(2000)]);
         let resp = self.http.post(&url)
             .headers(self.headers(auth))
             .json(request)

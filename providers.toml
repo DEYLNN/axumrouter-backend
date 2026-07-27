@@ -1498,6 +1498,10 @@ timeout = 64
 first_chunk_timeout = 120
 stall_timeout = 120
 
+[providers.quirks]
+auth_header = "x-api-key"
+drop_stream_options = true
+
 [[providers.models]]
 id = "MiniMax-M2.7"
 name = "MiniMax M2.7"

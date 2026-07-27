@@ -46,7 +46,7 @@ pub enum ContentBlock {
     #[serde(rename = "tool_use")]
     ToolUse { id: String, name: String, input: serde_json::Value },
     #[serde(rename = "tool_result")]
-    ToolResult { tool_use_id: String, content: String, #[serde(skip_serializing_if = "Option::is_none")] is_error: Option<bool> },
+    ToolResult { tool_use_id: String, content: serde_json::Value, #[serde(skip_serializing_if = "Option::is_none")] is_error: Option<bool> },
     #[serde(rename = "thinking")]
     Thinking { thinking: String, #[serde(skip_serializing_if = "Option::is_none")] signature: Option<String> },
 }

@@ -66,9 +66,10 @@ impl Mapper {
 
             // Tool result (tool → tool_result)
             if m.role == "tool" {
+                let content_str = m.content.clone().unwrap_or_default();
                 content.push(ContentBlock::ToolResult {
                     tool_use_id: m.tool_call_id.clone().unwrap_or_default(),
-                    content: m.content.clone().unwrap_or_default(),
+                    content: serde_json::json!([{"type": "text", "text": content_str}]),
                     is_error: None,
                 });
             }
@@ -83,6 +84,36 @@ impl Mapper {
             input_schema: t.function.parameters.clone(),
         }).collect());
 
+        // Tool choice — convert OpenAI format to Anthropic format.
+        // OpenAI: "auto" | "none" | "required" | {type:"function",function:{name}}
+        // Anthropic: {type:"auto"|"any"|"tool"|"none", name?}
+        let tool_choice: Option<serde_json::Value> = gw.tool_choice.as_ref().map(|tc| {
+            match tc {
+                serde_json::Value::String(s) => {
+                    if s == "required" {
+                        serde_json::json!({"type": "any"})
+                    } else {
+                        serde_json::json!({"type": s}) // "auto" or "none"
+                    }
+                }
+                serde_json::Value::Object(m) => {
+                    // OpenAI: {type:"function", function:{name}}
+                    if let Some(name) = m.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()) {
+                        serde_json::json!({"type": "tool", "name": name})
+                    } else if let Some(t) = m.get("type").and_then(|t| t.as_str()) {
+                        // Already Anthropic format — validate
+                        match t {
+                            "auto" | "any" | "tool" | "none" => tc.clone(),
+                            _ => serde_json::json!({"type": "auto"}),
+                        }
+                    } else {
+                        serde_json::json!({"type": "auto"})
+                    }
+                }
+                _ => serde_json::json!({"type": "auto"}),
+            }
+        });
+
         // Thinking
         let thinking = None; // could map from reasoning_effort later
 
@@ -94,7 +125,7 @@ impl Mapper {
             system,
             messages,
             tools,
-            tool_choice: gw.tool_choice.clone(),
+            tool_choice,
             thinking,
         }
     }
@@ -160,8 +191,17 @@ impl Mapper {
     }
 
     pub fn parse_stream_event(&self, line: &str) -> Result<AnthropicStreamEvent, GatewayError> {
-        let data = line.strip_prefix("data: ")
-            .ok_or_else(|| GatewayError::ProviderError("SSE line missing 'data: ' prefix".into()))?;
+        // Skip event: lines (Anthropic SSE format metadata — e.g. event: content_block_delta)
+        // MiniMax Anthropic endpoint sends these; missing handler breaks the stream.
+        if line.trim_start().starts_with("event:") {
+            return Ok(AnthropicStreamEvent::Ping);
+        }
+
+        // Tolerant: accept both "data: {...}" and "data:{...}" (no space after colon)
+        let data = line.trim_start().strip_prefix("data:").map(|s| {
+            if s.starts_with(' ') { &s[1..] } else { s }
+        }).ok_or_else(|| GatewayError::ProviderError("SSE line not a data frame".into()))?
+        .trim();
 
         if data == "[DONE]" || data.trim().is_empty() {
             return Err(GatewayError::ProviderError("Stream done".into()));
