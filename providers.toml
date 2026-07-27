@@ -1501,6 +1501,7 @@ stall_timeout = 120
 [providers.quirks]
 auth_header = "x-api-key"
 drop_stream_options = true
+string_tool_result = true
 
 [[providers.models]]
 id = "MiniMax-M2.7"

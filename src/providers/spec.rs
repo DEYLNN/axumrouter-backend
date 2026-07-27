@@ -36,6 +36,8 @@ pub struct ProviderQuirks {
     pub default_temperature: Option<f64>,
     /// Force temperature — always use this value, ignore user request.
     pub force_temperature: Option<f64>,
+    /// MiniMax expects tool_result.content as string, not array.
+    pub string_tool_result: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +63,7 @@ impl Default for ProviderQuirks {
             supports_stream_usage: true,
             default_temperature: None,
             force_temperature: None,
+            string_tool_result: false,
         }
     }
 }

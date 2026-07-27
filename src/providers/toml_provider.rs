@@ -54,6 +54,7 @@ pub struct QuirksDef {
     pub supports_stream_usage: Option<bool>,
     pub default_temperature: Option<f64>,
     pub force_temperature: Option<f64>,
+    pub string_tool_result: Option<bool>,
 }
 
 use crate::engine::openai_compat::config::{OpenAIConfig, ModelDef as EngineModelDef};
@@ -77,6 +78,7 @@ fn build_quirks(p: &ProviderDef) -> ProviderQuirks {
         supports_stream_usage: q.and_then(|x| x.supports_stream_usage).unwrap_or(true),
         default_temperature: q.and_then(|x| x.default_temperature),
         force_temperature: q.and_then(|x| x.force_temperature),
+        string_tool_result: q.and_then(|x| x.string_tool_result).unwrap_or(false),
     }
 }
 

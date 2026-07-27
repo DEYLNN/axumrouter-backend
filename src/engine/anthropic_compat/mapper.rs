@@ -67,9 +67,14 @@ impl Mapper {
             // Tool result (tool → tool_result)
             if m.role == "tool" {
                 let content_str = m.content.clone().unwrap_or_default();
+                let tool_content = if self.config.quirks.string_tool_result {
+                    serde_json::Value::String(content_str)
+                } else {
+                    serde_json::json!([{"type": "text", "text": content_str}])
+                };
                 content.push(ContentBlock::ToolResult {
                     tool_use_id: m.tool_call_id.clone().unwrap_or_default(),
-                    content: serde_json::json!([{"type": "text", "text": content_str}]),
+                    content: tool_content,
                     is_error: None,
                 });
             }
