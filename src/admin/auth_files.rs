@@ -9,10 +9,42 @@ use crate::state::AppState;
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/admin/api/auth-files", get(get_auth_files_json))
+        .route("/admin/api/auth-files/stats", get(get_auth_files_stats))
         .route("/admin/api/auth-files/download/:id", get(download_auth_file))
         .route("/admin/api/auth-files/import", post(import_auth_files))
         .route("/admin/api/auth-files/delete", post(delete_selected))
         .with_state(state)
+}
+
+// ── Stats endpoint: aggregate counts from ALL records ──
+
+async fn get_auth_files_stats(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys")
+        .fetch_one(&state.db).await.unwrap_or(0);
+
+    let active: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys WHERE is_active = 1")
+        .fetch_one(&state.db).await.unwrap_or(0);
+
+    // Count per provider (all records)
+    #[derive(sqlx::FromRow)]
+    struct ProvCount { provider_id: String, cnt: i64 }
+    let prov_rows: Vec<ProvCount> = sqlx::query_as(
+        "SELECT provider_id, COUNT(*) AS cnt FROM api_keys GROUP BY provider_id ORDER BY cnt DESC"
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    Json(serde_json::json!({
+        "total": total,
+        "active": active,
+        "disabled": total - active,
+        "providers": prov_rows.into_iter().map(|p| {
+            serde_json::json!({"provider_id": p.provider_id, "count": p.cnt})
+        }).collect::<Vec<_>>(),
+    }))
 }
 
 // ── Query params for server-side pagination ──

@@ -1519,6 +1519,13 @@ ctx = 204800
 vision = false
 tools = true
 
+[[providers.models]]
+id = "MiniMax-M3"
+name = "MiniMax M3"
+ctx = 1000000
+vision = false
+tools = true
+
 [[providers]]
 id = "mmxcn"
 name = "MiniMax China"
