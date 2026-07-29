@@ -4,7 +4,7 @@ use axum::Json;
 use crate::state::AppState;
 
 pub async fn start() -> Json<serde_json::Value> {
-    match crate::providers::freebuff::oauth::start().await {
+    match crate::providers::oauth::freebuff::oauth::start().await {
         Ok(data) => Json(data),
         Err(e) => Json(serde_json::json!({"error": e})),
     }
@@ -26,10 +26,10 @@ pub async fn poll(
         None => String::new(),
     };
 
-    match crate::providers::freebuff::oauth::poll(device_code, fingerprint_hash, &expires_at).await {
+    match crate::providers::oauth::freebuff::oauth::poll(device_code, fingerprint_hash, &expires_at).await {
         Ok(data) => {
             if data.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                if let Err(e) = crate::providers::freebuff::oauth::save_token(&state, &data).await {
+                if let Err(e) = crate::providers::oauth::freebuff::oauth::save_token(&state, &data).await {
                     return Json(serde_json::json!({"ok": false, "error": e}));
                 }
             }

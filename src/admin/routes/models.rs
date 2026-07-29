@@ -100,3 +100,60 @@ pub async fn api_blocked_models(
     .collect();
     Json(rows.into_iter().map(|(p, m)| serde_json::json!({ "provider": p, "model": m })).collect())
 }
+
+/// Bulk enable or disable all models for a provider in one call.
+/// Used by ModelsSection "Enable all" / "Disable all" buttons.
+#[derive(Deserialize)]
+pub struct BulkToggleRequest {
+    pub provider_id: String,
+    pub enabled: bool,
+}
+
+#[derive(Serialize)]
+pub struct BulkToggleResponse {
+    pub ok: bool,
+    pub provider_id: String,
+    pub enabled: bool,
+    pub affected: usize,
+}
+
+pub async fn api_bulk_toggle(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BulkToggleRequest>,
+) -> Json<BulkToggleResponse> {
+    let models = state
+        .provider_manager
+        .read()
+        .await
+        .list_all_models_unfiltered()
+        .await;
+    let prefix = format!("{}/", req.provider_id);
+    let mut affected = 0usize;
+    for m in &models {
+        if !m.id.starts_with(&prefix) {
+            continue;
+        }
+        let r = if req.enabled {
+            // Enable: remove from disabled list
+            sqlx::query("DELETE FROM disabled_models WHERE model_id = ?")
+                .bind(&m.id)
+                .execute(&state.db)
+                .await
+        } else {
+            // Disable: add to disabled list
+            sqlx::query("INSERT OR IGNORE INTO disabled_models (model_id) VALUES (?)")
+                .bind(&m.id)
+                .execute(&state.db)
+                .await
+        };
+        if r.is_ok() {
+            affected += 1;
+        }
+    }
+    Json(BulkToggleResponse {
+        ok: true,
+        provider_id: req.provider_id,
+        enabled: req.enabled,
+        affected,
+    })
+}

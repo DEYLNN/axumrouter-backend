@@ -51,6 +51,7 @@ impl Client {
     pub async fn chat_non_streaming(
         &self,
         auth: &ApiKeyAuth,
+        key_id: &str,
         request: &ChatRequest,
     ) -> Result<ChatResponse, GatewayError> {
         let mut headers = reqwest::header::HeaderMap::new();
@@ -72,11 +73,12 @@ impl Client {
         })?;
 
         if !status.is_success() {
-            return Err(GatewayError::ProviderError(format!(
-                "Provider returned HTTP {}: {}",
-                status.as_u16(),
-                body
-            )));
+            return Err(GatewayError::ProviderHttpError {
+                status: status.as_u16(),
+                body,
+                provider: self.config.provider_id.clone(),
+                key_id: Some(key_id.to_string()),
+            });
         }
 
         serde_json::from_str::<ChatResponse>(&body).map_err(|e| {

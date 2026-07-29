@@ -44,7 +44,20 @@ impl Mapper {
             stream_options: if quirks.drop_stream_options {
                 None
             } else {
-                gateway_req.stream_options.clone()
+                // When streaming, ensure `stream_options.include_usage = true` so upstream
+                // emits a final chunk with usage fields — required for our /usage tracker
+                // to record prompt/completion tokens. If the caller already set it, respect
+                // their value (don't override false→true unless the gateway forces it).
+                let is_streaming = gateway_req.stream.unwrap_or(false);
+                let mut opts = gateway_req.stream_options.clone();
+                if is_streaming {
+                    let val = opts.get_or_insert(serde_json::json!({}));
+                    if let Some(obj) = val.as_object_mut() {
+                        obj.entry("include_usage".to_string())
+                            .or_insert(serde_json::Value::Bool(true));
+                    }
+                }
+                opts
             },
             tools: if quirks.drop_tools {
                 None

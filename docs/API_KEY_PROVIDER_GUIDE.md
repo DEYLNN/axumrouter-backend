@@ -68,10 +68,13 @@ tools = true
 
 ## Provider Custom (OAuth / Complex Logic)
 
-Untuk provider yang butuh OAuth atau logika khusus (cf, fb, kc, np, cx, xai):
+Untuk provider yang butuh OAuth atau logika khusus (cf, fb, kc, np, xai):
 - Tetap pake folder `backend/src/providers/<id>/`
 - Register manual di `backend/src/providers/registry.rs`
 - Lihat contoh di folder `cloudflare/`, `freebuff/`, dll
+
+> **DB pool persist**: kalo pake `KeyManager`, WAJIB pass pool biar lock state survive restart.
+> Lengkap: `docs/USAGE_TRACKING.md` → "Key Lock State Persistence".
 
 ## Arsitektur
 

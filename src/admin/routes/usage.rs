@@ -1,95 +1,105 @@
 use std::sync::Arc;
+use std::convert::Infallible;
 
-use axum::{extract::State, Json};
-use serde::Serialize;
+use axum::{
+    extract::{Query, State},
+    response::sse::{Event, Sse},
+    Json,
+};
+use serde::Deserialize;
+use tokio::sync::broadcast::error::RecvError;
 
 use crate::state::AppState;
 
-#[derive(Serialize)]
-pub struct UsageStats {
-    pub total_requests: i64,
-    pub total_prompt_tokens: i64,
-    pub total_completion_tokens: i64,
-    pub total_tokens: i64,
-    pub success_count: i64,
-    pub error_count: i64,
+/// Aggregate stats for the Usage page top cards.
+/// GET /admin/api/usage/stats
+pub async fn api_usage_stats(
+    State(state): State<Arc<AppState>>,
+) -> Json<crate::db::UsageStatsRow> {
+    Json(crate::db::usage_stats(&state.db).await)
 }
 
-pub async fn api_usage_oauth_keys(State(state): State<Arc<AppState>>) -> Json<Vec<serde_json::Value>> {
-    // All keys with key_type='oauth' (xai, cx, fb etc)
-    let rows = sqlx::query_as::<_, (String, String, Option<String>)>(
-        "SELECT id, provider_id, label FROM api_keys WHERE key_type='oauth' ORDER BY created_at DESC"
-    )
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
-
-    let data: Vec<serde_json::Value> = rows.into_iter().map(|(id, provider_id, label)| {
-        serde_json::json!({ "id": id, "provider_id": provider_id, "label": label })
-    }).collect();
-
-    Json(data)
+#[derive(Debug, Deserialize)]
+pub struct UsageKeysQuery {
+    pub gateway_key_id: Option<String>,
 }
 
-pub async fn api_usage_stats(State(state): State<Arc<AppState>>) -> Json<UsageStats> {
-    let row: (i64, i64, i64, i64, i64, i64) = sqlx::query_as(
-        "SELECT COUNT(*), COALESCE(SUM(prompt_tokens),0), COALESCE(SUM(completion_tokens),0), COALESCE(SUM(total_tokens),0), COALESCE(SUM(CASE WHEN status='success' OR status='streaming' THEN 1 ELSE 0 END),0), COALESCE(SUM(CASE WHEN status='error' THEN 1 ELSE 0 END),0) FROM usage"
-    )
-    .fetch_one(&state.db)
-    .await
-    .unwrap_or((0,0,0,0,0,0));
-
-    Json(UsageStats {
-        total_requests: row.0,
-        total_prompt_tokens: row.1,
-        total_completion_tokens: row.2,
-        total_tokens: row.3,
-        success_count: row.4,
-        error_count: row.5,
-    })
+/// Per-key breakdown for the Usage page Per-Key table.
+/// GET /admin/api/usage/keys
+pub async fn api_usage_keys(
+    State(state): State<Arc<AppState>>,
+    Query(_q): Query<UsageKeysQuery>,
+) -> Json<Vec<crate::db::UsagePerKeyRow>> {
+    // For Phase 1 we return all rows; gateway_key_id filter is a follow-up
+    // when the FE asks for per-row drilldown.
+    Json(crate::db::usage_per_key(&state.db).await)
 }
 
-/// Aggregated usage per gateway key
-pub async fn api_usage_per_key(State(state): State<Arc<AppState>>) -> Json<Vec<serde_json::Value>> {
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        gateway_key_id: Option<String>,
-        label: Option<String>,
-        key_value: Option<String>,
-        requests: i64,
-        prompt_tokens: i64,
-        completion_tokens: i64,
-        total_tokens: i64,
-    }
+#[derive(Debug, Deserialize)]
+pub struct UsageLogsQuery {
+    pub page: Option<i64>,
+    pub limit: Option<i64>,
+}
 
-    let rows: Vec<Row> = sqlx::query_as(
-        r#"
-        SELECT
-            COALESCE(u.gateway_key_id, '') as gateway_key_id,
-            gk.label,
-            gk.key_value,
-            COUNT(*) as requests,
-            COALESCE(SUM(u.prompt_tokens), 0) as prompt_tokens,
-            COALESCE(SUM(u.completion_tokens), 0) as completion_tokens,
-            COALESCE(SUM(u.total_tokens), 0) as total_tokens
-        FROM usage u
-        LEFT JOIN gateway_keys gk ON u.gateway_key_id = gk.id
-        WHERE u.gateway_key_id IS NOT NULL
-        GROUP BY u.gateway_key_id
-        ORDER BY total_tokens DESC
-        "#
+/// Paginated recent-request list for the Usage page live feed.
+/// GET /admin/api/logs?page=1&limit=50
+pub async fn api_usage_logs(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<UsageLogsQuery>,
+) -> Json<serde_json::Value> {
+    let page = q.page.unwrap_or(1).max(1);
+    let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    let offset = (page - 1) * limit;
+    let logs = crate::db::usage_logs_page(&state.db, limit, offset).await;
+    let total = crate::db::count_usage_logs(&state.db).await;
+    let total_pages = if limit == 0 { 1 } else { (total + limit - 1) / limit };
+    Json(serde_json::json!({
+        "logs": logs,
+        "total": total,
+        "page": page,
+        "total_pages": total_pages,
+    }))
+}
+
+/// Server-Sent Events push — every new usage row is forwarded to
+/// connected FE clients in real-time. Open with EventSource on the FE.
+///
+/// GET /admin/api/usage/stream
+pub async fn api_usage_stream(
+    State(state): State<Arc<AppState>>,
+) -> Sse<impl futures::Stream<Item = Result<Event, Infallible>>> {
+    let mut rx = state.usage_broadcast.subscribe();
+
+    let stream = async_stream::stream! {
+        loop {
+            match rx.recv().await {
+                Ok(row) => {
+                    let json = serde_json::to_string(&row).unwrap_or_default();
+                    yield Ok(Event::default().event("usage").data(json));
+                }
+                Err(RecvError::Lagged(_)) => {
+                    // Subscriber slow — skip missed events, keep going.
+                    continue;
+                }
+                Err(RecvError::Closed) => break,
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(std::time::Duration::from_secs(15))
+            .text("keep-alive"),
     )
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+}
 
-    Json(rows.iter().map(|r| serde_json::json!({
-        "gateway_key_id": r.gateway_key_id,
-        "label": r.label,
-        "key_value": r.key_value.as_ref().map(|kv| &kv[..12.min(kv.len())]),
-        "requests": r.requests,
-        "prompt_tokens": r.prompt_tokens,
-        "completion_tokens": r.completion_tokens,
-        "total_tokens": r.total_tokens,
-    })).collect())
+/// DELETE all usage rows. Use with caution — this is irreversible.
+/// POST /admin/api/logs/clear
+pub async fn api_clear_logs(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let _ = sqlx::query("DELETE FROM usage")
+        .execute(&state.db)
+        .await;
+    Json(serde_json::json!({ "ok": true }))
 }

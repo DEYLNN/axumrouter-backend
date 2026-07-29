@@ -1,17 +1,22 @@
 use std::sync::Arc;
-use std::time::Instant;
 
 use axum::response::sse::{Event, Sse};
 use axum::response::IntoResponse;
 use futures::StreamExt;
 use std::convert::Infallible;
+use std::time::Instant;
 
 use crate::error::GatewayError;
-use crate::services::usage_tracking::{estimate_prompt_tokens, estimate_tokens_from_chars};
+use crate::services::usage_tracking::{record_error, record_success, StreamRecorder};
 use crate::state::AppState;
 use crate::types::chat::ChatCompletionRequest;
 
 /// Handle streaming chat completion.
+///
+/// Provider-agnostic usage tracking: each chunk folds into a
+/// `StreamRecorder` (prompt/completion tokens, TTFT on first chunk).
+/// After the producer stream is consumed, we persist one row.
+/// Provider-API-key-id isn't surfaced yet (TODO).
 pub(crate) async fn handle_streaming(
     state: &Arc<AppState>,
     gw_key: &crate::middleware::auth::GatewayKeyInfo,
@@ -21,68 +26,99 @@ pub(crate) async fn handle_streaming(
     provider_request: &ChatCompletionRequest,
     start: Instant,
 ) -> Result<axum::response::Response, GatewayError> {
+    let provider_id = provider_id.to_string();
+    let model = model.to_string();
+    let gateway_key_id = gw_key.key_id.clone();
+    let endpoint = "/v1/chat/completions".to_string();
+    let state_for_track = state.clone();
+    let endpoint_for_track = endpoint.clone();
+    let provider_id_for_track = provider_id.clone();
+    let model_for_track = model.clone();
+    let gateway_key_id_for_track = gateway_key_id.clone();
+    let started = start;
+
     let stream_result = provider.chat_completion_stream(provider_request.clone()).await;
-    let latency_ms = start.elapsed().as_millis() as i64;
 
     match stream_result {
         Ok(chat_result) => {
-            // Log failed key attempts
+            let used_key_id_for_track: Option<String> = chat_result.used_key_id.clone();
+            // Mirror non_streaming.rs: log each failed key attempt as its own error row.
             for failed in &chat_result.failed_keys {
-                let _ = crate::db::log_usage(
-                    &state.db, provider_id,
+                record_error(
+                    &state.usage_tracker,
+                    start,
+                    &provider_id,
+                    &model,
+                    &gateway_key_id,
                     Some(&failed.key_id),
-                    model, "error", Some(401), 0, 0,
-                    Some(latency_ms),
-                    Some(failed.error.to_string()),
-                    None, None,
-                    None,
-                ).await;
+                    &endpoint,
+                    failed.error.http_status().unwrap_or(503) as i32,
+                    &failed.error.to_string(),
+                )
+                .await;
             }
-
-            let usage_id = crate::db::log_usage(
-                &state.db, provider_id,
-                chat_result.used_key_id.as_deref(),
-                model, "streaming", Some(200),
-                0, 0,
-                Some(latency_ms), None,
-                Some(serde_json::to_string(provider_request).unwrap_or_default()),
-                None,
-                Some(&gw_key.key_id),
-            ).await.unwrap_or_default();
-
-            let db = state.db.clone();
-            let usage_id = std::sync::Arc::new(usage_id);
-            let prompt_tokens_est = estimate_prompt_tokens(provider_request);
-            let accumulated_content = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-
+            // `then` is FnMut — must capture by reference, not move.
+            // Track whether we've already persisted the final usage row; the
+            // chunk that carries `usage` is the terminal one — write immediately
+            // so we never lose token counts to the previous 500 ms-race.
+            let recorder_ref = Arc::new(tokio::sync::Mutex::new(StreamRecorder::default()));
+            let saved_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let recorder_w = recorder_ref.clone();
+            let saved_flag_w = saved_flag.clone();
+            let start_for_record = start;
+            let state_w = state.clone();
+            let provider_id_w = provider_id.clone();
+            let model_w = model.clone();
+            let gateway_key_id_w = gateway_key_id.clone();
+            let endpoint_w = endpoint.clone();
+            let started_w = start;
+            let key_id_w = used_key_id_for_track.clone();
             let stream = chat_result.stream.then(move |chunk| {
-                let db = db.clone();
-                let usage_id = usage_id.clone();
-                let accumulated_content = accumulated_content.clone();
+                let recorder_w = recorder_w.clone();
+                let saved_flag_w = saved_flag_w.clone();
+                let state_w = state_w.clone();
+                let provider_id_w = provider_id_w.clone();
+                let model_w = model_w.clone();
+                let gateway_key_id_w = gateway_key_id_w.clone();
+                let endpoint_w = endpoint_w.clone();
+                let key_id_w = key_id_w.clone();
                 async move {
                     match chunk {
                         Ok(chunk) => {
-                            for choice in &chunk.choices {
-                                if let Some(content) = &choice.delta.content {
-                                    if let Ok(mut acc) = accumulated_content.lock() {
-                                        acc.push_str(content);
-                                    }
-                                }
+                            // Borrow option so we don't move `chunk`.
+                            let usage = chunk.usage.as_ref();
+                            let prompt = usage.map(|u| u.prompt_tokens as i64);
+                            let completion = usage.map(|u| u.completion_tokens as i64);
+                            let (ttft_ms, last_seen) = {
+                                let mut r = recorder_w.lock().await;
+                                r.record_chunk(start_for_record, prompt, completion);
+                                (r.ttft_ms, (r.prompt_tokens, r.completion_tokens))
+                            };
+                            // If this chunk carries usage, flush immediately —
+                            // it IS the final chunk. Atomic compare-and-swap so
+                            // only the first chunk with usage fires the row write.
+                            if usage.is_some()
+                                && !saved_flag_w.swap(true, std::sync::atomic::Ordering::SeqCst)
+                            {
+                                let (p, c) = last_seen;
+                                tokio::spawn(async move {
+                                    record_success(
+                                        &state_w.usage_tracker,
+                                        started_w,
+                                        &provider_id_w,
+                                        &model_w,
+                                        &gateway_key_id_w,
+                                        key_id_w.as_deref(),
+                                        &endpoint_w,
+                                        crate::services::usage_tracking::CanonicalUsage {
+                                            prompt_tokens: p,
+                                            completion_tokens: c,
+                                        },
+                                        ttft_ms,
+                                    )
+                                    .await;
+                                });
                             }
-
-                            let should_update = chunk.usage.is_some()
-                                || chunk.choices.iter().any(|c| c.finish_reason.is_some());
-                            if should_update && !usage_id.is_empty() {
-                                let (pt, ct) = if let Some(usage) = &chunk.usage {
-                                    (usage.prompt_tokens as i64, usage.completion_tokens as i64)
-                                } else {
-                                    let content_len = accumulated_content.lock().map(|s| s.len()).unwrap_or(0);
-                                    (prompt_tokens_est, estimate_tokens_from_chars(content_len))
-                                };
-                                let response_body = serde_json::to_string(&chunk).ok();
-                                let _ = crate::db::update_usage_tokens(&db, &usage_id, pt, ct, response_body).await;
-                            }
-
                             let json = serde_json::to_string(&chunk).unwrap_or_default();
                             Ok::<_, Infallible>(Event::default().data(json))
                         }
@@ -104,14 +140,15 @@ pub(crate) async fn handle_streaming(
                 Ok::<_, Infallible>(Event::default().data("[DONE]"))
             });
 
-            let sse = stream.chain(done);
-            let mut response = Sse::new(sse)
+            let full_stream = stream.chain(done);
+
+            let sse = Sse::new(full_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new()
                     .interval(std::time::Duration::from_secs(15))
-                    .text("keep-alive"))
-                .into_response();
+                    .text("keep-alive"));
 
-            // Anti-buffer headers for CDN/proxy (Cloudflare, nginx, etc.)
+            let mut response = sse.into_response();
+
             response.headers_mut().insert(
                 axum::http::header::CACHE_CONTROL,
                 axum::http::HeaderValue::from_static("no-cache, no-transform"),
@@ -128,15 +165,18 @@ pub(crate) async fn handle_streaming(
             Ok(response)
         }
         Err(e) => {
-            let _ = crate::db::log_usage(
-                &state.db, provider_id, None,
-                model, "error", None, 0, 0,
-                Some(latency_ms),
-                Some(e.to_string()),
-                Some(serde_json::to_string(provider_request).unwrap_or_default()),
-                None,
-                None,
-            ).await;
+            record_error(
+                &state.usage_tracker,
+                start,
+                &provider_id,
+                &model,
+                &gateway_key_id,
+                e.provider_api_key_id(),
+                &endpoint,
+                500,
+                &e.to_string(),
+            )
+            .await;
             Err(e)
         }
     }

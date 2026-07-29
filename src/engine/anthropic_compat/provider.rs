@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use std::sync::Arc;
 
+use sqlx::SqlitePool;
+
 use crate::db::models::ApiKey;
 use crate::engine::anthropic_compat::auth::ApiKeyAuth;
 use crate::engine::anthropic_compat::client::Client;
@@ -25,8 +27,13 @@ pub struct AnthropicCompatibleProvider {
 }
 
 impl AnthropicCompatibleProvider {
-    pub fn new(config: AnthropicConfig, keys: Vec<ApiKey>) -> Self {
+    pub fn new(config: AnthropicConfig, keys: Vec<ApiKey>, db: Option<SqlitePool>) -> Self {
         let config = Arc::new(config);
+        let model_prefix = if config.model_prefix != config.provider_id {
+            Some(config.model_prefix.clone())
+        } else {
+            None
+        };
         let metadata = ProviderMetadata {
             name: config.provider_id.to_string(),
             display_name: config.provider_name.to_string(),
@@ -38,12 +45,13 @@ impl AnthropicCompatibleProvider {
             color: config.color.to_string(),
             oauth_flow: None,
             validate_url: config.validate_url.clone(),
+            model_prefix,
         };
 
         Self {
             config: config.clone(),
             metadata,
-            keys: KeyManager::new(keys),
+            keys: KeyManager::new_with_pool(keys, &config.provider_id, db),
             client: Client::new(config.clone()),
             mapper: Mapper::new(config),
         }
@@ -72,34 +80,68 @@ impl Provider for AnthropicCompatibleProvider {
     ) -> Result<ChatResult, GatewayError> {
         let provider_req = self.mapper.to_provider_request(&request);
         let total = self.keys.total_count();
-        let mut attempt = 0usize;
+        let mut excluded: Vec<String> = Vec::new();
+        let mut failed: Vec<crate::providers::result::FailedKeyAttempt> = Vec::new();
+        let mut last_error: Option<String> = None;
+        let mut last_status: Option<u16> = None;
+        let mut last_attempted_key_id: Option<String> = None;
 
-        loop {
-            let key = match self.keys.next() {
+        for _attempt in 0..total.max(1) {
+            let key = match self.keys.next_excluding(None, &excluded) {
                 Ok(k) => k,
-                Err(_) => return Err(GatewayError::ProviderError("All keys locked or no keys configured".into())),
+                Err(_) => break,
             };
             let key_id = key.id.clone();
-            let auth = match self.build_auth(key) {
+            last_attempted_key_id = Some(key_id.clone());
+            let auth = match self.build_auth(&key) {
                 Ok(a) => a,
-                Err(e) => { self.keys.lock_key(&key_id, 400, e.to_string()); continue; }
+                Err(e) => {
+                    let msg = e.to_string();
+                    self.keys.lock_key(&key_id, 400, msg.clone());
+                    excluded.push(key_id.clone());
+                    last_error = Some(msg.clone());
+                    last_status = Some(400);
+                    failed.push(crate::providers::result::FailedKeyAttempt {
+                        key_id: key_id.clone(),
+                        error: crate::error::GatewayError::ProviderError(msg),
+                    });
+                    continue;
+                }
             };
 
             match self.client.chat_non_streaming(&auth, &provider_req).await {
                 Ok(resp) => {
                     let gateway_resp = self.mapper.to_gateway_response(&resp);
-                    return Ok(ChatResult { response: gateway_resp, used_key_id: Some(key_id), failed_keys: vec![] });
+                    self.keys.mark_success(&key_id);
+                    return Ok(ChatResult {
+                        response: gateway_resp,
+                        used_key_id: Some(key_id),
+                        failed_keys: failed,
+                    });
                 }
                 Err(e) => {
-                    attempt += 1;
                     let c = lock_key_on_error(&self.keys, &key_id, &e);
-                    if c.retryable && attempt < total {
+                    let msg = e.to_string();
+                    let st = c.lock_status.unwrap_or(c.status.unwrap_or(503));
+                    last_error = Some(msg.clone());
+                    last_status = Some(st);
+                    if c.retryable {
+                        failed.push(crate::providers::result::FailedKeyAttempt {
+                            key_id: key_id.clone(), error: e,
+                        });
+                        excluded.push(key_id);
                         continue;
                     }
                     return Err(e);
                 }
             }
         }
+        Err(GatewayError::ProviderHttpError {
+            status: last_status.unwrap_or(503),
+            body: last_error.unwrap_or_default(),
+            provider: self.config.provider_id.clone(),
+            key_id: last_attempted_key_id,
+        })
     }
 
     async fn chat_completion_stream(
@@ -108,25 +150,35 @@ impl Provider for AnthropicCompatibleProvider {
     ) -> Result<ChatStreamResult, GatewayError> {
         let provider_req = self.mapper.to_provider_request(&request);
         let total = self.keys.total_count();
+        let mut excluded: Vec<String> = Vec::new();
         let mut failed = Vec::new();
+        let mut last_error: Option<String> = None;
+        let mut last_status: Option<u16> = None;
+        let mut last_attempted_key_id: Option<String> = None;
 
         for _attempt in 0..total.max(1) {
-            let key = match self.keys.next() {
+            let key = match self.keys.next_excluding(None, &excluded) {
                 Ok(k) => k,
                 Err(_) => break,
             };
             let key_id = key.id.clone();
-            let auth = match self.build_auth(key) {
+            last_attempted_key_id = Some(key_id.clone());
+            let auth = match self.build_auth(&key) {
                 Ok(a) => a,
                 Err(e) => {
-                    self.keys.lock_key(&key_id, 400, e.to_string());
-                    failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
+                    let msg = e.to_string();
+                    self.keys.lock_key(&key_id, 400, msg.clone());
+                    excluded.push(key_id.clone());
+                    last_error = Some(msg.clone());
+                    last_status = Some(400);
+                    failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: crate::error::GatewayError::ProviderError(msg) });
                     continue;
                 }
             };
 
             match self.client.chat_stream(&auth, &provider_req).await {
                 Ok(resp) => {
+                    self.keys.mark_success(&key_id);
                     let mapper = self.mapper.clone();
                     let config = self.config.clone();
                     let stream = async_stream::stream! {
@@ -158,19 +210,30 @@ impl Provider for AnthropicCompatibleProvider {
                             while let Some(frame_end) = buffer.find("\n\n") {
                                 let frame = buffer[..frame_end].to_string();
                                 buffer = buffer[frame_end + 2..].to_string();
+                                tracing::debug!("[sfp] raw frame: {}", frame.chars().take(300).collect::<String>());
                                 for line in frame.lines() {
                                     let line = line.trim();
                                     if line.is_empty() { continue; }
                                     match mapper.parse_stream_event(line) {
                                         Ok(event) => {
                                             if !first_chunk_received { first_chunk_received = true; }
+                                            let event_desc = format!("{:?}", event).chars().take(100).collect::<String>();
+                                            tracing::debug!("[sfp] parsed event: {}", event_desc);
                                             let chunks = mapper.to_gateway_chunks(&event, &mut state);
+                                            tracing::debug!("[sfp] → {} chunks yielded", chunks.len());
+                                            for c in &chunks {
+                                                tracing::debug!("[sfp] chunk fr={:?} usage={:?} content_len={}", c.choices[0].finish_reason, c.usage, c.choices[0].delta.content.as_ref().map(|s| s.len()).unwrap_or(0));
+                                            }
                                             for c in chunks {
                                                 yield Ok(c);
                                             }
                                         }
-                                        Err(crate::error::GatewayError::ProviderError(ref msg)) if msg == "Stream done" => continue,
+                                        Err(crate::error::GatewayError::ProviderError(ref msg)) if msg == "Stream done" => {
+                                            tracing::debug!("[sfp] stream done marker");
+                                            continue;
+                                        }
                                         Err(e) => {
+                                            tracing::warn!("[sfp] parse error: {}", e);
                                             yield Err(e);
                                             break;
                                         }
@@ -183,11 +246,17 @@ impl Provider for AnthropicCompatibleProvider {
                         stream: stream.boxed(),
                         used_key_id: Some(key_id),
                         failed_keys: failed,
+                        last_attempted_key_id,
                     });
                 }
                 Err(e) => {
                     let c = lock_key_on_error(&self.keys, &key_id, &e);
-                    if c.retryable && _attempt + 1 < total.max(1) {
+                    let msg = e.to_string();
+                    let st = c.lock_status.unwrap_or(c.status.unwrap_or(503));
+                    last_error = Some(msg.clone());
+                    last_status = Some(st);
+                    excluded.push(key_id.clone());
+                    if c.retryable {
                         failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
                         continue;
                     }
@@ -195,7 +264,12 @@ impl Provider for AnthropicCompatibleProvider {
                 }
             }
         }
-        Err(GatewayError::ProviderError("All keys locked or no keys configured".into()))
+        Err(GatewayError::ProviderHttpError {
+            status: last_status.unwrap_or(503),
+            body: last_error.unwrap_or_default(),
+            provider: self.config.provider_id.clone(),
+            key_id: last_attempted_key_id,
+        })
     }
 
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
@@ -207,7 +281,7 @@ impl Provider for AnthropicCompatibleProvider {
             return Ok(false);
         }
         let key = self.keys.next()?;
-        let auth = self.build_auth(key)?;
+        let auth = self.build_auth(&key)?;
         self.client.validate_auth(&auth).await.map(|_| true)
     }
 
@@ -216,7 +290,7 @@ impl Provider for AnthropicCompatibleProvider {
             return Err(GatewayError::ProviderError(format!("No API keys configured for {}", self.config.provider_name)));
         }
         let key = self.keys.next()?;
-        let auth = self.build_auth(key)?;
+        let auth = self.build_auth(&key)?;
         self.client.validate_auth(&auth).await
     }
 

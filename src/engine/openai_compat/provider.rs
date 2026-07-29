@@ -2,21 +2,22 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use std::sync::Arc;
 
+use sqlx::SqlitePool;
+
 use crate::db::models::ApiKey;
-use crate::error::GatewayError;
-use crate::engine::helpers::lock_key_on_error;
-use crate::providers::key_manager::KeyManager;
 use crate::engine::openai_compat::auth::ApiKeyAuth;
 use crate::engine::openai_compat::client::Client;
 use crate::engine::openai_compat::config::OpenAIConfig;
 use crate::engine::openai_compat::mapper::Mapper;
+use crate::error::GatewayError;
+use crate::engine::helpers::lock_key_on_error;
+use crate::providers::key_manager::KeyManager;
 use crate::providers::result::{ChatResult, ChatStreamResult};
 use crate::providers::traits::Provider;
 use crate::types::chat::ChatCompletionRequest;
 use crate::types::model::Model;
 use crate::types::provider::ProviderMetadata;
 
-/// Generic OpenAI-compatible provider.
 pub struct OpenAICompatibleProvider {
     config: Arc<OpenAIConfig>,
     metadata: ProviderMetadata,
@@ -26,8 +27,13 @@ pub struct OpenAICompatibleProvider {
 }
 
 impl OpenAICompatibleProvider {
-    pub fn new(config: OpenAIConfig, keys: Vec<ApiKey>) -> Self {
+    pub fn new(config: OpenAIConfig, keys: Vec<ApiKey>, db: Option<SqlitePool>) -> Self {
         let config = Arc::new(config);
+        let model_prefix = if config.model_prefix != config.provider_id {
+            Some(config.model_prefix.clone())
+        } else {
+            None
+        };
         let metadata = ProviderMetadata {
             name: config.provider_id.to_string(),
             display_name: config.provider_name.to_string(),
@@ -39,12 +45,12 @@ impl OpenAICompatibleProvider {
             color: config.color.to_string(),
             oauth_flow: None,
             validate_url: config.validate_url.clone(),
+            model_prefix,
         };
-
         Self {
             config: config.clone(),
             metadata,
-            keys: KeyManager::new(keys),
+            keys: KeyManager::new_with_pool(keys, &config.provider_id, db),
             client: Client::new(config.clone()),
             mapper: Mapper::new(config),
         }
@@ -73,46 +79,64 @@ impl Provider for OpenAICompatibleProvider {
     ) -> Result<ChatResult, GatewayError> {
         let provider_req = self.mapper.to_provider_request(&request);
         let total = self.keys.total_count();
-        let mut attempt = 0usize;
+        let mut excluded: Vec<String> = Vec::new();
+        let mut failed: Vec<crate::providers::result::FailedKeyAttempt> = Vec::new();
+        let mut last_error: Option<String> = None;
+        let mut last_status: Option<u16> = None;
+        let mut last_attempted_key_id: Option<String> = None;
 
-        loop {
-            let key = match self.keys.next() {
+        for _attempt in 0..total.max(1) {
+            let key = match self.keys.next_excluding(None, &excluded) {
                 Ok(k) => k,
-                Err(_) => {
-                    return Err(GatewayError::ProviderError(
-                        "All keys locked or no keys configured".into(),
-                    ));
-                }
+                Err(_) => break,
             };
-
             let key_id = key.id.clone();
-            let auth = match self.build_auth(key) {
+            last_attempted_key_id = Some(key_id.clone());
+            let auth = match self.build_auth(&key) {
                 Ok(a) => a,
                 Err(e) => {
-                    self.keys.lock_key(&key_id, 400, e.to_string());
+                    let msg = e.to_string();
+                    self.keys.lock_key(&key_id, 400, msg.clone());
+                    excluded.push(key_id.clone());
+                    last_error = Some(msg.clone());
+                    last_status = Some(400);
+                    failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: crate::error::GatewayError::ProviderError(msg) });
                     continue;
                 }
             };
-
-            match self.client.chat_non_streaming(&auth, &provider_req).await {
+            match self.client.chat_non_streaming(&auth, &key_id, &provider_req).await {
                 Ok(resp) => {
                     let gateway_resp = self.mapper.to_gateway_response(&resp);
+                    self.keys.mark_success(&key_id);
                     return Ok(ChatResult {
                         response: gateway_resp,
                         used_key_id: Some(key_id),
-                        failed_keys: vec![],
+                        failed_keys: failed,
                     });
                 }
                 Err(e) => {
-                    attempt += 1;
                     let c = lock_key_on_error(&self.keys, &key_id, &e);
-                    if c.retryable && attempt < total {
+                    let msg = e.to_string();
+                    let st = c.lock_status.unwrap_or(c.status.unwrap_or(503));
+                    last_error = Some(msg.clone());
+                    last_status = Some(st);
+                    if c.retryable {
+                        failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
+                        excluded.push(key_id);
                         continue;
                     }
                     return Err(e);
                 }
             }
         }
+
+        // 9router pattern: return LAST attempt's actual error, not generic
+        Err(GatewayError::ProviderHttpError {
+            status: last_status.unwrap_or(503),
+            body: last_error.unwrap_or_default(),
+            provider: self.config.provider_id.clone(),
+            key_id: last_attempted_key_id,
+        })
     }
 
     async fn chat_completion_stream(
@@ -121,29 +145,34 @@ impl Provider for OpenAICompatibleProvider {
     ) -> Result<ChatStreamResult, GatewayError> {
         let provider_req = self.mapper.to_provider_request(&request);
         let total = self.keys.total_count();
+        let mut excluded: Vec<String> = Vec::new();
         let mut failed = Vec::new();
+        let mut last_error: Option<String> = None;
+        let mut last_status: Option<u16> = None;
+        let mut last_attempted_key_id: Option<String> = None;
 
         for _attempt in 0..total.max(1) {
-            let key = match self.keys.next() {
+            let key = match self.keys.next_excluding(None, &excluded) {
                 Ok(k) => k,
                 Err(_) => break,
             };
             let key_id = key.id.clone();
-            let auth = match self.build_auth(key) {
+            last_attempted_key_id = Some(key_id.clone());
+            let auth = match self.build_auth(&key) {
                 Ok(a) => a,
                 Err(e) => {
                     self.keys.lock_key(&key_id, 400, e.to_string());
-                    failed.push(crate::providers::result::FailedKeyAttempt {
-                        key_id: key_id.clone(),
-                        error: e,
-                    });
+                    excluded.push(key_id.clone());
+                    last_error = Some(e.to_string());
+                    last_status = Some(400);
+                    failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
                     continue;
                 }
             };
-
             match self.client.chat_stream(&auth, &provider_req).await {
                 Ok(resp) => {
-                    let mapper = self.mapper.clone();
+                    self.keys.mark_success(&key_id);
+                    let _mapper = self.mapper.clone();
                     let config = self.config.clone();
                     let stream = async_stream::stream! {
                         let mut buffer = String::new();
@@ -155,72 +184,67 @@ impl Provider for OpenAICompatibleProvider {
                             } else {
                                 std::time::Duration::from_secs(config.stream_stall_timeout_secs)
                             };
-                            let next = tokio::time::timeout(
-                                timeout_dur,
-                                upstream.next(),
-                            ).await;
+                            let next = tokio::time::timeout(timeout_dur, upstream.next()).await;
                             let chunk = match next {
                                 Ok(Some(Ok(b))) => b,
                                 Ok(Some(Err(e))) => {
                                     yield Err(GatewayError::ProviderError(format!("Stream read error: {}", e)));
                                     break;
                                 }
-                                Ok(None) => break, // stream ended
+                                Ok(None) => break,
                                 Err(_) => {
                                     yield Err(GatewayError::ProviderError("Stream timeout".into()));
                                     break;
                                 }
                             };
                             buffer.push_str(&String::from_utf8_lossy(&chunk));
-                            // Process complete SSE frames (separated by \n\n)
                             while let Some(frame_end) = buffer.find("\n\n") {
                                 let frame = buffer[..frame_end].to_string();
                                 buffer = buffer[frame_end + 2..].to_string();
                                 for line in frame.lines() {
                                     let line = line.trim();
-                                    if line.is_empty() || !line.starts_with("data: ") { continue; }
-                                    match mapper.parse_stream_chunk(line) {
-                                        Ok(sse_chunk) => {
-                                            if !first_chunk_received {
-                                                first_chunk_received = true;
-                                            }
-                                            let gw_chunk = mapper.to_gateway_chunk(&sse_chunk);
-                                            yield Ok(gw_chunk);
-                                        }
-                                        Err(crate::error::GatewayError::ProviderError(ref msg)) if msg == "Stream done" => continue,
-                                        Err(e) => {
-                                            yield Err(e);
-                                            break;
+                                    if line.is_empty() { continue; }
+                                    if line.starts_with("data: ") {
+                                        let data = &line[6..];
+                                        if data.trim() == "[DONE]" { break; }
+                                        if let Ok(chunk) = serde_json::from_str::<crate::types::chat::ChatCompletionChunk>(data) {
+                                            first_chunk_received = true;
+                                            yield Ok(chunk);
                                         }
                                     }
                                 }
                             }
                         }
                     };
-
                     return Ok(ChatStreamResult {
                         stream: stream.boxed(),
                         used_key_id: Some(key_id),
                         failed_keys: failed,
+                        last_attempted_key_id,
                     });
                 }
                 Err(e) => {
                     let c = lock_key_on_error(&self.keys, &key_id, &e);
-                    if c.retryable && _attempt + 1 < total.max(1) {
-                        failed.push(crate::providers::result::FailedKeyAttempt {
-                            key_id: key_id.clone(),
-                            error: e,
-                        });
+                    let msg = e.to_string();
+                    let st = c.lock_status.unwrap_or(c.status.unwrap_or(503));
+                    last_error = Some(msg.clone());
+                    last_status = Some(st);
+                    excluded.push(key_id.clone());
+                    if c.retryable {
+                        failed.push(crate::providers::result::FailedKeyAttempt { key_id: key_id.clone(), error: e });
                         continue;
                     }
                     return Err(e);
                 }
             }
         }
-
-        Err(GatewayError::ProviderError(
-            "All keys locked or no keys configured".into(),
-        ))
+        // 9router pattern: return LAST attempt's actual error
+        Err(GatewayError::ProviderHttpError {
+            status: last_status.unwrap_or(503),
+            body: last_error.unwrap_or_default(),
+            provider: self.config.provider_id.clone(),
+            key_id: last_attempted_key_id,
+        })
     }
 
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
@@ -228,34 +252,20 @@ impl Provider for OpenAICompatibleProvider {
     }
 
     async fn health_check(&self) -> Result<bool, GatewayError> {
-        if self.keys.total_count() == 0 {
-            return Ok(false);
-        }
-        let key = self.keys.next()?;
-        let auth = self.build_auth(key)?;
-        self.client.validate_auth(&auth).await.map(|_| true)
+        Ok(self.keys.active_count() > 0)
     }
 
     async fn authenticate(&self) -> Result<(), GatewayError> {
         if self.keys.total_count() == 0 {
-            return Err(GatewayError::ProviderError(
-                format!("No API keys configured for {}", self.config.provider_name),
-            ));
+            return Err(GatewayError::ProviderError(format!(
+                "No API keys configured for {}",
+                self.config.provider_name
+            )));
         }
-        let key = self.keys.next()?;
-        let auth = self.build_auth(key)?;
-        self.client.validate_auth(&auth).await
+        Ok(())
     }
 
-    fn locked_keys(&self) -> Vec<(String, u64, String)> {
-        self.keys.locked_keys()
-    }
-
-    fn total_keys(&self) -> usize {
-        self.keys.total_count()
-    }
-
-    fn active_keys(&self) -> usize {
-        self.keys.active_count()
-    }
+    fn locked_keys(&self) -> Vec<(String, u64, String)> { self.keys.locked_keys() }
+    fn total_keys(&self) -> usize { self.keys.total_count() }
+    fn active_keys(&self) -> usize { self.keys.active_count() }
 }

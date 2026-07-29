@@ -15,42 +15,7 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS request_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            provider_id TEXT NOT NULL,
-            model TEXT NOT NULL,
-            status_code INTEGER,
-            latency_ms INTEGER,
-            prompt_tokens INTEGER,
-            completion_tokens INTEGER,
-            error_message TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS usage (
-            id TEXT PRIMARY KEY,
-            provider_id TEXT NOT NULL,
-            api_key_id TEXT,
-            model_id TEXT NOT NULL,
-            status TEXT NOT NULL,
-            status_code INTEGER,
-            prompt_tokens INTEGER NOT NULL DEFAULT 0,
-            completion_tokens INTEGER NOT NULL DEFAULT 0,
-            total_tokens INTEGER NOT NULL DEFAULT 0,
-            latency_ms INTEGER,
-            error_message TEXT,
-            request_body TEXT,
-            response_body TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-
         CREATE INDEX IF NOT EXISTS idx_api_keys_provider ON api_keys(provider_id, is_active);
-        CREATE INDEX IF NOT EXISTS idx_request_logs_provider ON request_logs(provider_id);
-        CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at);
-        CREATE INDEX IF NOT EXISTS idx_usage_provider ON usage(provider_id);
-        CREATE INDEX IF NOT EXISTS idx_usage_api_key ON usage(api_key_id);
-        CREATE INDEX IF NOT EXISTS idx_usage_created ON usage(created_at);
-        CREATE INDEX IF NOT EXISTS idx_usage_status ON usage(status);
 
         -- Gateway API keys (client-facing auth for /v1/*)
         CREATE TABLE IF NOT EXISTS gateway_keys (
@@ -99,34 +64,11 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
         Err(e) => tracing::warn!("Migration skipped: {}", e),
     }
 
-    // Migration v3: add gateway_key_id to usage table
-    match sqlx::query(    "ALTER TABLE usage ADD COLUMN gateway_key_id TEXT")
-    .execute(pool)
-    .await {
-        Ok(_) => tracing::debug!("Migration applied: ALTER TABLE"),
-        Err(e) => tracing::warn!("Migration skipped: {}", e),
-    }
-
     // Migration v4: add max_tokens to gateway_keys
     match sqlx::query(    "ALTER TABLE gateway_keys ADD COLUMN max_tokens INTEGER NOT NULL DEFAULT 0")
     .execute(pool)
     .await {
         Ok(_) => tracing::debug!("Migration applied: ALTER TABLE"),
-        Err(e) => tracing::warn!("Migration skipped: {}", e),
-    }
-
-    // Migration v2: add key_type column
-    match sqlx::query(    "ALTER TABLE api_keys ADD COLUMN key_type TEXT NOT NULL DEFAULT 'apikey'")
-    .execute(pool)
-    .await {
-        Ok(_) => tracing::debug!("Migration applied: ALTER TABLE"),
-        Err(e) => tracing::warn!("Migration skipped: {}", e),
-    }
-    // Backfill existing rows
-    match sqlx::query(    "UPDATE api_keys SET key_type = 'oauth' WHERE provider_id = 'cx' AND key_type = 'apikey'")
-    .execute(pool)
-    .await {
-        Ok(_) => tracing::debug!("Migration applied: UPDATE api_keys"),
         Err(e) => tracing::warn!("Migration skipped: {}", e),
     }
 
@@ -175,40 +117,6 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
     .execute(pool)
     .await?;
 
-    // Migration v5: combos table
-    sqlx::query(r#"
-        CREATE TABLE IF NOT EXISTS combos (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            description TEXT NOT NULL DEFAULT '',
-            tiers TEXT NOT NULL DEFAULT '[]',  -- JSON array
-            round_robin INTEGER NOT NULL DEFAULT 0,
-            is_active INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    "#)
-    .execute(pool)
-    .await?;
-
-    // Seed MiMo Code Free dummy key
-
-    // Migration v6: add min_context to combos
-    match sqlx::query(    "ALTER TABLE combos ADD COLUMN min_context INTEGER NOT NULL DEFAULT 0")
-    .execute(pool)
-    .await {
-        Ok(_) => tracing::debug!("Migration applied: combos.min_context"),
-        Err(e) => tracing::warn!("Migration skipped: {}", e),
-    }
-
-    // Migration v7: add gateway_key_id index for usage per-key aggregation
-    match sqlx::query(    "CREATE INDEX IF NOT EXISTS idx_usage_gateway_key ON usage(gateway_key_id)")
-    .execute(pool)
-    .await {
-        Ok(_) => tracing::debug!("Migration applied: idx_usage_gateway_key"),
-        Err(e) => tracing::warn!("Migration skipped: {}", e),
-    }
-
     // Migration v8: custom OpenAI-compatible providers
     sqlx::query(r#"
         CREATE TABLE IF NOT EXISTS custom_providers (
@@ -236,6 +144,73 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
             UNIQUE(provider_id, model_id)
         )
     "#).execute(pool).await?;
+
+    // Usage table — per-request token tracking row, populated by
+    // services::usage_tracking via UsageTracker. All engines
+    // (openai_compat, anthropic_compat, custom providers) MUST call
+    // `UsageTracker::save(...)` after their response/stream finalizes
+    // so the Usage page can show per-key stats and the gateway key
+    // `max_tokens` quota check can SUM total_tokens.
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS usage (
+            id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            gateway_key_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'success',
+            status_code INTEGER DEFAULT 200,
+            prompt_tokens INTEGER NOT NULL DEFAULT 0,
+            completion_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            latency_ms INTEGER NOT NULL DEFAULT 0,
+            endpoint TEXT,
+            error_message TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    "#).execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_usage_key ON usage(gateway_key_id)").execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_usage_provider ON usage(provider_id)").execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_usage_model ON usage(model_id)").execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_usage_created ON usage(created_at DESC)").execute(pool).await?;
+
+    // Additive schema migrations (2026-07-28): usage tracking extension.
+    // SQLite ALTER TABLE ADD COLUMN has no IF NOT EXISTS — ignore duplicate-column
+    // errors so re-running migrations on an old DB is a no-op.
+    let _ = sqlx::query("ALTER TABLE usage ADD COLUMN provider_api_key_id TEXT")
+        .execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE usage ADD COLUMN ttft_ms INTEGER")
+        .execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE usage ADD COLUMN request_body TEXT")
+        .execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE usage ADD COLUMN response_body TEXT")
+        .execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN consecutive_use_count INTEGER NOT NULL DEFAULT 0")
+        .execute(pool).await;
+
+    // Migration v9: custom_models — per-provider user-added model entries
+    // that get merged into the model list without needing to edit TOML or DB rows.
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS custom_models (
+            id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
+            ctx INTEGER NOT NULL DEFAULT 4096,
+            vision INTEGER NOT NULL DEFAULT 0,
+            tools INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(provider_id, model_id)
+        )
+    "#).execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_custom_models_provider ON custom_models(provider_id)").execute(pool).await?;
+
+    // Migration v10: persistent key lock state — cooldown, error, backoff
+    // Mirrors 9router's per-account error-state tracking but persisted across restarts.
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN locked_until TEXT").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN last_error_status INTEGER").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN last_error_message TEXT").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN last_error_at TEXT").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN backoff_level INTEGER NOT NULL DEFAULT 0").execute(pool).await;
 
     tracing::info!("Database migrations complete");
     Ok(())

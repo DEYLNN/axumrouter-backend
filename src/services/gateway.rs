@@ -1,6 +1,8 @@
+use sqlx::SqlitePool;
+
+use crate::db;
 use crate::error::GatewayError;
 use crate::middleware::auth::GatewayKeyInfo;
-use sqlx::SqlitePool;
 
 /// Layer 1 + Layer 2: Check if model is allowed for this gateway key.
 /// - Layer 1 (global): already done before calling this (disabled_models)
@@ -31,7 +33,9 @@ pub async fn check_model_access(
     Ok(())
 }
 
-/// Insert a gateway usage row for tracking token consumption per key.
+/// Backward-compat thin wrapper. New code should call
+/// `services::usage_tracking::UsageTracker::save` directly.
+#[allow(dead_code)]
 pub async fn track_gateway_usage(
     db: &SqlitePool,
     gateway_key_id: &str,
@@ -41,21 +45,25 @@ pub async fn track_gateway_usage(
     completion_tokens: i64,
     latency_ms: i64,
 ) {
-    let total = prompt_tokens + completion_tokens;
-    let _ = sqlx::query(
-        "INSERT INTO usage (id, provider_id, model_id, status, status_code, prompt_tokens, completion_tokens, total_tokens, latency_ms, gateway_key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    db::save_request_usage(
+        db,
+        &db::UsageEntry {
+            provider_id: provider_id.into(),
+            model_id: model_id.into(),
+            gateway_key_id: gateway_key_id.into(),
+            endpoint: "/v1/chat/completions".into(),
+            prompt_tokens,
+            completion_tokens,
+            latency_ms,
+            status: "success".into(),
+            status_code: 200,
+            error_message: None,
+            provider_api_key_id: None,
+            ttft_ms: None,
+            request_body: None,
+            response_body: None,
+        },
     )
-    .bind(format!("usage_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()))
-    .bind(provider_id)
-    .bind(model_id)
-    .bind("success")
-    .bind(200i64)
-    .bind(prompt_tokens)
-    .bind(completion_tokens)
-    .bind(total)
-    .bind(latency_ms)
-    .bind(gateway_key_id)
-    .execute(db)
     .await;
 }
 

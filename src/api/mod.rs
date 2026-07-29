@@ -1,6 +1,5 @@
 pub mod chat;
 pub mod models;
-pub mod responses;
 
 use axum::extract::State;
 use axum::routing::get;

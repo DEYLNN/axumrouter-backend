@@ -149,6 +149,8 @@ pub enum ContentDelta {
     InputJsonDelta { partial_json: String },
     #[serde(rename = "thinking_delta")]
     ThinkingDelta { thinking: String },
+    #[serde(rename = "signature_delta")]
+    SignatureDelta { signature: String },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -181,6 +183,7 @@ pub struct MessageStopEvent {
     pub type_: String,
 }
 
+#[derive(Debug)]
 pub enum AnthropicStreamEvent {
     MessageStart(MessageStartEvent),
     ContentBlockStart(ContentBlockStartEvent),

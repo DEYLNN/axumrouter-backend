@@ -37,6 +37,8 @@ pub struct AuthConfig {
     pub admin_password: Option<String>,
     #[serde(default)]
     pub jwt_secret: Option<String>,
+    #[serde(default)]
+    pub admin_username: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

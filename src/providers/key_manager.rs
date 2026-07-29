@@ -1,260 +1,364 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use sqlx::SqlitePool;
+
 use crate::db::models::ApiKey;
 use crate::error::GatewayError;
+use crate::services::key_strategy::{strategy_from_config, KeyStrategy, StrategyCtx};
 
-/// Locked key info with per-key expiry and backoff tracking
-pub struct LockedKey {
-    pub key_id: String,
-    pub locked_at: Instant,
-    /// Explicit expiry — overrides global cooldown_secs when set
+/// Runtime state for each key — extends the DB `ApiKey` with in-memory tracking.
+#[derive(Debug, Clone)]
+pub struct KeyState {
+    pub key: ApiKey,
+    /// Instant when this key was locked (account-level).
+    pub locked_at: Option<Instant>,
+    /// Explicit account-level lock expiry.
     pub locked_until: Option<Instant>,
-    pub reason: String,
-    /// Exponential backoff level (429 only). Reset on success.
+    /// Exponential backoff level (rate-limit only).
     pub backoff_level: u32,
+    /// Consecutive sticky-round-robin uses.
+    pub consecutive_use_count: i64,
+    /// Last time this key was picked.
+    pub last_used_at: Option<Instant>,
+    /// Per-model lock expiries: (model_id -> expiry Instant).
+    pub model_locks: HashMap<String, Instant>,
+    /// Reason for the lock (human-readable).
+    pub lock_reason: String,
 }
 
-/// Key cooldown lock config — mirrors 9router's ERROR_RULES model
+impl KeyState {
+    /// Check if account-level lock is active.
+    pub fn is_locked(&self, now: Instant) -> bool {
+        match self.locked_until {
+            Some(expiry) => now < expiry,
+            None => false,
+        }
+    }
+
+    /// Check if a specific model is locked on this key.
+    pub fn is_model_locked(&self, model: &str, now: Instant) -> bool {
+        self.model_locks
+            .get(model)
+            .map(|expiry| now < *expiry)
+            .unwrap_or(false)
+    }
+}
+
+/// Lock classification config — mirrors 9router's ERROR_RULES.
 pub struct KeyLockConfig {
-    /// Auth failures (401, 403): fixed cooldown
+    /// Auth errors (401/403): fixed cooldown.
     pub auth_cooldown_secs: u64,
-    /// Rate limit (429): exponential backoff base in seconds
+    /// Rate limit (429): exponential backoff base (seconds).
     pub rate_limit_backoff_base: u64,
-    /// Rate limit: max backoff in seconds
+    /// Rate limit: max backoff (seconds).
     pub rate_limit_backoff_max: u64,
-    /// Transient errors (5xx, etc.): fixed cooldown
+    /// Transient errors (5xx): fixed cooldown.
     pub transient_cooldown_secs: u64,
 }
 
 impl Default for KeyLockConfig {
     fn default() -> Self {
         Self {
-            // 2m — like 9router COOLDOWN.long
             auth_cooldown_secs: 120,
-            // 90s base — long enough to be visible in UI and avoid retry storms.
-            // 9router uses exponential backoff; this keeps same pattern with bigger provider-safe base.
             rate_limit_backoff_base: 90,
-            // 5m — like 9router BACKOFF_CONFIG.max=5*60*1000
             rate_limit_backoff_max: 300,
-            // 30s — like 9router TRANSIENT_COOLDOWN_MS=30000
             transient_cooldown_secs: 120,
         }
     }
 }
 
-/// Modular key management: round-robin distribution with cooldown lock failover.
-/// Provider-agnostic — any multi-key provider can use this.
+/// Multi-key manager with pluggable selection strategy, account-level lock,
+/// per-model lock, exponential backoff, and fallback loop support.
+///
+/// Provider-agnostic. Each provider instance holds one `KeyManager`.
 pub struct KeyManager {
-    keys: Vec<ApiKey>,
+    /// All key states, in provider-defined order (typically priority-sorted).
+    states: Mutex<Vec<KeyState>>,
+    /// Fallback cursor for non-sticky strategies.
     cursor: AtomicUsize,
-    locked: Mutex<HashMap<String, LockedKey>>,
+    /// Lock cooldown configuration.
     config: KeyLockConfig,
+    /// Pluggable key selection strategy.
+    strategy: Box<dyn KeyStrategy>,
+    /// Provider ID for display.
+    provider_id: String,
+    /// DB pool for persisting lock state across restarts.
+    db_pool: Option<SqlitePool>,
 }
 
 impl KeyManager {
-    pub fn new(keys: Vec<ApiKey>) -> Self {
-        Self {
-            keys,
-            cursor: AtomicUsize::new(0),
-            locked: Mutex::new(HashMap::new()),
-            config: KeyLockConfig::default(),
-        }
+    pub fn new(keys: Vec<ApiKey>, provider_id: &str) -> Self {
+        Self::new_with_pool(keys, provider_id, None)
     }
 
-    pub fn with_config(keys: Vec<ApiKey>, config: KeyLockConfig) -> Self {
-        Self {
-            keys,
-            cursor: AtomicUsize::new(0),
-            locked: Mutex::new(HashMap::new()),
-            config,
-        }
-    }
-
-    /// Returns next active key (round-robin, skipping locked keys).
-    fn next_active(&self) -> Result<&ApiKey, GatewayError> {
-        let mut locked = self.locked.lock().unwrap();
-        let now = Instant::now();
-
-        // Garbage-collect expired locks
-        locked.retain(|_, lk| {
-            match lk.locked_until {
-                Some(expiry) => now < expiry,
-                None => now.duration_since(lk.locked_at).as_secs() < self.config.auth_cooldown_secs,
-            }
-        });
-
-        // Filter out currently locked keys
-        let active: Vec<&ApiKey> = self
-            .keys
-            .iter()
-            .filter(|k| !locked.contains_key(&k.id))
+    pub fn new_with_pool(keys: Vec<ApiKey>, provider_id: &str, pool: Option<SqlitePool>) -> Self {
+        let states: Vec<KeyState> = keys
+            .into_iter()
+            .map(|key| KeyState {
+                key,
+                locked_at: None,
+                locked_until: None,
+                backoff_level: 0,
+                consecutive_use_count: 0,
+                last_used_at: None,
+                model_locks: HashMap::new(),
+                lock_reason: String::new(),
+            })
             .collect();
-
-        if active.is_empty() {
-            return Err(GatewayError::NoAvailableKeys(
-                "No active API keys — all keys in cooldown lock".to_string(),
-            ));
+        Self {
+            states: Mutex::new(states),
+            cursor: AtomicUsize::new(0),
+            config: KeyLockConfig::default(),
+            strategy: strategy_from_config("round-robin", 3),
+            provider_id: provider_id.to_string(),
+            db_pool: pool,
         }
-
-        let index = self.cursor.fetch_add(1, Ordering::Relaxed) % active.len();
-        Ok(active[index])
     }
 
-    /// Returns next key for usage. External wrapper for provider use.
-    pub fn next(&self) -> Result<&ApiKey, GatewayError> {
-        self.next_active()
+    pub fn with_strategy(mut self, strategy: Box<dyn KeyStrategy>) -> Self {
+        self.strategy = strategy;
+        self
     }
 
-    /// Lock a key with full error classification (like 9router's checkFallbackError + applyErrorState).
-    /// Determines cooldown from error status + backoff level. Text matching for rate-limit keywords.
-    pub fn lock_key(&self, key_id: &str, status: u16, reason: String) {
-        let mut locked = self.locked.lock().unwrap();
+    pub fn with_config(mut self, config: KeyLockConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Collect garbage-expired locks (both account and model).
+    fn gc(&self, now: Instant) {
+        if let Ok(mut states) = self.states.lock() {
+            for ks in states.iter_mut() {
+                // Account-level lock GC
+                if let Some(expiry) = ks.locked_until {
+                    if now >= expiry {
+                        ks.locked_at = None;
+                        ks.locked_until = None;
+                        ks.backoff_level = 0;
+                        ks.lock_reason.clear();
+                    }
+                }
+                // Model-level lock GC
+                ks.model_locks.retain(|_, expiry| now < *expiry);
+            }
+        }
+    }
+
+    /// Pick the next available key using the configured strategy.
+    pub fn next(&self) -> Result<ApiKey, GatewayError> {
+        self.next_for_model(None)
+    }
+
+    /// Pick next key for a specific model (checks model locks).
+    pub fn next_for_model(&self, model: Option<&str>) -> Result<ApiKey, GatewayError> {
+        self.next_excluding(model, &[])
+    }
+
+    /// Pick next key while excluding specific key IDs (for fallback loop).
+    pub fn next_excluding(
+        &self,
+        model: Option<&str>,
+        exclude_ids: &[String],
+    ) -> Result<ApiKey, GatewayError> {
         let now = Instant::now();
+        self.gc(now);
 
+        let states = self.states.lock().unwrap();
+        let ctx = StrategyCtx {
+            keys: &states,
+            exclude_ids,
+            model,
+            now,
+        };
+
+        match self.strategy.select(&ctx) {
+            Some(ks) => Ok(ks.key.clone()),
+            None => Err(GatewayError::NoAvailableKeys(
+                "All keys locked or unavailable".into(),
+            )),
+        }
+    }
+
+    /// Mark success on a key: unlock, reset backoff, reset consecutive count.
+    /// Also persists the recovery to DB so the key appears active after restart.
+    pub fn mark_success(&self, key_id: &str) {
+        if let Ok(mut states) = self.states.lock() {
+            if let Some(ks) = states.iter_mut().find(|s| s.key.id == key_id) {
+                ks.locked_at = None;
+                ks.locked_until = None;
+                ks.backoff_level = 0;
+                ks.lock_reason.clear();
+                // Clear ONLY expired + current-model model locks.
+                // (9router clears just the current model + expired ones on success.)
+                let now = Instant::now();
+                ks.model_locks.retain(|_, expiry| now < *expiry);
+            }
+        }
+        // Persist to DB: clear lock state, mark last_error_at as "recovered now"
+        if let Some(pool) = &self.db_pool {
+            let pool = pool.clone();
+            let kid = key_id.to_string();
+            let now_iso = chrono::Utc::now().to_rfc3339();
+            tokio::spawn(async move {
+                let _ = sqlx::query(
+                    "UPDATE api_keys SET locked_until = NULL, last_error_status = NULL, \
+                     last_error_message = NULL, last_error_at = ?, \
+                     backoff_level = 0 WHERE id = ?"
+                )
+                .bind(&now_iso)
+                .bind(&kid)
+                .execute(&pool)
+                .await;
+            });
+        }
+    }
+
+    /// Lock a key after error (account-level). Calls `lock_key_for_model` with `None`.
+    pub fn lock_key(&self, key_id: &str, status: u16, reason: String) {
+        self.lock_key_for_model(key_id, None, status, reason);
+    }
+
+    /// Lock a key for a specific model after error.
+    /// `model=None` means account-level lock (all models).
+    /// `model=Some(...)` means only that model is locked on this key.
+    pub fn lock_key_for_model(&self, key_id: &str, model: Option<&str>, status: u16, reason: String) {
+        let now = Instant::now();
+        let mut states = self.states.lock().unwrap();
+
+        // Compute cooldown
         let (cooldown_secs, new_backoff) = match status {
             401 | 403 => (self.config.auth_cooldown_secs, 0u32),
             429 => {
-                // Exponential backoff: level increments with each consecutive 429
-                let current_level = locked
-                    .get(key_id)
-                    .map(|lk| lk.backoff_level)
+                let current_level = states
+                    .iter()
+                    .find(|s| s.key.id == key_id)
+                    .map(|s| s.backoff_level)
                     .unwrap_or(0);
-                let level = current_level.min(15); // maxLevel = 15 like 9router
+                let level = current_level.min(15);
                 let cooldown = (self.config.rate_limit_backoff_base as u64)
-                    .saturating_mul(1u64 << level) // 2^level
+                    .saturating_mul(1u64 << level)
                     .min(self.config.rate_limit_backoff_max);
                 (cooldown, level + 1)
             }
             _ => (self.config.transient_cooldown_secs, 0u32),
         };
 
-        let locked_until = now
+        let expiry = now
             .checked_add(Duration::from_secs(cooldown_secs))
             .unwrap_or(now + Duration::from_secs(30));
 
-        locked.insert(
-            key_id.to_string(),
-            {
-                let readable = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&reason) {
-                    v["error"]["message"].as_str().map(|s| s.to_string())
-                        .or_else(|| v["error"].as_str().map(|s| s.to_string()))
-                        .or_else(|| v["message"].as_str().map(|s| s.to_string()))
-                        .unwrap_or_else(|| reason.split('{').next().unwrap_or(&reason).trim().to_string())
-                } else {
-                    reason.split('{').next().unwrap_or(&reason).trim().to_string()
-                };
-                LockedKey {
-                    key_id: key_id.to_string(),
-                    locked_at: now,
-                    locked_until: Some(locked_until),
-                    reason: format!(
-                        "HTTP {} — {} (cooldown {}s, backoff_level={})",
-                        status, readable, cooldown_secs, new_backoff
-                    ),
-                    backoff_level: new_backoff,
-                }
-            },
-        );
+        let readable = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&reason) {
+            v["error"]["message"]
+                .as_str()
+                .map(|s| s.to_string())
+                .or_else(|| v["error"].as_str().map(|s| s.to_string()))
+                .or_else(|| v["message"].as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| reason.split('{').next().unwrap_or(&reason).trim().to_string())
+        } else {
+            reason.split('{').next().unwrap_or(&reason).trim().to_string()
+        };
 
-        // Also lock duplicates (same key_value)
-        let key_value = self
-            .keys
-            .iter()
-            .find(|k| k.id == key_id)
-            .map(|k| k.key_value.clone());
-
-        if let Some(val) = key_value {
-            for k in &self.keys {
-                if k.key_value == val && k.id != key_id {
-                    locked.insert(
-                        k.id.clone(),
-                        LockedKey {
-                            key_id: k.id.clone(),
-                            locked_at: now,
-                            locked_until: Some(locked_until),
-                            reason: format!("duplicate of locked key {}", key_id),
-                            backoff_level: new_backoff,
-                        },
-                    );
-                }
+        if let Some(ks) = states.iter_mut().find(|s| s.key.id == key_id) {
+            if let Some(model_id) = model {
+                // Per-model lock
+                ks.model_locks.insert(model_id.to_string(), expiry);
+            } else {
+                // Account-level lock
+                ks.locked_at = Some(now);
+                ks.locked_until = Some(expiry);
+                ks.backoff_level = new_backoff;
+                ks.lock_reason = format!(
+                    "HTTP {} — {} (cooldown {}s, backoff_level={})",
+                    status, readable, cooldown_secs, new_backoff
+                );
             }
         }
 
-        // Count active WITHOUT calling active_count() to avoid deadlock
-        let active_remain = self.keys.iter().filter(|k| !locked.contains_key(&k.id)).count();
-
+        let _reason_preview = &readable[..readable.len().min(80)];
+        let target = model.unwrap_or("<account>");
         tracing::warn!(
-            "Key '{}' locked for {}s (backoff_level={}), {} active keys remain",
+            "Key '{}' locked for {} on '{}' for {}s (backoff={})",
             key_id,
+            target,
+            status,
             cooldown_secs,
-            new_backoff,
-            active_remain
+            new_backoff
         );
+
+        // Persist to DB
+        let now_iso = chrono::Utc::now().to_rfc3339();
+        let expires_iso = if cooldown_secs > 0 {
+            let dur = chrono::Duration::seconds(cooldown_secs as i64);
+            Some((chrono::Utc::now() + dur).to_rfc3339())
+        } else {
+            None
+        };
+        if let Some(pool) = &self.db_pool {
+            let pool = pool.clone();
+            let kid = key_id.to_string();
+            let lock_until = expires_iso;
+            let st = status as i64;
+            let msg = readable.clone();
+            let bl = new_backoff as i64;
+            tokio::spawn(async move {
+                let _ = sqlx::query(
+                    "UPDATE api_keys SET locked_until = ?, last_error_status = ?, \
+                     last_error_message = ?, last_error_at = ?, \
+                     backoff_level = ? WHERE id = ?"
+                )
+                .bind(&lock_until)
+                .bind(st)
+                .bind(&msg)
+                .bind(&now_iso)
+                .bind(bl)
+                .bind(&kid)
+                .execute(&pool)
+                .await;
+            });
+        }
     }
 
-    /// Reset key state after success (like 9router's resetAccountState).
-    /// Clears lock + backoff level so key is immediately available.
-    pub fn unlock(&self, key_id: &str) {
-        let mut locked = self.locked.lock().unwrap();
-        locked.remove(key_id);
-    }
-
-    /// Reset all locks.
-    pub fn reset_locks(&self) {
-        let mut locked = self.locked.lock().unwrap();
-        locked.clear();
-    }
-
-    /// Get current auth cooldown duration in seconds.
-    pub fn cooldown_secs(&self) -> u64 {
-        self.config.auth_cooldown_secs
-    }
-
-    /// Number of active (non-locked) keys.
+    /// Get active count (keys not locked at account level).
     pub fn active_count(&self) -> usize {
-        let locked = self.locked.lock().unwrap();
         let now = Instant::now();
-        self.keys
+        let states = self.states.lock().unwrap();
+        states
             .iter()
-            .filter(|k| {
-                locked
-                    .get(&k.id)
-                    .map(|lk| {
-                        match lk.locked_until {
-                            Some(expiry) => now >= expiry,
-                            None => now.duration_since(lk.locked_at).as_secs() >= self.config.auth_cooldown_secs,
-                        }
-                    })
-                    .unwrap_or(true)
-            })
+            .filter(|s| !s.is_locked(now))
             .count()
     }
 
-    /// Total keys configured.
+    /// Total keys.
     pub fn total_count(&self) -> usize {
-        self.keys.len()
+        self.states.lock().unwrap().len()
     }
 
-    /// Current key IDs managed.
+    /// Key IDs managed.
     pub fn key_ids(&self) -> Vec<String> {
-        self.keys.iter().map(|k| k.id.clone()).collect()
+        self.states
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|s| s.key.id.clone())
+            .collect()
     }
 
     /// All currently locked keys with remaining cooldown info.
     pub fn locked_keys(&self) -> Vec<(String, u64, String)> {
-        let locked = self.locked.lock().unwrap();
         let now = Instant::now();
-        locked
+        let states = self.states.lock().unwrap();
+        states
             .iter()
-            .filter_map(|(id, lk)| {
-                let remaining = match lk.locked_until {
+            .filter_map(|s| {
+                let remaining = match s.locked_until {
                     Some(expiry) if expiry > now => expiry.duration_since(now).as_secs(),
                     _ => return None,
                 };
-                Some((id.clone(), remaining, lk.reason.clone()))
+                Some((s.key.id.clone(), remaining, s.lock_reason.clone()))
             })
             .collect()
     }

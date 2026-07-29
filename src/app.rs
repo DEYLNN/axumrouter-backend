@@ -18,10 +18,9 @@ pub fn build(state: AppState) -> Router {
     // Public OpenAI-compatible API  (/v1/*)
     let api = crate::api::routes(shared.clone());
 
-    // Admin dashboard JSON API + auth_files
+    // Admin dashboard JSON API
     let admin = crate::admin::api::admin_routes(shared.clone())
         .merge(crate::admin::login::routes(shared.clone()))
-        .merge(crate::admin::auth_files::routes(shared.clone()))
         .merge(crate::admin::oauth::routes(shared.clone()));
 
     // Static assets and SPA fallback

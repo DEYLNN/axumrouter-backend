@@ -10,7 +10,7 @@ use serde_json::json;
 /// ```json
 /// { "error": { "message": "...", "type": "...", "code": "..." } }
 /// ```
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum GatewayError {
     // ---- 400 (Bad Request) ----
     #[error("Model must be prefixed with a provider ID (e.g. `mst/mistral-large`). Got: `{0}`")]
@@ -52,7 +52,7 @@ pub enum GatewayError {
 
     // ---- 502/503/504 (Upstream issues) ----
     #[error("Upstream HTTP {status}: {body}")]
-    ProviderHttpError { status: u16, body: String, provider: String },
+    ProviderHttpError { status: u16, body: String, provider: String, key_id: Option<String> },
     /// All API keys for provider `{0}` are exhausted or invalid
     #[error("All API keys for provider `{0}` are exhausted or invalid")]
     NoAvailableKeys(String),
@@ -112,6 +112,32 @@ impl GatewayError {
     pub fn is_rate_limit_error(&self) -> bool {
         matches!(self, Self::ProviderHttpError { status: 429, .. })
     }
+
+    /// Extract the underlying provider_api_key_id when this error was tied
+    /// to a specific key attempt (auth-build failure, upstream HTTP error,
+    /// etc.). `None` for errors that aren't tied to a key.
+    pub fn provider_api_key_id(&self) -> Option<&str> {
+        match self {
+            Self::ProviderHttpError { key_id: Some(id), .. } => Some(id.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Extract HTTP status code for usage logging (independent of into_response formatting).
+    pub fn http_status(&self) -> Option<u16> {
+        match self {
+            Self::ProviderHttpError { status, .. } => Some(*status),
+            Self::NoAvailableKeys(_) => Some(503),
+            Self::ProviderError(_) => Some(502),
+            Self::AllKeysRateLimited(_) => Some(429),
+            Self::TokenLimitExceeded { .. } => Some(429),
+            Self::InvalidModelFormat(_) | Self::MissingField(_) | Self::InvalidJsonBody(_) | Self::EmptyMessages => Some(400),
+            Self::MissingAuthHeader | Self::InvalidApiKey => Some(401),
+            Self::ProviderDisabled(_) => Some(403),
+            Self::ProviderNotFound(_) | Self::ModelNotFound { .. } => Some(404),
+            Self::Internal(_) => Some(500),
+        }
+    }
 }
 
 /// Serialize-safe error body. Avoids `Serialize` derive on `thiserror` so
@@ -144,7 +170,7 @@ impl IntoResponse for GatewayError {
         };
 
         let (message, code, suggestion) = match &self {
-            Self::ProviderHttpError { status: s, body, provider } => {
+            Self::ProviderHttpError { status: s, body, provider, .. } => {
                 let code = format!("provider_http_{}", s);
                 let clean_msg = clean_upstream_error_body(body, provider);
                 let suggestion = match s {
@@ -295,6 +321,7 @@ mod tests {
             status: 429,
             body: "rate-limited".into(),
             provider: "mst".into(),
+            key_id: None,
         };
         let resp = e.into_response();
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);

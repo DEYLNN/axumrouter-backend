@@ -74,7 +74,7 @@ impl ProviderManager {
                 let keys = crate::db::load_provider_keys(db, &cp.id).await?;
                 let key_count = keys.len();
 
-                let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config, keys);
+                let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config, keys, Some(db.clone()));
                 tracing::info!("Custom provider '{}' loaded with {} key(s)", cp.id, key_count);
                 active.insert(cp.id.clone(), Box::new(provider));
             }
@@ -86,6 +86,30 @@ impl ProviderManager {
     /// Look up provider by name
     pub fn get(&self, name: &str) -> Option<&dyn Provider> {
         self.active.get(name).map(|p| p.as_ref())
+    }
+
+    /// Resolve a model-id prefix to the underlying provider id.
+    ///
+    /// Custom providers expose models under a UI prefix (e.g. `nx`), while the
+    /// chat dispatcher looks them up by the DB id (`custom_nx`). This method
+    /// accepts either form and returns the canonical provider id, or `None`
+    /// if no active provider matches.
+    pub fn resolve_provider_id(&self, prefix_or_id: &str) -> Option<String> {
+        // Exact match wins — registered / OAuth / TOML providers use their id
+        // directly, and a custom provider may also share the name (e.g. `fb`).
+        if self.active.contains_key(prefix_or_id) {
+            return Some(prefix_or_id.to_string());
+        }
+        // Otherwise scan for a provider whose `model_prefix` (used to build
+        // `models_static()` ids) matches. Custom providers set this from
+        // `custom_providers.prefix`.
+        for (id, provider) in &self.active {
+            let meta = provider.metadata();
+            if meta.model_prefix.as_deref() == Some(prefix_or_id) {
+                return Some(id.clone());
+            }
+        }
+        None
     }
 
     /// List all registered provider names
@@ -138,13 +162,12 @@ impl ProviderManager {
             chat_path: "/chat/completions".into(),
         };
         let keys = crate::db::load_provider_keys(db, id).await?;
-        let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config, keys);
+        let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config, keys, Some(db.clone()));
         self.active.insert(id.to_string(), Box::new(provider));
         Ok(())
     }
 
     /// Aggregate models from all providers (skips those with zero keys).
-    /// Also includes combo models from the combos table.
     pub async fn list_all_models(&self) -> Vec<Model> {
         let mut all = Vec::new();
         for (_name, provider) in &self.active {
@@ -154,41 +177,43 @@ impl ProviderManager {
             if let Ok(models) = provider.list_models().await {
                 all.extend(models);
             }
+            // Merge custom models (user-added model entries) for this provider.
+            let meta = provider.metadata();
+            let prefix = meta.model_prefix.clone().unwrap_or_else(|| meta.name.clone());
+            let custom = crate::db::list_custom_models(&self.db, &meta.name).await;
+            for cm in custom {
+                all.push(Model {
+                    id: format!("{}/{}", prefix, cm.model_id),
+                    object: "model".to_string(),
+                    owned_by: meta.display_name.clone(),
+                    context_length: Some(cm.ctx as u32),
+                });
+            }
         }
-        // Also load combo models for /v1/models visibility
-        let combo_models = Self::load_combo_models(&self.db).await;
-        all.extend(combo_models);
         all
     }
 
     /// Like list_all_models but includes providers with zero keys.
-    /// Used by combo context detector (may run before keys are added).
     pub async fn list_all_models_unfiltered(&self) -> Vec<Model> {
         let mut all = Vec::new();
         for (_name, provider) in &self.active {
             if let Ok(models) = provider.list_models().await {
                 all.extend(models);
             }
+            // Merge custom models for this provider (same as above).
+            let meta = provider.metadata();
+            let prefix = meta.model_prefix.clone().unwrap_or_else(|| meta.name.clone());
+            let custom = crate::db::list_custom_models(&self.db, &meta.name).await;
+            for cm in custom {
+                all.push(Model {
+                    id: format!("{}/{}", prefix, cm.model_id),
+                    object: "model".to_string(),
+                    owned_by: meta.display_name.clone(),
+                    context_length: Some(cm.ctx as u32),
+                });
+            }
         }
         all
-    }
-
-    /// Fetch combos from DB and represent as Model entries for /v1/models
-    async fn load_combo_models(db: &SqlitePool) -> Vec<Model> {
-        sqlx::query_as::<_, (String, bool, u64)>(
-            "SELECT name, is_active, min_context FROM combos ORDER BY name"
-        )
-        .fetch_all(db)
-        .await
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(name, _is_active, min_ctx)| Model {
-            id: format!("combo/{}", name),
-            object: "model".to_string(),
-            owned_by: "combo".to_string(),
-            context_length: Some(min_ctx as u32),
-        })
-        .collect()
     }
 
     /// List all provider metadata

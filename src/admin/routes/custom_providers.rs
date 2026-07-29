@@ -58,9 +58,7 @@ pub async fn api_create_custom_provider(
 ) -> Json<serde_json::Value> {
     let validate_url = req.validate_url.unwrap_or_default();
     let color = req.color.unwrap_or_else(|| "#6366F1".to_string());
-    // Strip trailing /v1 to avoid double path with engine's /v1/chat/completions
-    let base_url = req.base_url.trim_end_matches('/');
-    let base_url = base_url.strip_suffix("/v1").unwrap_or(base_url).to_string();
+    let base_url = req.base_url.trim_end_matches('/').to_string();
 
     if let Err(e) = crate::db::create_custom_provider(
         &state.db, &req.id, &req.name, &req.prefix,

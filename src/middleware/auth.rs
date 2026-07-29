@@ -32,8 +32,8 @@ pub async fn auth_middleware(
 
     // === Admin API JWT auth (if password configured) ===
     if path.starts_with("/admin/api/") {
-        // Login endpoint is public
-        if path == "/admin/api/login" {
+        // Login endpoint is public (mounted at /admin/api/login in login.rs)
+        if path.starts_with("/admin/api/login") {
             return next.run(request).await;
         }
 
@@ -86,17 +86,6 @@ pub async fn auth_middleware(
     let key_value = match auth_header {
         Some(h) if h.starts_with("Bearer ") => &h[7..],
         _ => {
-            let _ = crate::db::log_usage(
-                &state.db,
-                "gateway",
-                None,
-                "N/A",
-                "error",
-                Some(401i64),
-                0, 0, None,
-                Some("missing_authorization: Missing or invalid Authorization header".into()),
-                None, None, None,
-            ).await;
             return err_response(
                 StatusCode::UNAUTHORIZED,
                 "authentication_error",
@@ -123,17 +112,6 @@ pub async fn auth_middleware(
     .unwrap_or(false);
 
     if !valid {
-        let _ = crate::db::log_usage(
-            &state.db,
-            "gateway",
-            key_id_opt.as_deref(),
-            "N/A",
-            "error",
-            Some(401i64),
-            0, 0, None,
-            Some("invalid_api_key: Invalid or inactive gateway API key".into()),
-            None, None, None,
-        ).await;
         return err_response(
             StatusCode::UNAUTHORIZED,
             "authentication_error",

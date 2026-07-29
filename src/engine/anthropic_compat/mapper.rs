@@ -38,18 +38,20 @@ impl Mapper {
 
         let quirks = &self.config.quirks;
         let (max_tokens, _) = match quirks.max_tokens_field {
-            MaxTokensField::MaxTokens => (gw.max_tokens, None::<u32>),
-            MaxTokensField::MaxCompletionTokens => (gw.max_tokens, None),
+            MaxTokensField::MaxTokens => (gw.max_tokens.or(Some(16384)), None::<u32>),
+            MaxTokensField::MaxCompletionTokens => (gw.max_tokens.or(Some(16384)), None),
         };
 
-        let messages: Vec<AnthropicMessage> = msgs.iter().map(|m| {
+        let messages: Vec<AnthropicMessage> = msgs.iter().filter_map(|m| {
             let role = if m.role == "assistant" { "assistant" } else { "user" };
             let mut content = Vec::new();
 
-            // Text content
-            if let Some(text) = &m.content {
-                if !text.is_empty() {
-                    content.push(ContentBlock::Text { text: text.clone() });
+            // Text content — skip for tool role (content goes inside tool_result)
+            if m.role != "tool" {
+                if let Some(text) = &m.content {
+                    if !text.is_empty() {
+                        content.push(ContentBlock::Text { text: text.clone() });
+                    }
                 }
             }
 
@@ -79,7 +81,12 @@ impl Mapper {
                 });
             }
 
-            AnthropicMessage { role: role.into(), content }
+            // Skip messages with empty content — Anthropic/StepFun reject
+            if content.is_empty() {
+                return None;
+            }
+
+            Some(AnthropicMessage { role: role.into(), content })
         }).collect();
 
         // Tools
@@ -152,10 +159,8 @@ impl Mapper {
                         },
                     });
                 }
-                ResponseContentBlock::Thinking { thinking, .. } => {
-                    // Include thinking as reasoning_content in the message
-                    if !content.is_empty() { content.push('\n'); }
-                    content.push_str(&format!("<think>{}</think>", thinking));
+                ResponseContentBlock::Thinking { .. } => {
+                    // thinking block — skip, not mapped to OpenAI output
                 }
             }
         }
@@ -244,7 +249,10 @@ impl Mapper {
                 Ok(AnthropicStreamEvent::MessageStop)
             }
             "ping" => Ok(AnthropicStreamEvent::Ping),
-            _ => Err(GatewayError::ProviderError(format!("Unknown SSE event: {}", event_type))),
+            _ => {
+                tracing::debug!("[anthropic] unknown SSE event: {}", event_type);
+                Ok(AnthropicStreamEvent::Ping)
+            }
         }
     }
 
@@ -279,19 +287,8 @@ impl Mapper {
                         }, None));
                         state.pending_tool_calls.insert(e.index, idx);
                     }
-                    ResponseContentBlock::Thinking { thinking, .. } => {
-                        if !thinking.is_empty() {
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some("<think>".into()), reasoning_content: None, tool_calls: None }, None));
-                            chunks.push(self._make_chunk(state, Delta {
-                                role: None,
-                                reasoning_content: None,
-                                content: None,
-                                tool_calls: None,
-                            }, None));
-                            // reasoning_content is not in Delta struct currently, so we put it inline
-                            // Actually let's use content for simplicity
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(thinking.clone()), reasoning_content: None, tool_calls: None }, None));
-                        }
+                    ResponseContentBlock::Thinking { .. } => {
+                        // thinking block — skip, reasoning not exposed to OpenAI output
                     }
                 }
             }
@@ -312,8 +309,11 @@ impl Mapper {
                             }, None));
                         }
                     }
-                    ContentDelta::ThinkingDelta { thinking } => {
-                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(thinking.clone()), reasoning_content: None, tool_calls: None }, None));
+                    ContentDelta::ThinkingDelta { .. } => {
+                        // thinking delta — skip, reasoning not exposed
+                    }
+                    ContentDelta::SignatureDelta { .. } => {
+                        // signature_delta = thinking signature, no-op for OpenAI output
                     }
                 }
             }
@@ -331,6 +331,7 @@ impl Mapper {
                     _ => "stop",
                 }).map(String::from);
 
+                let has_stop = fr.is_some();
                 let usage = e.usage.as_ref().map(|u| Usage {
                     prompt_tokens: u.input_tokens + u.cache_creation_input_tokens + u.cache_read_input_tokens,
                     completion_tokens: u.output_tokens,
@@ -345,6 +346,11 @@ impl Mapper {
                     choices: vec![ChunkChoice { index: 0, delta: Delta { role: None, content: None, reasoning_content: None, tool_calls: None }, finish_reason: fr }],
                     usage,
                 });
+
+                // message_delta with stop_reason = final chunk — prevent message_stop duplicate
+                if has_stop {
+                    state.finish_sent = true;
+                }
             }
             AnthropicStreamEvent::MessageStop => {
                 if !state.finish_sent {

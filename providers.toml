@@ -1,4 +1,101 @@
 [[providers]]
+id = "ocf"
+name = "OpenCode Free"
+category = "apikey"
+color = "#E87040"
+icon = "ocf.webp"
+base_url = "https://opencode.ai/zen"
+validate_url = "https://opencode.ai/zen/v1/models"
+api_type = "openai"
+docs_url = "https://opencode.ai"
+api_key_url = "https://opencode.ai"
+timeout = 60
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "north-mini-code-free"
+name = "North Mini Code Free"
+ctx = 128000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "nemotron-3-ultra-free"
+name = "Nemotron 3 Ultra Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "mimo-v2.5-free"
+name = "MiMo V2.5 Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "deepseek-v4-flash-free"
+name = "DeepSeek V4 Flash Free"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "ling-3.0-flash-free"
+name = "Ling 3.0 Flash Free"
+ctx = 262144
+vision = false
+tools = true
+
+[[providers]]
+id = "sfp"
+name = "StepFun Plan"
+category = "apikey"
+color = "#6C5CE7"
+icon = "sfp.webp"
+base_url = "https://api.stepfun.ai/step_plan"
+validate_url = "https://api.stepfun.ai/v1/models"
+api_type = "anthropic"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "step-3.5-flash"
+name = "Step 3.5 Flash"
+ctx = 256000
+vision = true
+tools = true
+
+[[providers.models]]
+id = "step-3.7-flash"
+name = "Step 3.7 Flash"
+ctx = 256000
+vision = true
+tools = true
+
+[[providers]]
+id = "mmx"
+name = "MiniMax"
+category = "apikey"
+color = "#8B5CF6"
+icon = "mmx.webp"
+base_url = "https://api.minimax.io/anthropic"
+validate_url = "https://api.minimax.io/v1/models"
+api_type = "anthropic"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "MiniMax-M3"
+name = "MiniMax M3"
+ctx = 1000000
+vision = true
+tools = true
+
+[[providers]]
 id = "ocg"
 name = "OpenCode Go"
 category = "apikey"
@@ -90,6 +187,7 @@ ctx = 1000000
 vision = false
 tools = true
 
+
 [[providers]]
 id = "mst"
 name = "Mistral AI"
@@ -125,6 +223,7 @@ name = "Mistral Small 3"
 ctx = 262144
 vision = false
 tools = true
+
 
 [[providers]]
 id = "nov"
@@ -204,6 +303,7 @@ ctx = 1000000
 vision = false
 tools = true
 
+
 [[providers]]
 id = "ags"
 name = "Agnes AI"
@@ -232,6 +332,7 @@ name = "Agnes 2.5 Flash"
 ctx = 500000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "aio"
@@ -283,55 +384,7 @@ ctx = 1000000
 vision = false
 tools = true
 
-[[providers]]
-id = "ocf"
-name = "OpenCode Free"
-category = "apikey"
-color = "#E87040"
-icon = "ocf.webp"
-base_url = "https://opencode.ai/zen"
-validate_url = "https://opencode.ai/zen/v1/models"
-api_type = "openai"
-docs_url = "https://opencode.ai"
-api_key_url = "https://opencode.ai"
-timeout = 60
-first_chunk_timeout = 200
-stall_timeout = 360
 
-[[providers.models]]
-id = "north-mini-code-free"
-name = "North Mini Code Free"
-ctx = 128000
-vision = false
-tools = true
-
-[[providers.models]]
-id = "nemotron-3-ultra-free"
-name = "Nemotron 3 Ultra Free"
-ctx = 1000000
-vision = false
-tools = true
-
-[[providers.models]]
-id = "mimo-v2.5-free"
-name = "MiMo V2.5 Free"
-ctx = 1000000
-vision = false
-tools = true
-
-[[providers.models]]
-id = "deepseek-v4-flash-free"
-name = "DeepSeek V4 Flash Free"
-ctx = 1000000
-vision = false
-tools = true
-
-[[providers.models]]
-id = "ling-3.0-flash-free"
-name = "Ling 3.0 Flash Free"
-ctx = 262144
-vision = false
-tools = true
 [[providers]]
 id = "am"
 name = "AIMux"
@@ -367,6 +420,7 @@ name = "GLM 5"
 ctx = 202752
 vision = false
 tools = true
+
 
 [[providers]]
 id = "al"
@@ -436,6 +490,7 @@ name = "GLM 4.7"
 ctx = 202752
 vision = false
 tools = true
+
 
 [[providers]]
 id = "alc"
@@ -557,6 +612,7 @@ ctx = 1000000
 vision = false
 tools = true
 
+
 [[providers]]
 id = "alin"
 name = "Alibaba Intl"
@@ -619,6 +675,7 @@ ctx = 202752
 vision = false
 tools = true
 
+
 [[providers]]
 id = "amb"
 name = "Ambient"
@@ -639,6 +696,7 @@ ctx = 202752
 vision = false
 tools = true
 
+
 [[providers]]
 id = "btl"
 name = "Badtheory Labs"
@@ -658,6 +716,7 @@ name = "DeepSeek V4 Flash"
 ctx = 1
 vision = false
 tools = true
+
 
 [[providers]]
 id = "bai"
@@ -737,6 +796,7 @@ ctx = 163840
 vision = false
 tools = true
 
+
 [[providers]]
 id = "bmc"
 name = "BigModel China"
@@ -787,6 +847,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "cwv"
 name = "CanopyWave"
@@ -823,6 +884,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "cv"
 name = "Cavoti"
@@ -844,6 +906,7 @@ name = "GPT 5.5"
 ctx = 131072
 vision = false
 tools = true
+
 
 [[providers]]
 id = "cer"
@@ -923,6 +986,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "chi"
 name = "Cheaper Inference"
@@ -986,6 +1050,7 @@ name = "Claude Fable 5"
 ctx = 1000000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "conc"
@@ -1100,6 +1165,7 @@ ctx = 1048576
 vision = true
 tools = true
 
+
 [[providers]]
 id = "co"
 name = "Conduit Ozdoev"
@@ -1126,6 +1192,7 @@ name = "Claude Haiku 4.5"
 ctx = 256
 vision = true
 tools = true
+
 
 [[providers]]
 id = "evo"
@@ -1184,6 +1251,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "glb"
 name = "Gitlawb"
@@ -1205,6 +1273,7 @@ name = "Tencent Hy3 Free"
 ctx = 260000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "gmi"
@@ -1232,6 +1301,7 @@ name = "Hy3"
 ctx = 262144
 vision = false
 tools = true
+
 
 [[providers]]
 id = "gq"
@@ -1304,6 +1374,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "hus"
 name = "Husada"
@@ -1338,6 +1409,7 @@ ctx = 2097152
 vision = false
 tools = true
 
+
 [[providers]]
 id = "kim"
 name = "Kimchi"
@@ -1365,6 +1437,7 @@ ctx = 1
 vision = false
 tools = true
 
+
 [[providers]]
 id = "kimi"
 name = "Kimi"
@@ -1391,6 +1464,7 @@ name = "Kimi K2.5"
 ctx = 262000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "llm7"
@@ -1463,6 +1537,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "lc"
 name = "LongCat"
@@ -1483,53 +1558,6 @@ ctx = 128000
 vision = false
 tools = true
 
-[[providers]]
-id = "mmx"
-name = "MiniMax"
-category = "apikey"
-color = "#7C3AED"
-icon = "minimax.png"
-base_url = "https://api.minimax.io/anthropic"
-validate_url = "https://api.minimax.io/anthropic/v1/messages"
-api_type = "anthropic"
-docs_url = "https://www.minimaxi.com"
-api_key_url = "https://www.minimaxi.com"
-timeout = 64
-first_chunk_timeout = 120
-stall_timeout = 120
-
-[providers.quirks]
-auth_header = "x-api-key"
-drop_stream_options = true
-string_tool_result = true
-
-[[providers.models]]
-id = "MiniMax-M2.7"
-name = "MiniMax M2.7"
-ctx = 204800
-vision = false
-tools = true
-
-[[providers.models]]
-id = "MiniMax-M2.5"
-name = "MiniMax M2.5"
-ctx = 204800
-vision = false
-tools = true
-
-[[providers.models]]
-id = "MiniMax-M2.1"
-name = "MiniMax M2.1"
-ctx = 204800
-vision = false
-tools = true
-
-[[providers.models]]
-id = "MiniMax-M3"
-name = "MiniMax M3"
-ctx = 1000000
-vision = false
-tools = true
 
 [[providers]]
 id = "mmxcn"
@@ -1564,6 +1592,7 @@ name = "MiniMax M2.1"
 ctx = 204800
 vision = false
 tools = true
+
 
 [[providers]]
 id = "mrph"
@@ -1606,6 +1635,7 @@ ctx = 1000000
 vision = false
 tools = true
 
+
 [[providers]]
 id = "nzc"
 name = "Nabz Clan"
@@ -1627,6 +1657,7 @@ name = "MiniMax M3"
 ctx = 1048576
 vision = false
 tools = true
+
 
 [[providers]]
 id = "nry"
@@ -1671,6 +1702,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "nak"
 name = "Nous"
@@ -1714,6 +1746,7 @@ ctx = 128000
 vision = false
 tools = true
 
+
 [[providers]]
 id = "ocz"
 name = "Ocenza"
@@ -1742,6 +1775,7 @@ name = "Step 3.5 Flash"
 ctx = 262144
 vision = false
 tools = true
+
 
 [[providers]]
 id = "0g"
@@ -1784,6 +1818,7 @@ ctx = 1000000
 vision = false
 tools = true
 
+
 [[providers]]
 id = "om"
 name = "OpenModel"
@@ -1803,6 +1838,7 @@ name = "DeepSeek V4 Flash"
 ctx = 1
 vision = false
 tools = true
+
 
 [[providers]]
 id = "or"
@@ -1861,6 +1897,7 @@ ctx = 262144
 vision = false
 tools = true
 
+
 [[providers]]
 id = "poll"
 name = "Pollinations"
@@ -1880,6 +1917,7 @@ name = "GPT-OSS 20B (Pollinations)"
 ctx = 131072
 vision = false
 tools = true
+
 
 [[providers]]
 id = "qiniu"
@@ -1902,6 +1940,7 @@ name = "DeepSeek V3"
 ctx = 131072
 vision = false
 tools = true
+
 
 [[providers]]
 id = "qc"
@@ -2051,6 +2090,7 @@ ctx = 163840
 vision = false
 tools = true
 
+
 [[providers]]
 id = "rwy"
 name = "Routeway AI"
@@ -2171,6 +2211,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "sn"
 name = "SambaNova"
@@ -2228,6 +2269,7 @@ ctx = 131072
 vision = true
 tools = true
 
+
 [[providers]]
 id = "sr"
 name = "SwiftRouter"
@@ -2254,6 +2296,7 @@ name = "DeepSeek V4 Pro"
 ctx = 1000000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "tbay"
@@ -2282,6 +2325,7 @@ name = "DeepSeek V4 Pro"
 ctx = 128000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "tr"
@@ -2323,6 +2367,7 @@ name = "Z-AI GLM 5.2 Free"
 ctx = 1000000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "um"
@@ -2367,6 +2412,7 @@ ctx = 202752
 vision = false
 tools = true
 
+
 [[providers]]
 id = "vk"
 name = "Vikey"
@@ -2388,6 +2434,7 @@ name = "Vikey VCLaw"
 ctx = 131072
 vision = false
 tools = true
+
 
 [[providers]]
 id = "xak"
@@ -2444,6 +2491,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "mimo"
 name = "Xiaomi MiMo"
@@ -2491,6 +2539,7 @@ name = "MiMo V2 Flash"
 ctx = 131000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "mimosg"
@@ -2542,6 +2591,7 @@ ctx = 131072
 vision = false
 tools = true
 
+
 [[providers]]
 id = "yun"
 name = "Yunwu AI"
@@ -2571,6 +2621,7 @@ ctx = 1
 vision = false
 tools = true
 
+
 [[providers]]
 id = "zmx"
 name = "Zenmux"
@@ -2590,6 +2641,7 @@ name = "Step 3.7 Flash Free"
 ctx = 262144
 vision = false
 tools = true
+
 
 [[providers]]
 id = "zyl"
@@ -2635,6 +2687,7 @@ vision = false
 tools = true
 
 
+
 [[providers]]
 id = "volc"
 name = "Volcengine Ark"
@@ -2654,6 +2707,7 @@ name = "Kimi K2.6"
 ctx = 262000
 vision = false
 tools = true
+
 
 [[providers]]
 id = "zai"
@@ -2697,6 +2751,7 @@ name = "GLM 4.6"
 ctx = 202752
 vision = false
 tools = true
+
 
 [[providers]]
 id = "ver"

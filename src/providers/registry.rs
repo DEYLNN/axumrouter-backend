@@ -40,15 +40,15 @@ impl ProviderRegistry {
                 match p.api_type.as_str() {
                     "anthropic" => {
                         let config = build_anthropic_config(p);
-                        registry.register(&id, move |keys: Vec<ApiKey>, _db: Arc<SqlitePool>| {
-                            let provider = crate::engine::anthropic_compat::provider::AnthropicCompatibleProvider::new(config.clone(), keys);
+                        registry.register(&id, move |keys: Vec<ApiKey>, db: Arc<SqlitePool>| {
+                            let provider = crate::engine::anthropic_compat::provider::AnthropicCompatibleProvider::new(config.clone(), keys, Some((*db).clone()));
                             Ok(Box::new(provider))
                         });
                     }
                     _ => {
                         let config = build_openai_config(p);
-                        registry.register(&id, move |keys: Vec<ApiKey>, _db: Arc<SqlitePool>| {
-                            let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config.clone(), keys);
+                        registry.register(&id, move |keys: Vec<ApiKey>, db: Arc<SqlitePool>| {
+                            let provider = crate::engine::openai_compat::provider::OpenAICompatibleProvider::new(config.clone(), keys, Some((*db).clone()));
                             Ok(Box::new(provider))
                         });
                     }
@@ -57,14 +57,10 @@ impl ProviderRegistry {
         }
 
         // --- Custom providers (manual) ---
-        register_provider!(registry, "cf", crate::providers::cloudflare::provider::CfProvider::new_with_keys);
-        register_provider!(registry, "cl", crate::providers::cline::provider::ClProvider::new_with_keys);
-        register_provider!(registry, "fb", crate::providers::freebuff::provider::FbProvider::new_with_keys);
-        register_provider!(registry, "gb", crate::providers::grok_cli::provider::GcliProvider::new_with_keys, db);
-        register_provider!(registry, "np", crate::providers::nous_portal::provider::NpProvider::new_with_keys, db);
-        register_provider!(registry, "cx", crate::providers::openai_codex::provider::CxProvider::new_with_keys);
-        register_provider!(registry, "xai", crate::providers::xai::provider::XaiProvider::new_with_keys);
-        register_provider!(registry, "kc", crate::providers::kilocode::provider::KlProvider::new_with_keys);
+        register_provider!(registry, "fb", crate::providers::oauth::freebuff::provider::FbProvider::new_with_keys, db);
+        register_provider!(registry, "kc", crate::providers::oauth::kilocode::provider::KlProvider::new_with_keys, db);
+        register_provider!(registry, "cl", crate::providers::apikey::cline::provider::ClProvider::new_with_keys, db);
+        register_provider!(registry, "cf", crate::providers::apikey::cloudflare::provider::CfProvider::new_with_keys, db);
 
         registry
     }

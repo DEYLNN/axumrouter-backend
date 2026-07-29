@@ -1,5 +1,4 @@
 // Chat completions module — split for maintainability.
-pub mod combo;
 pub mod non_streaming;
 pub mod streaming;
 
@@ -18,22 +17,6 @@ use crate::services::tool_normalizer::normalize_tool_messages;
 use crate::state::AppState;
 use crate::types::chat::ChatCompletionRequest;
 
-async fn log_and_return(
-    db: &sqlx::SqlitePool,
-    model_ref: &str,
-    err: GatewayError,
-    status: u16,
-) -> GatewayError {
-    // Extract provider from model_ref (e.g. "mst/mistral-small-latest" → "mst")
-    let provider = model_ref.split('/').next().filter(|p| !p.is_empty()).unwrap_or("gateway");
-    let _ = crate::db::log_usage(
-        db, provider, None, model_ref,
-        "error", Some(status as i64), 0, 0, None,
-        Some(err.to_string()), None, None, None,
-    ).await;
-    err
-}
-
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/v1/chat/completions", post(chat_completions))
@@ -51,61 +34,67 @@ async fn chat_completions(
     // ── Pre-checks ──
 
     if crate::db::is_model_disabled(&state.db, &model).await {
-        return Err(log_and_return(&state.db, model.as_str(), GatewayError::ModelNotFound {
+        return Err(GatewayError::ModelNotFound {
             provider: "gateway".to_string(), model: model.clone(),
-        }, 404).await);
+        });
     }
 
     if let Err(e) = crate::services::gateway::check_model_access(&gw_key, &model).await {
-        return Err(log_and_return(&state.db, &model, e, 404).await);
+        return Err(e);
     }
 
     if let Err(e) = crate::services::gateway::check_token_limit(&state.db, &gw_key.key_id).await {
-        return Err(log_and_return(&state.db, &model, e, 429).await);
+        return Err(e);
     }
 
-    let (provider_id, model_name) = match model.split_once('/') {
+    let (raw_prefix, model_name) = match model.split_once('/') {
         Some((pid, rest)) => (pid, rest),
-        None => return Err(log_and_return(&state.db, model.as_str(), GatewayError::InvalidModelFormat(model.clone()), 400).await),
+        None => return Err(GatewayError::InvalidModelFormat(model.clone())),
     };
     let is_streaming = request.stream.unwrap_or(false);
 
-    // Combo routing
-    if provider_id == "combo" {
-        if is_streaming {
-            return combo::handle_combo_request_stream(state, request, model_name.to_string(), start).await;
-        }
-        return combo::handle_combo_request(state, request, model_name.to_string(), start).await;
-    }
-
-    // Blocked model check
-    if crate::db::is_model_blocked(&state.db, provider_id, model_name).await {
-        return Err(log_and_return(&state.db, &model, GatewayError::ModelNotFound {
-            provider: provider_id.to_string(), model: model_name.to_string(),
-        }, 404).await);
+    // Blocked model check — uses the raw prefix as the provider column for now;
+    // admin UI enters blocked_models with the user-facing prefix (e.g. `nx`).
+    if crate::db::is_model_blocked(&state.db, raw_prefix, model_name).await {
+        return Err(GatewayError::ModelNotFound {
+            provider: raw_prefix.to_string(), model: model_name.to_string(),
+        });
     }
 
     if request.messages.is_empty() {
-        return Err(log_and_return(&state.db, &model, GatewayError::EmptyMessages, 400).await);
+        return Err(GatewayError::EmptyMessages);
     }
 
     // ── Resolve provider ──
-
+    // `raw_prefix` may be the DB provider id (`fb`, `ocf`) or the UI model
+    // prefix (e.g. `nx` for a custom provider with prefix != id). Resolve via
+    // the active provider map's `model_prefix` lookup so both forms work.
     let pm = state.provider_manager.read().await;
-    let provider = match pm.get(provider_id) {
+    let provider_id = match pm.resolve_provider_id(raw_prefix) {
+        Some(id) => id,
+        None => {
+            drop(pm);
+            return Err(GatewayError::ProviderNotFound(raw_prefix.to_string()));
+        }
+    };
+    let provider = match pm.get(&provider_id) {
         Some(p) => p,
         None => {
             drop(pm);
-            return Err(log_and_return(&state.db, &model, GatewayError::ProviderNotFound(provider_id.to_string()), 404).await);
+            return Err(GatewayError::ProviderNotFound(provider_id.clone()));
         }
     };
 
     let all_models = provider.list_models().await.map_err(|_| GatewayError::Internal("Failed to list models".into()))?;
-    if !all_models.iter().any(|m| m.id == model) {
+    // Match either by full id (e.g. `nx/foo`) or by suffix (e.g. `foo`) since
+    // the caller's `model` may use either the provider's UI prefix or its DB
+    // row id as the leading segment.
+    let model_suffix = model_name.to_string();
+    if !all_models.iter().any(|m| m.id == model || m.id.ends_with(&format!("/{}", model_suffix))) {
         drop(pm);
-        return Err(log_and_return(&state.db, &model, GatewayError::ModelNotFound {
+        return Err(GatewayError::ModelNotFound {
             provider: provider_id.to_string(), model: model_name.to_string(),
-        }, 404).await);
+        });
     }
 
     // ── Prepare request ──
@@ -138,8 +127,8 @@ async fn chat_completions(
     // ── Route to handler ──
 
     if is_streaming {
-        streaming::handle_streaming(&state, &gw_key, provider, provider_id, &model, &provider_request, start).await
+        streaming::handle_streaming(&state, &gw_key, provider, &provider_id, &model, &provider_request, start).await
     } else {
-        non_streaming::handle_non_streaming(&state, &gw_key, provider, provider_id, &model, &provider_request, start).await
+        non_streaming::handle_non_streaming(&state, &gw_key, provider, &provider_id, &model, &provider_request, start).await
     }
 }

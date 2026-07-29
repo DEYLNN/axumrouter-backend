@@ -9,6 +9,8 @@ use chrono::Utc;
 #[derive(Deserialize)]
 pub struct LoginRequest {
     pub password: String,
+    #[serde(default)]
+    pub username: Option<String>,
 }
 
 pub fn routes(state: Arc<AppState>) -> Router {
@@ -28,6 +30,19 @@ async fn login_handler(
             Json(json!({"error": "login_disabled", "message": "Admin password not set"})),
         )),
     };
+
+    // Username from config, fallback ke "admin"
+    let expected_user = state.config.auth.admin_username
+        .as_deref()
+        .unwrap_or("admin");
+    if let Some(ref u) = req.username {
+        if u != expected_user {
+            return Err((
+                axum::http::StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "invalid_username"})),
+            ));
+        }
+    }
 
     if req.password != *expected {
         return Err((
