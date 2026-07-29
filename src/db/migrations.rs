@@ -176,6 +176,8 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
     // Additive schema migrations (2026-07-28): usage tracking extension.
     // SQLite ALTER TABLE ADD COLUMN has no IF NOT EXISTS — ignore duplicate-column
     // errors so re-running migrations on an old DB is a no-op.
+    let _ = sqlx::query("ALTER TABLE usage ADD COLUMN endpoint TEXT")
+        .execute(pool).await;
     let _ = sqlx::query("ALTER TABLE usage ADD COLUMN provider_api_key_id TEXT")
         .execute(pool).await;
     let _ = sqlx::query("ALTER TABLE usage ADD COLUMN ttft_ms INTEGER")
