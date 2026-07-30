@@ -10,6 +10,9 @@ use crate::state::AppState;
 pub struct KeysQuery {
     pub page: Option<i64>,
     pub per_page: Option<i64>,
+    pub provider_id: Option<String>,
+    pub only_problem: Option<bool>,
+    pub only_disabled: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -45,20 +48,38 @@ pub async fn api_list_keys(
     let per_page = q.per_page.unwrap_or(100).clamp(1, 200);
     let offset = (page - 1) * per_page;
 
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys")
-        .fetch_one(&state.db)
-        .await
-        .unwrap_or(0);
+    // Build dynamic WHERE
+    let mut where_sql = String::from(" WHERE 1=1");
+    if q.provider_id.is_some() {
+        where_sql.push_str(" AND provider_id = ?");
+    }
+    if q.only_disabled.unwrap_or(false) {
+        where_sql.push_str(" AND is_active = 0");
+    }
+    if q.only_problem.unwrap_or(false) {
+        where_sql.push_str(" AND (last_error_status IS NOT NULL OR last_error_message IS NOT NULL)");
+    }
 
-    let rows = sqlx::query_as::<_, (String, String, Option<String>, String, String, bool, Option<String>, Option<i64>, Option<String>, Option<String>, i64, String)>(
-        "SELECT id, provider_id, label, COALESCE(key_type, 'apikey'), key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, created_at
-         FROM api_keys ORDER BY provider_id, created_at DESC LIMIT ? OFFSET ?"
-    )
-    .bind(per_page)
-    .bind(offset)
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+    let count_sql = format!("SELECT COUNT(*) FROM api_keys{}", where_sql);
+    let list_sql = format!(
+        "SELECT id, provider_id, label, COALESCE(key_type, 'apikey'), key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, created_at FROM api_keys{} ORDER BY provider_id, created_at DESC LIMIT ? OFFSET ?",
+        where_sql
+    );
+
+    // Count with binds
+    let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql);
+    if let Some(pid) = &q.provider_id { count_q = count_q.bind(pid); }
+    let total: i64 = count_q.fetch_one(&state.db).await.unwrap_or(0);
+
+    // List with binds + LIMIT/OFFSET
+    let mut list_q = sqlx::query_as::<_, (String, String, Option<String>, String, String, bool, Option<String>, Option<i64>, Option<String>, Option<String>, i64, String)>(&list_sql);
+    if let Some(pid) = &q.provider_id { list_q = list_q.bind(pid); }
+    let rows = list_q
+        .bind(per_page)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
 
     let keys = rows.into_iter().map(|(id, provider_id, label, key_type, key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, created_at)| {
         let preview = if key_value.len() > 12 {

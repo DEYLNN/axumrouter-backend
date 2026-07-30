@@ -54,23 +54,6 @@ pub async fn api_provider_detail(
             _ => vec![],
         };
 
-        // Merge custom models (user-added) into the detail response so the FE
-        // can render delete buttons for them. Custom models use the provider's
-        // model_prefix (or name) as the id prefix.
-        let prefix = meta.model_prefix.clone().unwrap_or_else(|| meta.name.clone());
-        let custom_models = crate::db::list_custom_models(&state.db, &provider_id).await;
-        let mut models = models;
-        for cm in custom_models {
-            let full_id = format!("{}/{}", prefix, cm.model_id);
-            models.push(serde_json::json!({
-                "id": full_id,
-                "name": cm.model_id,
-                "available": true,
-                "blocked": false,
-                "context_length": cm.ctx,
-            }));
-        }
-
         let keys: Vec<serde_json::Value> = sqlx::query_as::<_, (String, String, Option<String>, String, bool)>(
             "SELECT id, key_value, label, key_type, is_active FROM api_keys WHERE provider_id = ? ORDER BY created_at DESC",
         )

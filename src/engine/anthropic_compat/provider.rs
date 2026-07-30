@@ -24,6 +24,7 @@ pub struct AnthropicCompatibleProvider {
     keys: KeyManager,
     client: Client,
     mapper: Mapper,
+    db: Option<SqlitePool>,
 }
 
 impl AnthropicCompatibleProvider {
@@ -51,9 +52,10 @@ impl AnthropicCompatibleProvider {
         Self {
             config: config.clone(),
             metadata,
-            keys: KeyManager::new_with_pool(keys, &config.provider_id, db),
+            keys: KeyManager::new_with_pool(keys, &config.provider_id, db.clone()),
             client: Client::new(config.clone()),
             mapper: Mapper::new(config),
+            db,
         }
     }
 
@@ -273,7 +275,21 @@ impl Provider for AnthropicCompatibleProvider {
     }
 
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
-        Ok(self.mapper.models_static())
+        let mut models = self.mapper.models_static();
+        // Merge user-added custom models from DB
+        if let Some(pool) = &self.db {
+            let custom = crate::db::list_custom_models(pool, &self.config.provider_id).await;
+            let prefix = self.config.model_prefix.clone();
+            for cm in custom {
+                models.push(Model {
+                    id: format!("{}/{}", prefix, cm.model_id),
+                    object: "model".to_string(),
+                    owned_by: self.config.provider_name.clone(),
+                    context_length: Some(cm.ctx as u32),
+                });
+            }
+        }
+        Ok(models)
     }
 
     async fn health_check(&self) -> Result<bool, GatewayError> {
