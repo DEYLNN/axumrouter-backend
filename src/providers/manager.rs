@@ -182,8 +182,13 @@ impl ProviderManager {
             let prefix = meta.model_prefix.clone().unwrap_or_else(|| meta.name.clone());
             let custom = crate::db::list_custom_models(&self.db, &meta.name).await;
             for cm in custom {
+                let id = format!("{}/{}", prefix, cm.model_id);
+                // Skip if already exists from native list (dedup by id)
+                if all.iter().any(|m| m.id == id) {
+                    continue;
+                }
                 all.push(Model {
-                    id: format!("{}/{}", prefix, cm.model_id),
+                    id,
                     object: "model".to_string(),
                     owned_by: meta.display_name.clone(),
                     context_length: Some(cm.ctx as u32),
@@ -205,8 +210,13 @@ impl ProviderManager {
             let prefix = meta.model_prefix.clone().unwrap_or_else(|| meta.name.clone());
             let custom = crate::db::list_custom_models(&self.db, &meta.name).await;
             for cm in custom {
+                let id = format!("{}/{}", prefix, cm.model_id);
+                // Skip if already exists from native list (dedup by id)
+                if all.iter().any(|m| m.id == id) {
+                    continue;
+                }
                 all.push(Model {
-                    id: format!("{}/{}", prefix, cm.model_id),
+                    id,
                     object: "model".to_string(),
                     owned_by: meta.display_name.clone(),
                     context_length: Some(cm.ctx as u32),

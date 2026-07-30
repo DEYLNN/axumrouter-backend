@@ -2781,3 +2781,23 @@ name = "Poolside Laguna S 2.1"
 ctx = 256000
 vision = false
 tools = true
+
+[[providers]]
+id = "orc"
+name = "OrcaRouter"
+category = "apikey"
+color = "#1a8cdb"
+icon = "orc.png"
+base_url = "https://api.orcarouter.ai"
+validate_url = "https://api.orcarouter.ai/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "orcarouter/free"
+name = "OrcaRouter Free"
+ctx = 256000
+vision = true
+tools = true
