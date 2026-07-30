@@ -2798,6 +2798,20 @@ stall_timeout = 360
 [[providers.models]]
 id = "orcarouter/free"
 name = "OrcaRouter Free"
-ctx = 256000
+ctx = 1000000
 vision = true
+tools = true
+
+[[providers.models]]
+id = "deepseek/deepseek-v4-pro-free"
+name = "DeepSeek V4 Pro Free"
+ctx = 1000000
+vision = true
+tools = true
+
+[[providers.models]]
+id = "deepseek/deepseek-v4-flash-free"
+name = "DeepSeek V4 Flash Free"
+ctx = 1000000
+vision = false
 tools = true
