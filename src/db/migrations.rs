@@ -214,6 +214,10 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
     let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN last_error_at TEXT").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN backoff_level INTEGER NOT NULL DEFAULT 0").execute(pool).await;
 
+    // Migration v11: consecutive_error_count for auto-deactivate after N retryable errors.
+    // Counts consecutive retryable errors; reset to 0 on mark_success.
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN consecutive_error_count INTEGER NOT NULL DEFAULT 0").execute(pool).await;
+
     tracing::info!("Database migrations complete");
     Ok(())
 }

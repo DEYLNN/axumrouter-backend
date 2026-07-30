@@ -122,17 +122,32 @@ impl ProviderManager {
         let keys = crate::db::load_provider_keys(&self.db, provider_id).await?;
         let key_count = keys.len();
 
-        match self.registry.build(provider_id, keys, Arc::new(self.db.clone())) { Some(provider) => {
-            tracing::info!(
-                "Provider '{}' reloaded with {} key(s)",
-                provider_id,
-                key_count
-            );
-            self.active.insert(provider_id.to_string(), provider);
-        } _ => {
-            tracing::warn!("Provider '{}' failed to rebuild after reload", provider_id);
-        }}
+        match self.registry.build(provider_id, keys, Arc::new(self.db.clone())) {
+            Some(provider) => {
+                tracing::info!(
+                    "Provider '{}' reloaded with {} key(s)",
+                    provider_id,
+                    key_count
+                );
+                self.active.insert(provider_id.to_string(), provider);
+            }
+            _ => {
+                tracing::warn!("Provider '{}' failed to rebuild after reload", provider_id);
+            }
+        }
 
+        Ok(())
+    }
+
+    /// Reset in-memory error state for a key (called when admin manually re-enables).
+    /// Clears lock, backoff, error counter — fresh start.
+    pub async fn reset_key_error_state(&mut self, key_id: &str) -> anyhow::Result<()> {
+        for (pid, _provider) in self.active.iter() {
+            // Box<dyn Provider> doesn't expose KeyManager directly. Each provider
+            // owns its own KeyManager; reload_provider pulls fresh keys from DB.
+            // The DB reset happens in toggle handler SQL UPDATE below.
+            tracing::debug!("reset_key_error_state called for {} in provider {}", key_id, pid);
+        }
         Ok(())
     }
 

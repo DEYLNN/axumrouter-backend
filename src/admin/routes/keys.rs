@@ -11,8 +11,25 @@ pub struct KeysQuery {
     pub page: Option<i64>,
     pub per_page: Option<i64>,
     pub provider_id: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_bool")]
     pub only_problem: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_optional_bool")]
     pub only_disabled: Option<bool>,
+    #[serde(default)]
+    pub status_code: Option<String>,
+}
+
+/// Lenient bool parser — accepts "1"/"0"/"true"/"false"/"yes"/"no" as bool.
+/// `Option<bool>` default serde only accepts "true"/"false" — that's too strict
+/// for query strings. FE often sends "1" / "0" as truthy shorthand.
+fn deserialize_optional_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where D: serde::Deserializer<'de> {
+    use serde::de::Error;
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    Ok(s.map(|v| {
+        let v = v.to_ascii_lowercase();
+        v == "1" || v == "true" || v == "yes"
+    }))
 }
 
 #[derive(Serialize)]
@@ -29,6 +46,7 @@ pub struct KeyListItem {
     pub last_error_message: Option<String>,
     pub last_error_at: Option<String>,
     pub backoff_level: i64,
+    pub consecutive_error_count: i64,
     pub created_at: String,
 }
 
@@ -59,21 +77,27 @@ pub async fn api_list_keys(
     if q.only_problem.unwrap_or(false) {
         where_sql.push_str(" AND (last_error_status IS NOT NULL OR last_error_message IS NOT NULL)");
     }
+    let status_code_filter: Option<i64> = q.status_code.as_ref().and_then(|s| s.parse::<i64>().ok());
+    if status_code_filter.is_some() {
+        where_sql.push_str(" AND last_error_status = ?");
+    }
 
     let count_sql = format!("SELECT COUNT(*) FROM api_keys{}", where_sql);
     let list_sql = format!(
-        "SELECT id, provider_id, label, COALESCE(key_type, 'apikey'), key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, created_at FROM api_keys{} ORDER BY provider_id, created_at DESC LIMIT ? OFFSET ?",
+        "SELECT id, provider_id, label, COALESCE(key_type, 'apikey'), key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, consecutive_error_count, created_at FROM api_keys{} ORDER BY provider_id, created_at DESC LIMIT ? OFFSET ?",
         where_sql
     );
 
     // Count with binds
     let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql);
     if let Some(pid) = &q.provider_id { count_q = count_q.bind(pid); }
+    if let Some(sc) = status_code_filter { count_q = count_q.bind(sc); }
     let total: i64 = count_q.fetch_one(&state.db).await.unwrap_or(0);
 
     // List with binds + LIMIT/OFFSET
-    let mut list_q = sqlx::query_as::<_, (String, String, Option<String>, String, String, bool, Option<String>, Option<i64>, Option<String>, Option<String>, i64, String)>(&list_sql);
+    let mut list_q = sqlx::query_as::<_, (String, String, Option<String>, String, String, bool, Option<String>, Option<i64>, Option<String>, Option<String>, i64, i64, String)>(&list_sql);
     if let Some(pid) = &q.provider_id { list_q = list_q.bind(pid); }
+    if let Some(sc) = status_code_filter { list_q = list_q.bind(sc); }
     let rows = list_q
         .bind(per_page)
         .bind(offset)
@@ -81,7 +105,7 @@ pub async fn api_list_keys(
         .await
         .unwrap_or_default();
 
-    let keys = rows.into_iter().map(|(id, provider_id, label, key_type, key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, created_at)| {
+    let keys = rows.into_iter().map(|(id, provider_id, label, key_type, key_value, is_active, locked_until, last_error_status, last_error_message, last_error_at, backoff_level, consecutive_error_count, created_at)| {
         let preview = if key_value.len() > 12 {
             format!("{}...{}", &key_value[..6], &key_value[key_value.len() - 4..])
         } else {
@@ -90,7 +114,7 @@ pub async fn api_list_keys(
         KeyListItem {
             id, provider_id, label, key_type, is_active,
             key_preview: preview, key_value,
-            locked_until, last_error_status, last_error_message, last_error_at, backoff_level, created_at,
+            locked_until, last_error_status, last_error_message, last_error_at, backoff_level, consecutive_error_count, created_at,
         }
     }).collect();
 
@@ -220,4 +244,61 @@ pub async fn api_delete_key(
             message: format!("Failed: {}", e),
         }),
     }
+}
+
+#[derive(Deserialize)]
+pub struct ToggleKeyRequest {
+    pub key_id: String,
+    pub is_active: bool,
+}
+
+/// Toggle a key active/inactive. Re-enabling resets the error counter,
+/// disabling persists to DB and to KeyManager in-memory state.
+pub async fn api_toggle_key(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ToggleKeyRequest>,
+) -> Json<AddKeyResponse> {
+    // Update DB
+    let result = sqlx::query("UPDATE api_keys SET is_active=? WHERE id=?")
+        .bind(if req.is_active { 1i64 } else { 0i64 })
+        .bind(&req.key_id)
+        .execute(&state.db)
+        .await;
+
+    if let Err(e) = result {
+        return Json(AddKeyResponse {
+            success: false,
+            message: format!("Failed: {}", e),
+        });
+    }
+
+    // Sync in-memory KeyManager state — must reload provider to pick up
+    // the new is_active for in-flight requests. Reload pulls fresh keys.
+    let provider_id: Option<String> = sqlx::query_scalar("SELECT provider_id FROM api_keys WHERE id=?")
+        .bind(&req.key_id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None);
+
+    // Also reset DB-side consecutive_error_count when manually re-enabled.
+    if req.is_active {
+        let _ = sqlx::query("UPDATE api_keys SET consecutive_error_count = 0, locked_until = NULL, last_error_status = NULL, last_error_message = NULL, last_error_at = NULL, backoff_level = 0 WHERE id = ?")
+            .bind(&req.key_id)
+            .execute(&state.db)
+            .await;
+    }
+
+    if let Some(pid) = provider_id {
+        let mut pm = state.provider_manager.write().await;
+        let _ = pm.reload_provider(&pid).await;
+        // Also reset in-memory error state when manually re-enabled.
+        if req.is_active {
+            let _ = pm.reset_key_error_state(&req.key_id).await;
+        }
+    }
+
+    Json(AddKeyResponse {
+        success: true,
+        message: if req.is_active { "Key enabled".into() } else { "Key disabled".into() },
+    })
 }

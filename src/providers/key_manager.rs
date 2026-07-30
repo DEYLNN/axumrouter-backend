@@ -10,6 +10,10 @@ use crate::db::models::ApiKey;
 use crate::error::GatewayError;
 use crate::services::key_strategy::{strategy_from_config, KeyStrategy, StrategyCtx};
 
+/// Number of consecutive retryable errors before a key is auto-deactivated
+/// (set is_active=0). Reset to 0 on mark_success. Admin can re-enable via FE toggle.
+pub const AUTO_DEACTIVATE_THRESHOLD: i64 = 3;
+
 /// Runtime state for each key — extends the DB `ApiKey` with in-memory tracking.
 #[derive(Debug, Clone)]
 pub struct KeyState {
@@ -22,6 +26,8 @@ pub struct KeyState {
     pub backoff_level: u32,
     /// Consecutive sticky-round-robin uses.
     pub consecutive_use_count: i64,
+    /// Consecutive retryable errors — auto-deactivate when threshold reached.
+    pub consecutive_error_count: i64,
     /// Last time this key was picked.
     pub last_used_at: Option<Instant>,
     /// Per-model lock expiries: (model_id -> expiry Instant).
@@ -104,6 +110,7 @@ impl KeyManager {
                 locked_until: None,
                 backoff_level: 0,
                 consecutive_use_count: 0,
+                consecutive_error_count: 0,
                 last_used_at: None,
                 model_locks: HashMap::new(),
                 lock_reason: String::new(),
@@ -113,7 +120,7 @@ impl KeyManager {
             states: Mutex::new(states),
             cursor: AtomicUsize::new(0),
             config: KeyLockConfig::default(),
-            strategy: strategy_from_config("round-robin", 3),
+            strategy: strategy_from_config("fill-first", 3),
             provider_id: provider_id.to_string(),
             db_pool: pool,
         }
@@ -191,6 +198,7 @@ impl KeyManager {
                 ks.locked_at = None;
                 ks.locked_until = None;
                 ks.backoff_level = 0;
+                ks.consecutive_error_count = 0;  // reset on success
                 ks.lock_reason.clear();
                 // Clear ONLY expired + current-model model locks.
                 // (9router clears just the current model + expired ones on success.)
@@ -267,26 +275,46 @@ impl KeyManager {
                 // Per-model lock
                 ks.model_locks.insert(model_id.to_string(), expiry);
             } else {
-                // Account-level lock
+                // Account-level lock — increment error counter
                 ks.locked_at = Some(now);
                 ks.locked_until = Some(expiry);
                 ks.backoff_level = new_backoff;
+                ks.consecutive_error_count += 1;
                 ks.lock_reason = format!(
-                    "HTTP {} — {} (cooldown {}s, backoff_level={})",
-                    status, readable, cooldown_secs, new_backoff
+                    "HTTP {} — {} (cooldown {}s, backoff_level={}, errors={})",
+                    status, readable, cooldown_secs, new_backoff, ks.consecutive_error_count
                 );
             }
         }
 
+        // Auto-deactivate if consecutive errors exceed threshold
+        let auto_deactivated = {
+            let mut deactivate = false;
+            if model.is_none() {
+                if let Some(ks) = states.iter().find(|s| s.key.id == key_id) {
+                    if ks.consecutive_error_count >= AUTO_DEACTIVATE_THRESHOLD {
+                        deactivate = true;
+                    }
+                }
+            }
+            if deactivate {
+                if let Some(ks) = states.iter_mut().find(|s| s.key.id == key_id) {
+                    ks.key.is_active = 0;
+                }
+            }
+            deactivate
+        };
+
         let _reason_preview = &readable[..readable.len().min(80)];
         let target = model.unwrap_or("<account>");
         tracing::warn!(
-            "Key '{}' locked for {} on '{}' for {}s (backoff={})",
+            "Key '{}' locked for {} on '{}' for {}s (backoff={}){}",
             key_id,
             target,
             status,
             cooldown_secs,
-            new_backoff
+            new_backoff,
+            if auto_deactivated { " — AUTO-DEACTIVATED" } else { "" }
         );
 
         // Persist to DB
@@ -304,17 +332,22 @@ impl KeyManager {
             let st = status as i64;
             let msg = readable.clone();
             let bl = new_backoff as i64;
+            let will_deactivate = auto_deactivated;
             tokio::spawn(async move {
                 let _ = sqlx::query(
                     "UPDATE api_keys SET locked_until = ?, last_error_status = ?, \
                      last_error_message = ?, last_error_at = ?, \
-                     backoff_level = ? WHERE id = ?"
+                     backoff_level = ?, consecutive_error_count = CASE WHEN ? THEN consecutive_error_count + 1 ELSE consecutive_error_count END, \
+                     is_active = CASE WHEN ? THEN 0 ELSE is_active END \
+                     WHERE id = ?"
                 )
                 .bind(&lock_until)
                 .bind(st)
                 .bind(&msg)
                 .bind(&now_iso)
                 .bind(bl)
+                .bind(true)  // always bump on lock (in-memory already incremented)
+                .bind(will_deactivate)
                 .bind(&kid)
                 .execute(&pool)
                 .await;
@@ -335,6 +368,26 @@ impl KeyManager {
     /// Total keys.
     pub fn total_count(&self) -> usize {
         self.states.lock().unwrap().len()
+    }
+
+    /// Manually toggle key active state. Called from FE /keys/:id/toggle endpoint.
+    /// `true` = enable (active), `false` = disable. Also resets the error counter
+    /// when re-enabling, since admin override is treated as a fresh start.
+    pub fn set_active(&self, key_id: &str, active: bool) -> Result<(), GatewayError> {
+        let mut states = self.states.lock().unwrap();
+        let ks = states.iter_mut().find(|s| s.key.id == key_id)
+            .ok_or_else(|| GatewayError::ProviderError(format!("Key not found: {}", key_id)))?;
+        ks.key.is_active = if active { 1 } else { 0 };
+        if active {
+            // Reset error state on manual re-enable.
+            ks.consecutive_error_count = 0;
+            ks.locked_at = None;
+            ks.locked_until = None;
+            ks.backoff_level = 0;
+            ks.lock_reason.clear();
+            ks.model_locks.clear();
+        }
+        Ok(())
     }
 
     /// Key IDs managed.

@@ -75,7 +75,7 @@ fn sqlite_file_path(database_url: &str) -> Option<String> {
 /// Load active API keys for a provider
 pub async fn load_provider_keys(pool: &SqlitePool, provider_id: &str) -> anyhow::Result<Vec<models::ApiKey>> {
     let keys = sqlx::query_as::<_, models::ApiKey>(
-        "SELECT id, provider_id, key_value, label, is_active, last_used_at, consecutive_use_count, created_at, updated_at
+        "SELECT id, provider_id, key_value, label, is_active, last_used_at, consecutive_use_count, consecutive_error_count, created_at, updated_at
          FROM api_keys WHERE provider_id = ? AND is_active != 0 ORDER BY created_at"
     )
     .bind(provider_id)

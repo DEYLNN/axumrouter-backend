@@ -73,6 +73,7 @@ fn keys_routes(state: Arc<AppState>) -> Router {
         .route("/admin/api/keys", get(routes::keys::api_list_keys))
         .route("/admin/api/keys", post(routes::keys::api_add_key))
         .route("/admin/api/keys/delete", post(routes::keys::api_delete_key))
+        .route("/admin/api/keys/toggle", post(routes::keys::api_toggle_key))
         .with_state(state)
 }
 

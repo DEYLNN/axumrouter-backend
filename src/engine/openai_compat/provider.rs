@@ -171,7 +171,7 @@ impl Provider for OpenAICompatibleProvider {
                     continue;
                 }
             };
-            match self.client.chat_stream(&auth, &provider_req).await {
+            match self.client.chat_stream(&auth, &key_id, &provider_req).await {
                 Ok(resp) => {
                     self.keys.mark_success(&key_id);
                     let _mapper = self.mapper.clone();

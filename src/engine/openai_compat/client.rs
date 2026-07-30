@@ -94,6 +94,7 @@ impl Client {
     pub async fn chat_stream(
         &self,
         auth: &ApiKeyAuth,
+        key_id: &str,
         request: &ChatRequest,
     ) -> Result<reqwest::Response, GatewayError> {
         let mut headers = reqwest::header::HeaderMap::new();
@@ -114,11 +115,14 @@ impl Client {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            return Err(GatewayError::ProviderError(format!(
-                "Provider returned HTTP {}: {}",
-                status.as_u16(),
-                body
-            )));
+            // Return ProviderHttpError (not ProviderError) so caller can
+            // extract key_id via provider_api_key_id() for usage tracking.
+            return Err(GatewayError::ProviderHttpError {
+                status: status.as_u16(),
+                body,
+                provider: self.config.provider_id.clone(),
+                key_id: Some(key_id.to_string()),
+            });
         }
 
         Ok(resp)
