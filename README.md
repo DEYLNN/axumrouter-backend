@@ -8,7 +8,10 @@ Lightweight AI Gateway — **Rust + Axum 0.7**. Multi-provider LLM router with a
 |-----|----------|
 | **Full Guide** | `docs/GUIDE.md` — setup, config, run, deploy, troubleshooting |
 | **Project Rules** | `AGENTS.md` — arsitektur, conventions |
+| **Provider Architecture** | `docs/PROVIDER_ARCHITECTURE.md` — cooldown, strategy, lock, custom models, provider checklist |
+| **Usage Tracking** | `docs/USAGE_TRACKING.md` — wiring usage tracking, key lock persistence |
 | **Provider Guide** | `docs/API_KEY_PROVIDER_GUIDE.md` — cara tambah provider baru (TOML-based) |
+| **Import Schema** | `docs/IMPORT_SCHEMA.md` — JSON import key validation |
 | **Provider Templates** | `docs/provider_templates/apikey/` — template siap copy |
 
 ## Quick Start
@@ -24,7 +27,7 @@ cargo build --release
 ./target/release/axumrouter
 ```
 
-Open `http://localhost:3000/admin/` — admin dashboard.
+Open `http://localhost:7444/admin/` — admin dashboard.
 
 ## Architecture
 
@@ -37,6 +40,9 @@ backend/
 │   ├── error.rs             # GatewayError — OpenAI-compatible error format
 │   ├── config/              # Config loader (TOML + AXUM_ env vars)
 │   ├── db/                  # SQLite — migrations, models, queries
+│   │   ├── mod.rs            # init, backup, load/count keys, custom models CRUD
+│   │   ├── migrations.rs     # auto-schema: api_keys, custom_providers, custom_models, usage, …
+│   │   └── models.rs         # DB row structs
 │   ├── api/                 # /v1/* — chat completions, models, health
 │   ├── admin/               # /admin/api* — providers, keys, logs, usage, OAuth
 │   ├── providers/           # 69+ provider implementations
@@ -58,7 +64,11 @@ backend/
 │   └── admin/               # Frontend SPA build
 └── docs/
     ├── GUIDE.md
-    └── API_KEY_PROVIDER_GUIDE.md
+    ├── PROVIDER_ARCHITECTURE.md
+    ├── USAGE_TRACKING.md
+    ├── API_KEY_PROVIDER_GUIDE.md
+    ├── IMPORT_SCHEMA.md
+    └── provider_templates/
 ```
 
 ## Tech Stack

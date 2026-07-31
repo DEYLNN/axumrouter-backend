@@ -72,9 +72,15 @@ Untuk provider yang butuh OAuth atau logika khusus (cf, fb, kc, np, xai):
 - Tetap pake folder `backend/src/providers/<id>/`
 - Register manual di `backend/src/providers/registry.rs`
 - Lihat contoh di folder `cloudflare/`, `freebuff/`, dll
+- **Full checklist**: `docs/PROVIDER_ARCHITECTURE.md` §3 — required files, mandatory trait methods, wiring steps.
 
 > **DB pool persist**: kalo pake `KeyManager`, WAJIB pass pool biar lock state survive restart.
 > Lengkap: `docs/USAGE_TRACKING.md` → "Key Lock State Persistence".
+>
+> **Custom models**: provider MUST merge `custom_models` table in `list_models()`.
+> Pattern: `docs/PROVIDER_ARCHITECTURE.md` §2.3.
+>
+> **Cooldown + strategy**: auto via `KeyManager`. Config: `docs/PROVIDER_ARCHITECTURE.md` §1.
 
 ## Arsitektur
 

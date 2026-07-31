@@ -227,6 +227,27 @@ Restart       → kolom di DB tetap ada, tinggal di-load pas startup
 
 ### Catatan OAuth / complex provider
 
-Provider OAuth (freebuff, dll) yg **tidak** pass pool → state cuma
-in-memory. Hilang pas restart. Kalo mau persist, ikutin pattern di atas:
-tambah `db: Option<SqlitePool>`, pass ke `KeyManager::new_with_pool()`.`
+Provider OAuth (freebuff, kilocode, dll) **WAJIB**:
+1. Store `db: Option<SqlitePool>` in struct
+2. Pass pool to constructor + `KeyManager::new_with_pool()`
+3. Merge `custom_models` in `list_models()` — pattern: `PROVIDER_ARCHITECTURE.md` §2.3
+
+Tanpa langkah di atas:
+- Lock state hilang saat restart (in-memory only)
+- Custom models dari Settings → Models tidak muncul di provider detail page
+
+### Test endpoint cooldown
+
+`POST /admin/api/providers/:id/test` sekarang return field `locked_keys`:
+```json
+{
+  "ok": false,
+  "error": "All 1 key(s) locked — cooldown active",
+  "locked_keys": [
+    {"key_id": "key_abc", "remaining_secs": 119, "reason": "HTTP 429 — ..."}
+  ]
+}
+```
+
+Kalo semua key locked (`active_count == 0`), endpoint early-reject — gak ada HTTP call ke upstream.
+Detail: `PROVIDER_ARCHITECTURE.md` §1.6.

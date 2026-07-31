@@ -22,6 +22,7 @@ pub struct KlProvider {
     keys: KeyManager,
     client: KlClient,
     mapper: KlMapper,
+    db: Option<SqlitePool>,
 }
 
 impl KlProvider {
@@ -39,11 +40,13 @@ impl KlProvider {
             validate_url: format!("{}/v1/models", constants::API_BASE_URL),
             model_prefix: None,
         };
+        let db_pool = Some((*db).clone());
         Self {
             metadata,
             keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())),
             client: KlClient::new(),
             mapper: KlMapper,
+            db: db_pool,
         }
     }
 
@@ -186,5 +189,23 @@ impl Provider for KlProvider {
         });
     }
 
-    async fn list_models(&self) -> Result<Vec<Model>, GatewayError> { Ok(self.models_static()) }
+    async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
+        let mut models = self.models_static();
+        // Merge user-added custom models from DB (same pattern as OpenAICompatibleProvider)
+        if let Some(pool) = &self.db {
+            let custom = crate::db::list_custom_models(pool, &self.metadata.name).await;
+            let prefix = self.metadata.model_prefix.clone().unwrap_or_else(|| self.metadata.name.clone());
+            for cm in custom {
+                let id = format!("{}/{}", prefix, cm.model_id);
+                if models.iter().any(|m| m.id == id) { continue; }
+                models.push(Model {
+                    id,
+                    object: "model".to_string(),
+                    owned_by: self.metadata.display_name.clone(),
+                    context_length: Some(cm.ctx as u32),
+                });
+            }
+        }
+        Ok(models)
+    }
 }

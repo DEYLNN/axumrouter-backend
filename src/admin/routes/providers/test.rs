@@ -23,12 +23,14 @@ pub struct TestModelResponse {
     pub completion_tokens: i64,
     pub total_tokens: i64,
     pub error: Option<String>,
+    /// Keys currently locked with cooldown remaining (key_id, remaining_secs, reason).
+    pub locked_keys: Vec<serde_json::Value>,
 }
 
 /// POST /admin/api/providers/:id/test
 ///
 /// Fire a one-shot chat request against the selected model to verify connectivity.
-/// Uses the most recently created active API key.
+/// Uses the provider's internal KeyManager — respect strategy, cooldown, and lock state.
 pub async fn api_test_model(
     State(state): State<Arc<AppState>>,
     Path(provider_id): Path<String>,
@@ -47,9 +49,33 @@ pub async fn api_test_model(
                 completion_tokens: 0,
                 total_tokens: 0,
                 error: Some("Provider not found".into()),
+                locked_keys: vec![],
             });
         }
     };
+
+    // Check lock state BEFORE attempting request — surface cooldown to FE
+    let locked = provider.locked_keys();
+    let locked_json: Vec<serde_json::Value> = locked.iter().map(|(kid, rem, reason)| {
+        serde_json::json!({"key_id": kid, "remaining_secs": rem, "reason": reason})
+    }).collect();
+
+    // If all keys are locked (active_count == 0 && total > 0), refuse early.
+    let total = provider.total_keys();
+    let active = provider.active_keys();
+    if total > 0 && active == 0 {
+        return Json(TestModelResponse {
+            ok: false,
+            response: String::new(),
+            model: req.model,
+            latency_ms: 0,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+            error: Some(format!("All {} key(s) locked — cooldown active", total)),
+            locked_keys: locked_json,
+        });
+    }
 
     let chat_request = crate::types::chat::ChatCompletionRequest {
         model: req.model.clone(),
@@ -72,15 +98,6 @@ pub async fn api_test_model(
 
     let start = std::time::Instant::now();
 
-    let known_keys: Vec<String> = sqlx::query_scalar(
-        "SELECT id FROM api_keys WHERE provider_id=? AND is_active=1 ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(&provider_id)
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
-    let _db_key_id = known_keys.first().cloned();
-
     match provider.chat_completion(chat_request).await {
         Ok(result) => {
             let latency = start.elapsed().as_millis() as i64;
@@ -96,7 +113,7 @@ pub async fn api_test_model(
                 total_tokens: 0,
             });
 
-            // Track test request in usage logs — use actual key from provider
+            // Track test request in usage logs
             let tracked_usage = crate::services::usage_tracking::CanonicalUsage {
                 prompt_tokens: usage.prompt_tokens as i64,
                 completion_tokens: usage.completion_tokens as i64,
@@ -113,7 +130,7 @@ pub async fn api_test_model(
                 None,
             ).await;
 
-            // Log failed key attempts
+            // Log failed key attempts from fallback loop
             for failed in &result.failed_keys {
                 crate::services::usage_tracking::record_error(
                     &state.usage_tracker,
@@ -137,13 +154,14 @@ pub async fn api_test_model(
                 completion_tokens: usage.completion_tokens as i64,
                 total_tokens: usage.total_tokens as i64,
                 error: None,
+                locked_keys: locked_json,
             })
         }
         Err(e) => {
             let latency = start.elapsed().as_millis() as i64;
+            let err_status = e.http_status().unwrap_or(502) as i32;
 
             // Track test failure in usage logs
-            let err_status = e.http_status().unwrap_or(502) as i32;
             crate::services::usage_tracking::record_error(
                 &state.usage_tracker,
                 start,
@@ -165,6 +183,7 @@ pub async fn api_test_model(
                 completion_tokens: 0,
                 total_tokens: 0,
                 error: Some(e.to_string()),
+                locked_keys: locked_json,
             })
         }
     }

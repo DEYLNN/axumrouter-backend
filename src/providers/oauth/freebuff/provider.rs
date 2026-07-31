@@ -23,6 +23,7 @@ pub struct FbProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
     client: FbClient,
+    db: Option<SqlitePool>,
 }
 
 impl FbProvider {
@@ -40,10 +41,12 @@ impl FbProvider {
             validate_url: constants::VALIDATE_URL.to_string(),
             model_prefix: None,
         };
+        let db_pool = Some((*db).clone());
         Self {
             metadata,
             keys: KeyManager::new(keys, constants::PROVIDER_ID),
             client: FbClient::new(constants::DEFAULT_TIMEOUT_SECS),
+            db: db_pool,
         }
     }
 
@@ -335,6 +338,22 @@ impl Provider for FbProvider {
     }
 
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
-        Ok(self.models_static())
+        let mut models = self.models_static();
+        // Merge user-added custom models from DB (same pattern as OpenAICompatibleProvider)
+        if let Some(pool) = &self.db {
+            let custom = crate::db::list_custom_models(pool, &self.metadata.name).await;
+            let prefix = self.metadata.model_prefix.clone().unwrap_or_else(|| self.metadata.name.clone());
+            for cm in custom {
+                let id = format!("{}/{}", prefix, cm.model_id);
+                if models.iter().any(|m| m.id == id) { continue; }
+                models.push(Model {
+                    id,
+                    object: "model".to_string(),
+                    owned_by: self.metadata.display_name.clone(),
+                    context_length: Some(cm.ctx as u32),
+                });
+            }
+        }
+        Ok(models)
     }
 }

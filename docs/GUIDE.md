@@ -267,15 +267,19 @@ Setiap startup, DB di-backup ke `data/backups/`. Keep 20 backup terakhir.
 
 | Table | Description |
 |-------|-------------|
-| `api_keys` | Provider API keys (+ OAuth credentials) |
+| `api_keys` | Provider API keys (+ OAuth credentials, lock state, backoff) |
 | `gateway_keys` | Client-facing auth keys buat /v1/* |
-| `usage` | Token usage logs |
-| `request_logs` | Request history |
+| `custom_providers` | Admin-defined custom providers (base_url, timeout, etc.) |
+| `custom_provider_models` | Models defined per custom provider at creation time |
+| `custom_models` | User-added models per any provider (Settings → Models page) |
+| `usage` | Per-request token tracking + usage logs |
 | `blocked_models` | Per-provider blocked models |
-| `disabled_models` | Global model blocklist |
+| `disabled_models` | Global model blocklist (enable/disable via Settings) |
 | `settings` | Key-value settings (rtk_enabled, caveman_enabled) |
 | `proxies` | Proxy pool |
 | `combos` | Provider combo routing |
+
+> Full architecture: `docs/PROVIDER_ARCHITECTURE.md` — cooldown, strategy, lock, custom models, provider checklist.
 
 ### Commands
 
@@ -329,8 +333,12 @@ curl http://localhost:3000/admin/api/database/export
 | GET/POST/DELETE | `/admin/api/gateway_keys` | Gateway key CRUD |
 | GET/POST/DELETE | `/admin/api/combos` | Combo routing CRUD |
 | GET | `/admin/api/models/disabled` | Disabled models |
-| GET | `/admin/api/models/all` | All models |
+| GET | `/admin/api/models/all` | All models grouped by provider |
+| POST | `/admin/api/models/toggle` | Enable/disable model globally |
 | GET | `/admin/api/models/blocked` | Blocked models |
+| GET | `/admin/api/providers/:id/custom-models` | Custom models for provider |
+| POST | `/admin/api/providers/:id/custom-models` | Add custom model |
+| DELETE | `/admin/api/providers/:id/custom-models/:m` | Remove custom model |
 
 ### Model Format
 ```
