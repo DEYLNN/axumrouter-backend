@@ -302,3 +302,57 @@ pub async fn api_toggle_key(
         message: if req.is_active { "Key enabled".into() } else { "Key disabled".into() },
     })
 }
+
+#[derive(Deserialize)]
+pub struct BulkEnableRequest {
+    pub key_ids: Vec<String>,
+}
+
+/// Bulk-enable selected keys — same semantics as api_toggle_key(true):
+/// activates key AND resets error state (backoff, consecutive errors,
+/// last error fields). Used by Auth Files "Enable" bulk action.
+pub async fn api_bulk_enable_keys(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BulkEnableRequest>,
+) -> Json<serde_json::Value> {
+    let mut enabled = 0usize;
+    let mut failed = 0usize;
+    let mut provider_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for key_id in &req.key_ids {
+        // 1. Activate + reset error state in one UPDATE (only if currently disabled)
+        let r = sqlx::query(
+            "UPDATE api_keys SET is_active=1, consecutive_error_count=0, locked_until=NULL, \
+             last_error_status=NULL, last_error_message=NULL, last_error_at=NULL, backoff_level=0 \
+             WHERE id=? AND is_active=0"
+        )
+        .bind(key_id)
+        .execute(&state.db)
+        .await;
+
+        match r {
+            Ok(res) if res.rows_affected() > 0 => {
+                enabled += 1;
+                if let Ok(Some(pid)) = sqlx::query_scalar::<_, String>(
+                    "SELECT provider_id FROM api_keys WHERE id=?"
+                ).bind(key_id).fetch_optional(&state.db).await {
+                    provider_ids.insert(pid);
+                }
+            }
+            _ => failed += 1,
+        }
+    }
+
+    // Reload affected providers so KeyManager picks up fresh is_active state.
+    for pid in &provider_ids {
+        let mut pm = state.provider_manager.write().await;
+        let _ = pm.reload_provider(pid).await;
+    }
+
+    Json(serde_json::json!({
+        "success": true,
+        "enabled": enabled,
+        "failed": failed,
+        "message": format!("Enabled {enabled} key(s){}{}", if failed > 0 { format!(", {failed} already active/failed") } else { String::new() }, if failed > 0 { "" } else { "" }),
+    }))
+}

@@ -25,6 +25,7 @@ pub fn agent_id_for_model(backend_model: &str) -> &str {
         "minimax/minimax-m3" => "base2-free-minimax-m3",
         "mimo/mimo-v2.5" => "base2-free-mimo",
         "mimo/mimo-v2.5-pro" => "base2-free-mimo-pro",
+        "openai/gpt-5.6-luna" => "base2-free-luna",
         _ => "base2-free-deepseek-flash",
     }
 }

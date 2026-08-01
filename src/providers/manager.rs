@@ -119,6 +119,11 @@ impl ProviderManager {
 
     /// Reload keys from DB for a provider and rebuild it
     pub async fn reload_provider(&mut self, provider_id: &str) -> anyhow::Result<()> {
+        // Custom providers live in DB, not the registry — rebuild from DB config.
+        if crate::db::get_custom_provider(&self.db, provider_id).await?.is_some() {
+            let db = self.db.clone();
+            return self.reload_custom_provider(provider_id, &db).await;
+        }
         let keys = crate::db::load_provider_keys(&self.db, provider_id).await?;
         let key_count = keys.len();
 

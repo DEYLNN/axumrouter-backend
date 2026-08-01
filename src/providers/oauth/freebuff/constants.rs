@@ -22,6 +22,7 @@ pub const AGENT_BY_MODEL: &[(&str, &str)] = &[
     ("minimax/minimax-m3", "base2-free-minimax-m3"),
     ("mimo/mimo-v2.5", "base2-free-mimo"),
     ("mimo/mimo-v2.5-pro", "base2-free-mimo-pro"),
+    ("openai/gpt-5.6-luna", "base2-free-luna"),
 ];
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "minimax-m3", backend_model: "minimax/minimax-m3", max_tokens: None, context_length: 1000000 },
     ModelDef { id: "mimo-v2.5", backend_model: "mimo/mimo-v2.5", max_tokens: None, context_length: 1000000 },
     ModelDef { id: "mimo-v2.5-pro", backend_model: "mimo/mimo-v2.5-pro", max_tokens: None, context_length: 1000000 },
+    ModelDef { id: "gpt-5.6-luna", backend_model: "openai/gpt-5.6-luna", max_tokens: None, context_length: 131072 },
 ];
 
 /// Only fields actually consulted by body builder.
@@ -56,9 +58,18 @@ pub const DEEPSEEK_V4_AGENTIC_PROFILE: AgenticProfile = AgenticProfile {
     strip_reasoning_params: false,
 };
 
+/// GPT-5.6 Luna runs reasoning effort `high` — reasoning params MUST be
+/// forwarded (not stripped) or the model loses its thinking mode.
+pub const LUNA_AGENTIC_PROFILE: AgenticProfile = AgenticProfile {
+    max_messages: FREEBUFF_MAX_MESSAGES,
+    strip_reasoning_params: false,
+};
+
 pub fn agentic_profile_for_backend(backend_model: &str) -> &'static AgenticProfile {
     if backend_model.contains("deepseek") {
         &DEEPSEEK_V4_AGENTIC_PROFILE
+    } else if backend_model.contains("luna") {
+        &LUNA_AGENTIC_PROFILE
     } else {
         &BASE_AGENTIC_PROFILE
     }

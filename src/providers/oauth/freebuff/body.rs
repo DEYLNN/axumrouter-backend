@@ -124,6 +124,12 @@ pub fn build_request_body(
             obj.remove("reasoning_effort");
             obj.remove("reasoning");
             obj.remove("thinking");
+        } else if backend_model.contains("luna") {
+            // Luna runs reasoning effort `high` by default (see Codebuff
+            // base2-free-luna.ts). Forward if client set one, else force high.
+            if !obj.contains_key("reasoning_effort") && !obj.contains_key("reasoning") {
+                obj.insert("reasoning_effort".into(), serde_json::json!("high"));
+            }
         }
         // Ensure reasoning content placeholder for tool_calls
         let _ = obj.get_mut("messages").map(|m| ensure_reasoning_content(m));
