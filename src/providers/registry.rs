@@ -57,7 +57,6 @@ impl ProviderRegistry {
         }
 
         // --- Custom providers (manual) ---
-        register_provider!(registry, "fb", crate::providers::oauth::freebuff::provider::FbProvider::new_with_keys, db);
         register_provider!(registry, "kc", crate::providers::oauth::kilocode::provider::KlProvider::new_with_keys, db);
         register_provider!(registry, "cl", crate::providers::apikey::cline::provider::ClProvider::new_with_keys, db);
         register_provider!(registry, "cf", crate::providers::apikey::cloudflare::provider::CfProvider::new_with_keys, db);
