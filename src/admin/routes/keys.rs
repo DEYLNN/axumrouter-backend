@@ -122,6 +122,138 @@ pub async fn api_list_keys(
 }
 
 #[derive(Deserialize)]
+pub struct DedupeRequest {
+    /// Restrict dedupe to one provider; None = scan all.
+    pub provider_id: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct DedupeResponse {
+    pub removed: i64,
+    pub kept: i64,
+    pub groups: i64,
+}
+
+/// Deduplicate API keys — keep oldest per (provider_id, key_value).
+/// OAuth entries are left alone (key_type='oauth') since they hold tokens
+/// the user reconnected manually, not actual API keys.
+pub async fn api_dedupe_keys(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<DedupeRequest>,
+) -> Json<DedupeResponse> {
+    // Find duplicates — keep min(created_at), remove the rest.
+    // OAuth rows are excluded from both target + keeper selection.
+    let base_query = "SELECT provider_id, key_value, COUNT(*) AS n, MIN(created_at) \
+         FROM api_keys \
+         WHERE COALESCE(key_type, 'apikey') != 'oauth' \
+         GROUP BY provider_id, key_value \
+         HAVING COUNT(*) > 1 \
+         ORDER BY provider_id, key_value";
+    let dup_rows: Vec<(String, String, i64, String)> = if let Some(pid) = req.provider_id.as_deref() {
+        sqlx::query_as::<_, (String, String, i64, String)>(
+            &format!("{base_query} AND provider_id = ?")
+        )
+        .bind(pid)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default()
+    } else {
+        sqlx::query_as::<_, (String, String, i64, String)>(base_query)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default()
+    };
+
+    let groups = dup_rows.len() as i64;
+    let mut removed: i64 = 0;
+    let mut kept: i64 = 0;
+
+    for (pid, kv, n, min_created) in &dup_rows {
+        kept += 1; // 1 per group kept
+        removed += n - 1; // n-1 deletions per group
+        // Delete everything for this (provider_id, key_value) row EXCEPT the
+        // row with the oldest created_at. This keeps behavior predictable
+        // even if rowids surprise us.
+        let r = sqlx::query(
+            "DELETE FROM api_keys \
+             WHERE provider_id = ? AND key_value = ? \
+               AND COALESCE(key_type, 'apikey') != 'oauth' \
+               AND created_at != ?"
+        )
+        .bind(pid)
+        .bind(kv)
+        .bind(min_created)
+        .execute(&state.db)
+        .await
+        .map(|x| x.rows_affected() as i64)
+        .unwrap_or(0);
+        let _ = r;
+    }
+
+    Json(DedupeResponse { removed, kept, groups })
+}
+
+#[derive(Serialize)]
+pub struct KeysStatsResponse {
+    pub total: i64,
+    pub active: i64,
+    pub disabled: i64,
+    pub providers: Vec<ProviderKeyCount>,
+    /// Number of distinct (provider_id, key_value) groups with >1 non-OAuth
+    /// entries. This is the count of "duplicate groups" — running dedupe
+    /// would delete (sum of group sizes) - duplicates_count rows.
+    pub duplicates: i64,
+}
+
+#[derive(Serialize)]
+pub struct ProviderKeyCount {
+    pub provider_id: String,
+    pub count: i64,
+    pub active: i64,
+}
+
+/// Full key stats for FE provider dropdown — single GROUP BY scan,
+/// independent of pagination. Same filter knobs as api_list_keys so FE
+/// can show counts that match the visible list.
+pub async fn api_keys_stats(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<KeysQuery>,
+) -> Json<KeysStatsResponse> {
+    use crate::db::count_keys_per_provider;
+    let all = count_keys_per_provider(&state.db).await;
+
+    // Apply same filters as api_list_keys so counts reflect the same set.
+    let rows = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT \
+           COUNT(*), \
+           SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) \
+         FROM api_keys WHERE 1=1 \
+           AND (?1 IS NULL OR provider_id = ?1) \
+           AND (?2 = 0 OR is_active = 0) \
+           AND (?3 = 0 OR (last_error_status IS NOT NULL OR last_error_message IS NOT NULL))"
+    )
+    .bind(&q.provider_id)
+    .bind(q.only_disabled.unwrap_or(false) as i64)
+    .bind(q.only_problem.unwrap_or(false) as i64)
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or((0, 0));
+
+    let total = rows.0;
+    let active = rows.1;
+    let duplicates = crate::db::count_duplicate_groups(&state.db, q.provider_id.as_deref()).await;
+    Json(KeysStatsResponse {
+        total,
+        active,
+        disabled: total - active,
+        providers: all.into_iter().map(|(pid, c, a)| ProviderKeyCount {
+            provider_id: pid, count: c, active: a,
+        }).collect(),
+        duplicates,
+    })
+}
+
+#[derive(Deserialize)]
 pub struct AddKeyRequest {
     pub provider_id: String,
     pub key_value: String,
@@ -141,6 +273,27 @@ pub async fn api_add_key(
     let id = format!("key_{}", &Uuid::new_v4().to_string()[..8]);
     let label = req.label.unwrap_or_default();
     let key_type = "apikey";
+
+    // Reject duplicates — same (provider_id, key_value) already exists.
+    // OAuth tokens (stored under key_type='oauth' by the OAuth flow) are
+    // intentionally excluded from this check — users reconnect manually.
+    let dup: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM api_keys \
+         WHERE provider_id = ? AND key_value = ? \
+           AND COALESCE(key_type, 'apikey') != 'oauth' LIMIT 1"
+    )
+    .bind(&req.provider_id)
+    .bind(&req.key_value)
+    .fetch_optional(&state.db)
+    .await
+    .unwrap_or(None);
+
+    if dup.is_some() {
+        return Json(AddKeyResponse {
+            success: false,
+            message: format!("Duplicate key already exists for provider '{}'", req.provider_id),
+        });
+    }
 
     let result = sqlx::query(
         "INSERT INTO api_keys (id, provider_id, key_value, label, is_active, key_type) VALUES (?, ?, ?, ?, 1, ?)",

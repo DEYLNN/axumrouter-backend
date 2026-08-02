@@ -72,10 +72,12 @@ fn gateway_routes(state: Arc<AppState>) -> Router {
 fn keys_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/admin/api/keys", get(routes::keys::api_list_keys))
+        .route("/admin/api/keys/stats", get(routes::keys::api_keys_stats))
         .route("/admin/api/keys", post(routes::keys::api_add_key))
         .route("/admin/api/keys/delete", post(routes::keys::api_delete_key))
         .route("/admin/api/keys/toggle", post(routes::keys::api_toggle_key))
         .route("/admin/api/keys/bulk-enable", post(routes::keys::api_bulk_enable_keys))
+        .route("/admin/api/keys/dedupe", post(routes::keys::api_dedupe_keys))
         .with_state(state)
 }
 

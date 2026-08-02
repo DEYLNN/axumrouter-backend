@@ -108,6 +108,48 @@ pub async fn count_total_active_keys(pool: &SqlitePool) -> i64 {
         .unwrap_or(0)
 }
 
+/// Per-provider key counts — used by /admin/api/keys/stats for the FE provider
+/// dropdown. Single GROUP BY scan, no pagination dependency. Returns
+/// (provider_id, total_count, active_count) sorted alphabetically.
+pub async fn count_keys_per_provider(pool: &SqlitePool) -> Vec<(String, i64, i64)> {
+    sqlx::query_as::<_, (String, i64, i64)>(
+        "SELECT provider_id, COUNT(*), SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) \
+         FROM api_keys GROUP BY provider_id ORDER BY provider_id"
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+}
+
+/// Count distinct (provider_id, key_value) groups that have >1 non-OAuth
+/// duplicate row — used by FE to display "X duplicates" badge next to Run.
+/// Same scope as api_dedupe_keys (non-OAuth only).
+pub async fn count_duplicate_groups(pool: &SqlitePool, provider_id: Option<&str>) -> i64 {
+    let q = if provider_id.is_some() {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM ( \
+               SELECT provider_id, key_value \
+               FROM api_keys \
+               WHERE COALESCE(key_type, 'apikey') != 'oauth' AND provider_id = ?1 \
+               GROUP BY provider_id, key_value \
+               HAVING COUNT(*) > 1\
+             )"
+        )
+        .bind(provider_id.unwrap_or(""))
+    } else {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM ( \
+               SELECT provider_id, key_value \
+               FROM api_keys \
+               WHERE COALESCE(key_type, 'apikey') != 'oauth' \
+               GROUP BY provider_id, key_value \
+               HAVING COUNT(*) > 1\
+             )"
+        )
+    };
+    q.fetch_one(pool).await.unwrap_or(0)
+}
+
 // ── Usage tracking ──
 //
 // One row per upstream API call. Populated by services::usage_tracking
