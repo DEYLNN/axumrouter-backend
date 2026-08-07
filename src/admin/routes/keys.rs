@@ -17,6 +17,8 @@ pub struct KeysQuery {
     pub only_disabled: Option<bool>,
     #[serde(default)]
     pub status_code: Option<String>,
+    #[serde(default)]
+    pub query: Option<String>,
 }
 
 /// Lenient bool parser — accepts "1"/"0"/"true"/"false"/"yes"/"no" as bool.
@@ -81,6 +83,12 @@ pub async fn api_list_keys(
     if status_code_filter.is_some() {
         where_sql.push_str(" AND last_error_status = ?");
     }
+    // Text search — matches provider_id, label, or key_type. Used by the
+    // Auth Files search box. Like-wrapped so partial matches work.
+    let query_filter = q.query.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| format!("%{s}%"));
+    if query_filter.is_some() {
+        where_sql.push_str(" AND (provider_id LIKE ? OR label LIKE ? OR COALESCE(key_type,'') LIKE ?)");
+    }
 
     let count_sql = format!("SELECT COUNT(*) FROM api_keys{}", where_sql);
     let list_sql = format!(
@@ -92,12 +100,14 @@ pub async fn api_list_keys(
     let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql);
     if let Some(pid) = &q.provider_id { count_q = count_q.bind(pid); }
     if let Some(sc) = status_code_filter { count_q = count_q.bind(sc); }
+    if let Some(qf) = &query_filter { count_q = count_q.bind(qf).bind(qf).bind(qf); }
     let total: i64 = count_q.fetch_one(&state.db).await.unwrap_or(0);
 
     // List with binds + LIMIT/OFFSET
     let mut list_q = sqlx::query_as::<_, (String, String, Option<String>, String, String, bool, Option<String>, Option<i64>, Option<String>, Option<String>, i64, i64, String)>(&list_sql);
     if let Some(pid) = &q.provider_id { list_q = list_q.bind(pid); }
     if let Some(sc) = status_code_filter { list_q = list_q.bind(sc); }
+    if let Some(qf) = &query_filter { list_q = list_q.bind(qf).bind(qf).bind(qf); }
     let rows = list_q
         .bind(per_page)
         .bind(offset)
