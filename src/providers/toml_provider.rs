@@ -18,6 +18,12 @@ pub struct ProviderDef {
     pub validate_url: String,
     pub api_type: String,
 
+    /// Chat endpoint suffix. Defaults to `/v1/chat/completions` for standard
+    /// OpenAI-compatible APIs; override when base_url already carries a
+    /// version or provider-specific path such as `/v4` or `/openai/v1`.
+    #[serde(default)]
+    pub chat_path: Option<String>,
+
     // Optional
     pub timeout: Option<u64>,
     pub first_chunk_timeout: Option<u64>,
@@ -105,7 +111,7 @@ pub fn build_openai_config(p: &ProviderDef) -> OpenAIConfig {
         stream_stall_timeout_secs: p.stall_timeout.unwrap_or(360),
         models: build_models(p),
         quirks: build_quirks(p),
-        chat_path: "/v1/chat/completions".into(),
+        chat_path: p.chat_path.clone().unwrap_or_else(|| "/v1/chat/completions".into()),
     }
 }
 

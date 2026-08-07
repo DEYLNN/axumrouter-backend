@@ -50,6 +50,12 @@ pub struct KeyListItem {
     pub backoff_level: i64,
     pub consecutive_error_count: i64,
     pub created_at: String,
+    pub email: String,
+    pub plan: String,
+    pub account_id: String,
+    pub has_refresh: bool,
+    pub has_access: bool,
+    pub expires_at: String,
 }
 
 #[derive(Serialize)]
@@ -121,10 +127,28 @@ pub async fn api_list_keys(
         } else {
             key_value.clone()
         };
+        let oauth: serde_json::Value = serde_json::from_str(&key_value).unwrap_or_default();
+        let expires_at = oauth
+            .get("expires_at")
+            .or_else(|| oauth.get("expiresAt"))
+            .map(|v| v.as_str().map(str::to_owned).unwrap_or_else(|| v.to_string()))
+            .unwrap_or_default();
+        let email = oauth.get("email").and_then(|v| v.as_str()).unwrap_or_default().to_owned();
+        let plan = oauth.get("plan").and_then(|v| v.as_str()).unwrap_or_default().to_owned();
+        let account_id = oauth
+            .get("account_id")
+            .or_else(|| oauth.get("accountId"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_owned();
         KeyListItem {
             id, provider_id, label, key_type, is_active,
             key_preview: preview, key_value,
             locked_until, last_error_status, last_error_message, last_error_at, backoff_level, consecutive_error_count, created_at,
+            email, plan, account_id,
+            has_refresh: oauth.get("refresh_token").or_else(|| oauth.get("refreshToken")).and_then(|v| v.as_str()).is_some_and(|v| !v.is_empty()),
+            has_access: oauth.get("access_token").or_else(|| oauth.get("accessToken")).and_then(|v| v.as_str()).is_some_and(|v| !v.is_empty()),
+            expires_at,
         }
     }).collect();
 

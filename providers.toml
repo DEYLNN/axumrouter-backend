@@ -2815,3 +2815,30 @@ name = "DeepSeek V4 Flash Free"
 ctx = 1000000
 vision = false
 tools = true
+
+[[providers]]
+id = "bb"
+name = "Blackbox AI"
+category = "apikey"
+color = "#1DA1F2"
+icon = "bb.png"
+base_url = "https://api.blackbox.ai"
+validate_url = "https://api.blackbox.ai/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "blackboxai/deepseek/deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
+
+[[providers.models]]
+id = "z-ai/glm-5.2"
+name = "GLM 5.2"
+ctx = 1000000
+vision = false
+tools = true
