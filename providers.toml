@@ -2835,10 +2835,3 @@ name = "DeepSeek V4 Pro"
 ctx = 1000000
 vision = false
 tools = true
-
-[[providers.models]]
-id = "z-ai/glm-5.2"
-name = "GLM 5.2"
-ctx = 1000000
-vision = false
-tools = true

@@ -292,6 +292,7 @@ pub struct AddKeyRequest {
     pub provider_id: String,
     pub key_value: String,
     pub label: Option<String>,
+    pub key_type: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -306,7 +307,7 @@ pub async fn api_add_key(
 ) -> Json<AddKeyResponse> {
     let id = format!("key_{}", &Uuid::new_v4().to_string()[..8]);
     let label = req.label.unwrap_or_default();
-    let key_type = "apikey";
+    let key_type = req.key_type.as_deref().unwrap_or("apikey");
 
     // Reject duplicates — same (provider_id, key_value) already exists.
     // OAuth tokens (stored under key_type='oauth' by the OAuth flow) are
