@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 use sqlx::SqlitePool;
+use serde_json::json;
 
 use crate::db::models::ApiKey;
 use crate::error::GatewayError;
@@ -66,6 +67,24 @@ impl GbProvider {
             })
             .collect()
     }
+
+    async fn refresh_if_needed(&self, key: &ApiKey, cred: GbOAuthCredential) -> Result<GbOAuthCredential, GatewayError> {
+        if !cred.needs_refresh(chrono::Utc::now().timestamp(), 300) {
+            return Ok(cred);
+        }
+        let refresh_token = cred.refresh_token.clone().ok_or_else(|| GatewayError::ProviderError("GrokBuild: refresh_token missing".into()))?;
+        let data = super::oauth::refresh(&refresh_token).await.map_err(GatewayError::ProviderError)?;
+        let access_token = data["access_token"].as_str().ok_or_else(|| GatewayError::ProviderError("GrokBuild refresh: access_token missing".into()))?;
+        let expires_at = data["expires_in"].as_i64().map(|s| chrono::Utc::now().timestamp() + s).or(cred.expires_at);
+        let new_refresh = data["refresh_token"].as_str().unwrap_or(&refresh_token);
+        let key_value = serde_json::to_string(&json!({"access_token": access_token, "refresh_token": new_refresh, "expires_at": expires_at, "email": cred.email}))
+            .map_err(|e| GatewayError::ProviderError(format!("GrokBuild refresh serialize: {e}")))?;
+        sqlx::query("UPDATE api_keys SET key_value = ?, updated_at = ? WHERE id = ?")
+            .bind(&key_value).bind(chrono::Utc::now().to_rfc3339()).bind(&key.id)
+            .execute(self.db.as_ref().ok_or_else(|| GatewayError::ProviderError("GrokBuild: DB unavailable".into()))?)
+            .await.map_err(|e| GatewayError::ProviderError(format!("GrokBuild refresh DB: {e}")))?;
+        GbOAuthCredential::parse(&key_value).map_err(GatewayError::ProviderError)
+    }
 }
 
 #[async_trait]
@@ -127,6 +146,10 @@ impl Provider for GbProvider {
                     });
                     continue;
                 }
+            };
+            let cred = match self.refresh_if_needed(&key, cred).await {
+                Ok(c) => c,
+                Err(e) => { excluded.push(key_id.clone()); last_error = Some(e.to_string()); last_status = Some(502); failed.push(FailedKeyAttempt { key_id: key_id.clone(), error: e }); continue; }
             };
             let body = self.mapper.to_responses_request(request.clone());
             match self.client.send_collect(body, &cred).await {
@@ -195,6 +218,10 @@ impl Provider for GbProvider {
                     });
                     continue;
                 }
+            };
+            let cred = match self.refresh_if_needed(&key, cred).await {
+                Ok(c) => c,
+                Err(e) => { excluded.push(key_id.clone()); last_error = Some(e.to_string()); last_status = Some(502); last_attempted_key_id = Some(key_id.clone()); failed.push(FailedKeyAttempt { key_id: key_id.clone(), error: e }); continue; }
             };
             let body = self.mapper.to_responses_request(request.clone());
             match self.client.send_stream(body, &cred).await {

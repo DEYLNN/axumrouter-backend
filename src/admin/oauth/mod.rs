@@ -14,5 +14,6 @@ pub fn routes(state: Arc<AppState>) -> Router {
         // Grok Build OAuth
         .route("/admin/api/oauth/gb/start", get(gb::start))
         .route("/admin/api/oauth/gb/poll", post(gb::poll))
+        .route("/admin/api/oauth/gb/refresh/:key_id", post(gb::refresh))
         .with_state(state)
 }
