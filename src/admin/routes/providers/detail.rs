@@ -39,8 +39,7 @@ pub async fn api_provider_detail(
 
                 list.into_iter()
                     .map(|m| {
-                        let model_name =
-                            m.id.split('/').last().unwrap_or(&m.id).to_string();
+                        let model_name = m.id.strip_prefix(&format!("{}/", provider_id)).unwrap_or(&m.id).to_string();
                         serde_json::json!({
                             "id": m.id,
                             "name": model_name,
