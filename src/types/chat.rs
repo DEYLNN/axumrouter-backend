@@ -20,6 +20,8 @@ pub struct ChatCompletionRequest {
     /// Tool definitions the model may call
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<ToolDefinition>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
     /// Tool choice control: "auto", "none", "required", or {"type":"function","function":{"name":"..."}}
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,

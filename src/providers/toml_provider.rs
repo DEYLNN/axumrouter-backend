@@ -46,6 +46,8 @@ pub struct ModelDef {
     pub vision: bool,
     #[serde(default)]
     pub tools: bool,
+    #[serde(default)]
+    pub reasoning: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,7 +93,7 @@ fn build_quirks(p: &ProviderDef) -> ProviderQuirks {
 fn build_models(p: &ProviderDef) -> Vec<EngineModelDef> {
     p.models.iter().map(|m| EngineModelDef {
         id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
-        supports_vision: m.vision, supports_tools: m.tools,
+        supports_vision: m.vision, supports_tools: m.tools, reasoning: m.reasoning,
     }).collect()
 }
 
@@ -131,7 +133,7 @@ pub fn build_anthropic_config(p: &ProviderDef) -> AnthropicConfig {
         stream_stall_timeout_secs: p.stall_timeout.unwrap_or(360),
         models: p.models.iter().map(|m| AnthropicModelDef {
             id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
-            supports_vision: m.vision, supports_tools: m.tools,
+            supports_vision: m.vision, supports_tools: m.tools, reasoning: m.reasoning,
         }).collect(),
         quirks: build_quirks(p),
     }

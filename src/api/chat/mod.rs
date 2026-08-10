@@ -115,15 +115,6 @@ async fn chat_completions(
     // Ponytail: inject "lazy senior dev" minimalism prompt
     ponytail::inject(&state.db, &mut provider_request.messages).await;
 
-    // Reasoning placeholder: inject reasoning_content: " " on assistant messages
-    // Signals upstream (OCG/deepseek) to separate thinking from visible content.
-    // Without this, model puts "The user wants..." thinking into content field.
-    for msg in &mut provider_request.messages {
-        if msg.role == "assistant" && msg.reasoning_content.is_none() {
-            msg.reasoning_content = Some(" ".to_string());
-        }
-    }
-
     // ── Route to handler ──
 
     if is_streaming {

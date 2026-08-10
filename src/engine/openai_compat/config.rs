@@ -29,6 +29,7 @@ pub struct ModelDef {
     pub context_length: u32,
     pub supports_vision: bool,
     pub supports_tools: bool,
+    pub reasoning: bool,
 }
 
 impl ModelDef {
@@ -40,6 +41,7 @@ impl ModelDef {
             context_length,
             supports_vision,
             supports_tools,
+            reasoning: false,
         }
     }
 }

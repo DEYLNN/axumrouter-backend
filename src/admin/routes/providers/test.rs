@@ -92,6 +92,7 @@ pub async fn api_test_model(
         stream: Some(false),
         stream_options: None,
         tools: None,
+        reasoning_effort: None,
         tool_choice: None,
         top_p: None,
     };

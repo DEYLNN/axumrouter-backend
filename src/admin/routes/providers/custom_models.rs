@@ -25,9 +25,24 @@ pub async fn api_add_custom_model_for_provider(
     Path(id): Path<String>,
     Json(req): Json<AddCustomModelReq>,
 ) -> Json<serde_json::Value> {
+    let model_id = req.model_id.trim();
+    if model_id.is_empty() {
+        return Json(serde_json::json!({"ok": false, "error": "invalid_model_id", "message": "Model ID required"}));
+    }
+    let toml_duplicate = crate::providers::toml_provider::ProviderList {
+        providers: toml::from_str(include_str!("../../../../providers.toml"))
+            .map(|list: crate::providers::toml_provider::ProviderList| list.providers)
+            .unwrap_or_default(),
+    }.providers.iter().find(|p| p.id == id)
+        .is_some_and(|p| p.models.iter().any(|m| m.id == model_id));
+    let db_duplicate = crate::db::list_custom_models(&state.db, &id).await
+        .iter().any(|m| m.model_id == model_id);
+    if toml_duplicate || db_duplicate {
+        return Json(serde_json::json!({"ok": false, "error": "duplicate_model", "message": "Model already exists"}));
+    }
     if let Err(e) = crate::db::add_custom_model(
-        &state.db, &id, &req.model_id,
-        req.display_name.as_deref().unwrap_or(&req.model_id),
+        &state.db, &id, model_id,
+        req.display_name.as_deref().unwrap_or(model_id),
         req.ctx.unwrap_or(4096),
         if req.vision.unwrap_or(false) { 1 } else { 0 },
         if req.tools.unwrap_or(true) { 1 } else { 0 },

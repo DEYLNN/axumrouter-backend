@@ -33,6 +33,10 @@ impl Mapper {
             MaxTokensField::MaxCompletionTokens => (None, gateway_req.max_tokens),
         };
 
+        let reasoning_effort = gateway_req.reasoning_effort.clone().filter(|_| {
+            self.config.models.iter().any(|m| m.id == model && m.reasoning)
+        });
+
         ChatRequest {
             model,
             messages: gateway_req.messages.clone(),
@@ -69,6 +73,7 @@ impl Mapper {
             } else {
                 gateway_req.tool_choice.clone()
             },
+            reasoning_effort,
         }
     }
 
@@ -87,7 +92,7 @@ impl Mapper {
                     tool_calls: c.message.tool_calls.clone(),
                     tool_call_id: None,
                     name: None,
-                    reasoning_content: None,
+                    reasoning_content: c.message.reasoning_content.clone(),
                 },
                 finish_reason: c.finish_reason.clone(),
             })
@@ -138,6 +143,7 @@ impl Mapper {
                 role: None,
                 content: None,
                 tool_calls: None,
+                reasoning_content: None,
             });
 
         crate::types::chat::ChatCompletionChunk {
@@ -153,7 +159,7 @@ impl Mapper {
                 delta: crate::types::chat::Delta {
                     role: delta.role,
                     content: delta.content,
-                    reasoning_content: None,
+                    reasoning_content: delta.reasoning_content,
                     tool_calls: delta.tool_calls,
                 },
                 finish_reason: chunk.choices.first().and_then(|c| c.finish_reason.clone()),

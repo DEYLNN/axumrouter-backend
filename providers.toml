@@ -2835,3 +2835,20 @@ name = "DeepSeek V4 Pro"
 ctx = 1000000
 vision = false
 tools = true
+reasoning = true
+
+[[providers.models]]
+id = "blackboxai/moonshotai/kimi-k2.7-code"
+name = "Kimi K2.7 Code"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true
+
+[[providers.models]]
+id = "z-ai/glm-5.2"
+name = "GLM 5.2"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true

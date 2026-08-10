@@ -52,6 +52,7 @@ impl ProviderManager {
                     id: m.model_id.clone(), name: m.model_id.clone(),
                     max_tokens: None, context_length: m.ctx as u32,
                     supports_vision: m.vision != 0, supports_tools: m.tools != 0,
+                    reasoning: false,
                 }).collect();
 
                 let config = OpenAIConfig {
@@ -168,6 +169,7 @@ impl ProviderManager {
             id: m.model_id.clone(), name: m.model_id.clone(),
             max_tokens: None, context_length: m.ctx as u32,
             supports_vision: m.vision != 0, supports_tools: m.tools != 0,
+            reasoning: false,
         }).collect();
 
         let config = OpenAIConfig {

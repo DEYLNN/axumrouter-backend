@@ -24,6 +24,8 @@ pub struct ChatRequest {
     pub tools: Option<Vec<crate::types::chat::ToolDefinition>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 /// Generic OpenAI-compatible chat response.
@@ -52,6 +54,8 @@ pub struct ResponseMessage {
     pub content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<crate::types::chat::ToolCall>>,
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
 }
 
 /// SSE streaming chunk.
@@ -80,4 +84,6 @@ pub struct StreamDelta {
     pub content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ChunkToolCall>>,
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
 }
