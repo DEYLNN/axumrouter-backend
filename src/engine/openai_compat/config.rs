@@ -30,6 +30,8 @@ pub struct ModelDef {
     pub supports_vision: bool,
     pub supports_tools: bool,
     pub reasoning: bool,
+    /// Suppress reasoning_content downstream (model still thinks internally).
+    pub hide_reasoning: bool,
 }
 
 impl ModelDef {
@@ -42,6 +44,7 @@ impl ModelDef {
             supports_vision,
             supports_tools,
             reasoning: false,
+            hide_reasoning: false,
         }
     }
 }

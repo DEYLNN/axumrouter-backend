@@ -48,6 +48,9 @@ pub struct ModelDef {
     pub tools: bool,
     #[serde(default)]
     pub reasoning: bool,
+    /// Hide reasoning_content in response (model still thinks internally).
+    #[serde(default)]
+    pub hide_reasoning: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,7 +96,7 @@ fn build_quirks(p: &ProviderDef) -> ProviderQuirks {
 fn build_models(p: &ProviderDef) -> Vec<EngineModelDef> {
     p.models.iter().map(|m| EngineModelDef {
         id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
-        supports_vision: m.vision, supports_tools: m.tools, reasoning: m.reasoning,
+        supports_vision: m.vision, supports_tools: m.tools, reasoning: m.reasoning, hide_reasoning: m.hide_reasoning,
     }).collect()
 }
 

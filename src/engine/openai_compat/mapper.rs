@@ -18,6 +18,12 @@ impl Mapper {
         Self { config }
     }
 
+    /// True when this model's reasoning_content must be suppressed downstream
+    /// (model still thinks provider-side / internally).
+    fn hide_reasoning(&self, model: &str) -> bool {
+        self.config.models.iter().any(|m| m.id == model && m.hide_reasoning)
+    }
+
     pub fn to_provider_request(&self, gateway_req: &ChatCompletionRequest) -> ChatRequest {
         let model = gateway_req
             .model
@@ -92,7 +98,11 @@ impl Mapper {
                     tool_calls: c.message.tool_calls.clone(),
                     tool_call_id: None,
                     name: None,
-                    reasoning_content: c.message.reasoning_content.clone(),
+                    reasoning_content: if self.hide_reasoning(&provider_resp.model) {
+                        None
+                    } else {
+                        c.message.reasoning_content.clone()
+                    },
                 },
                 finish_reason: c.finish_reason.clone(),
             })
@@ -159,7 +169,13 @@ impl Mapper {
                 delta: crate::types::chat::Delta {
                     role: delta.role,
                     content: delta.content,
-                    reasoning_content: delta.reasoning_content,
+                    reasoning_content: if self.hide_reasoning(
+                        chunk.model.as_deref().unwrap_or("")
+                    ) {
+                        None
+                    } else {
+                        delta.reasoning_content
+                    },
                     tool_calls: delta.tool_calls,
                 },
                 finish_reason: chunk.choices.first().and_then(|c| c.finish_reason.clone()),

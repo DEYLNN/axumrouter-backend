@@ -66,13 +66,19 @@ impl ClClient {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let reasoning_content = body_obj.get("choices")
-            .and_then(|c| c.as_array())
-            .and_then(|arr| arr.first())
-            .and_then(|c| c.get("message"))
-            .and_then(|m| m.get("reasoning"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+        let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("cl").to_string();
+
+        let reasoning_content = if model.contains(constants::HIDE_REASONING_MODEL) {
+            None
+        } else {
+            body_obj.get("choices")
+                .and_then(|c| c.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|c| c.get("message"))
+                .and_then(|m| m.get("reasoning"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        };
 
         let tool_calls = body_obj.get("choices")
             .and_then(|c| c.as_array())
@@ -185,7 +191,11 @@ impl ClClient {
         let idx = choice.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
         let delta = choice.get("delta").cloned().unwrap_or_default();
         let content = delta.get("content").and_then(|c| c.as_str()).map(|s| s.to_string());
-        let reasoning_content = delta.get("reasoning").and_then(|c| c.as_str()).map(|s| s.to_string());
+        let reasoning_content = if model.contains(constants::HIDE_REASONING_MODEL) {
+            None
+        } else {
+            delta.get("reasoning").and_then(|c| c.as_str()).map(|s| s.to_string())
+        };
         let finish = choice.get("finish_reason").and_then(|f| f.as_str()).map(|s| s.to_string());
 
         // Tool calls in streaming delta (ChunkToolCall — index-based)
