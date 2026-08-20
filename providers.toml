@@ -94,6 +94,7 @@ name = "MiniMax M3"
 ctx = 1000000
 vision = true
 tools = true
+thinking_tags = ["ant_thinking", "thinking", "reasoning"]
 
 [[providers]]
 id = "ocg"

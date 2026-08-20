@@ -1,4 +1,5 @@
 use crate::error::GatewayError;
+use crate::services::thinking_filter;
 use crate::types::chat::{ChatCompletionChunk, Delta, ChunkChoice, Choice, ChatCompletionResponse, Message, ToolCall, Usage};
 
 use futures::stream::{BoxStream, StreamExt};
@@ -58,15 +59,8 @@ impl ClClient {
             .unwrap_or("cl-unknown")
             .to_string();
 
-        let content = body_obj.get("choices")
-            .and_then(|c| c.as_array())
-            .and_then(|arr| arr.first())
-            .and_then(|c| c.get("message"))
-            .and_then(|m| m.get("content"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-
         let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("cl").to_string();
+        let tags = constants::thinking_tags_for(&model);
 
         let reasoning_content = if model.contains(constants::HIDE_REASONING_MODEL) {
             None
@@ -101,6 +95,16 @@ impl ClClient {
             completion_tokens: u.get("completion_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
             total_tokens: u.get("total_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
         });
+
+        // Strip leaked agent thinking/tool-call tags from content (per-model config).
+        let raw_content = body_obj.get("choices")
+            .and_then(|c| c.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|c| c.get("message"))
+            .and_then(|m| m.get("content"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let content = raw_content.map(|s| thinking_filter::strip_thinking_tags_const(&s, tags));
 
         Ok(ChatCompletionResponse {
             id,
@@ -190,7 +194,10 @@ impl ClClient {
         let choice = &choices[0];
         let idx = choice.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
         let delta = choice.get("delta").cloned().unwrap_or_default();
-        let content = delta.get("content").and_then(|c| c.as_str()).map(|s| s.to_string());
+        // Strip leaked agent thinking/tool-call tags from streaming content too.
+        let tags = constants::thinking_tags_for(model);
+        let raw_content = delta.get("content").and_then(|c| c.as_str()).map(|s| s.to_string());
+        let content = raw_content.map(|s| thinking_filter::strip_thinking_tags_const(&s, tags));
         let reasoning_content = if model.contains(constants::HIDE_REASONING_MODEL) {
             None
         } else {

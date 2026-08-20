@@ -2,6 +2,7 @@ use crate::error::GatewayError;
 use crate::providers::spec::MaxTokensField;
 use crate::engine::openai_compat::config::OpenAIConfig;
 use crate::engine::openai_compat::types::{ChatRequest, ChatResponse, StreamChunk};
+use crate::services::thinking_filter;
 use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, Choice, Message, Usage};
 use crate::types::model::Model;
 use std::sync::Arc;
@@ -83,6 +84,21 @@ impl Mapper {
         }
     }
 
+    /// Filter content using the resolved model_id from upstream response.
+    /// No-op when the model has no `thinking_tags` configured.
+    fn filter_thinking_for(&self, model_id: &str, content: &str) -> String {
+        let tags = self
+            .config
+            .models
+            .iter()
+            .find(|m| m.id == model_id)
+            .and_then(|m| m.thinking_tags.as_ref());
+        match tags {
+            Some(t) => thinking_filter::strip_with_strings(content, t),
+            None => content.to_string(),
+        }
+    }
+
     pub fn to_gateway_response(
         &self,
         provider_resp: &ChatResponse,
@@ -90,11 +106,13 @@ impl Mapper {
         let choices: Vec<Choice> = provider_resp
             .choices
             .iter()
-            .map(|c| Choice {
+            .map(|c| {
+                let content = self.filter_thinking_for(&provider_resp.model, c.message.content.as_deref().unwrap_or(""));
+                Choice {
                 index: c.index,
                 message: Message {
                     role: c.message.role.clone(),
-                    content: c.message.content.clone(),
+                    content: if content.is_empty() { None } else { Some(content) },
                     tool_calls: c.message.tool_calls.clone(),
                     tool_call_id: None,
                     name: None,
@@ -105,7 +123,7 @@ impl Mapper {
                     },
                 },
                 finish_reason: c.finish_reason.clone(),
-            })
+            }})
             .collect();
 
         let usage = provider_resp.usage.clone().map(|u| Usage {
@@ -168,7 +186,7 @@ impl Mapper {
                 index: chunk.choices.first().map(|c| c.index).unwrap_or(0),
                 delta: crate::types::chat::Delta {
                     role: delta.role,
-                    content: delta.content,
+                    content: delta.content.map(|c| self.filter_thinking_for(chunk.model.as_deref().unwrap_or(""), &c)),
                     reasoning_content: if self.hide_reasoning(
                         chunk.model.as_deref().unwrap_or("")
                     ) {

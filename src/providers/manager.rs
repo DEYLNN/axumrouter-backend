@@ -53,6 +53,7 @@ impl ProviderManager {
                     max_tokens: None, context_length: m.ctx as u32,
                     supports_vision: m.vision != 0, supports_tools: m.tools != 0,
                     reasoning: false, hide_reasoning: false,
+                    thinking_tags: None,
                 }).collect();
 
                 let config = OpenAIConfig {
@@ -170,6 +171,7 @@ impl ProviderManager {
             max_tokens: None, context_length: m.ctx as u32,
             supports_vision: m.vision != 0, supports_tools: m.tools != 0,
             reasoning: false, hide_reasoning: false,
+            thinking_tags: None,
         }).collect();
 
         let config = OpenAIConfig {

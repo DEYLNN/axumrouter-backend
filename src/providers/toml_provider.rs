@@ -51,6 +51,12 @@ pub struct ModelDef {
     /// Hide reasoning_content in response (model still thinks internally).
     #[serde(default)]
     pub hide_reasoning: bool,
+    /// Optional list of tag names whose blocks get stripped from content.
+    /// e.g. `thinking_tags = ["ant_thinking", "thinking"]` removes
+    /// `<ant_thinking>…</ant_thinking>` and `<thinking>…</thinking>` from
+    /// upstream output. Empty / missing = no stripping.
+    #[serde(default)]
+    pub thinking_tags: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +103,7 @@ fn build_models(p: &ProviderDef) -> Vec<EngineModelDef> {
     p.models.iter().map(|m| EngineModelDef {
         id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
         supports_vision: m.vision, supports_tools: m.tools, reasoning: m.reasoning, hide_reasoning: m.hide_reasoning,
+        thinking_tags: m.thinking_tags.clone(),
     }).collect()
 }
 
@@ -137,6 +144,7 @@ pub fn build_anthropic_config(p: &ProviderDef) -> AnthropicConfig {
         models: p.models.iter().map(|m| AnthropicModelDef {
             id: m.id.clone(), name: m.name.clone(), max_tokens: None, context_length: m.ctx as u32,
             supports_vision: m.vision, supports_tools: m.tools, reasoning: m.reasoning,
+            thinking_tags: m.thinking_tags.clone(),
         }).collect(),
         quirks: build_quirks(p),
     }

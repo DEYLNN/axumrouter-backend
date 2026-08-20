@@ -12,6 +12,40 @@ pub const USER_AGENT: &str = "axumrouter/1.0";
 /// content is suppressed downstream — only final answer reaches the agent.
 pub const HIDE_REASONING_MODEL: &str = "cline-pass";
 
+/// Model definition for Cline — `thinking_tags` lists tag names whose blocks
+/// get stripped from response content (e.g. leaked Hermes internal tool calls,
+/// or upstream-specific thinking markers). Opt-in per model; empty = no strip.
+#[derive(Debug, Clone)]
+pub struct ModelDef {
+    pub id: &'static str,
+    pub context_length: u32,
+    pub thinking_tags: &'static [&'static str],
+}
+
+pub const MODELS: &[ModelDef] = &[
+    ModelDef {
+        id: "tencent/hy3",
+        context_length: 128000,
+        // Strip Hermes agent internal thinking blocks that leak through cline.
+        thinking_tags: &["tool_calls", "tool", "DSML", "function_calls"],
+    },
+    ModelDef {
+        id: "cline-pass/deepseek-v4-flash",
+        context_length: 1000000,
+        thinking_tags: &["tool_calls", "tool", "DSML", "function_calls"],
+    },
+];
+
+/// Look up thinking_tags for a model id. Empty slice if model unknown / no tags.
+pub fn thinking_tags_for(model_id: &str) -> &'static [&'static str] {
+    for m in MODELS {
+        if m.id == model_id {
+            return m.thinking_tags;
+        }
+    }
+    &[]
+}
+
 pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
     crate::providers::spec::ProviderSpec {
         id: PROVIDER_ID,

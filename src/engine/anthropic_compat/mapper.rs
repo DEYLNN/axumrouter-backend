@@ -4,6 +4,7 @@ use crate::engine::anthropic_compat::config::AnthropicConfig;
 use crate::engine::anthropic_compat::types::*;
 use crate::error::GatewayError;
 use crate::providers::spec::MaxTokensField;
+use crate::services::thinking_filter;
 use crate::types::chat::*;
 use crate::types::model::Model;
 
@@ -16,6 +17,21 @@ pub struct Mapper {
 impl Mapper {
     pub fn new(config: Arc<AnthropicConfig>) -> Self {
         Self { config }
+    }
+
+    /// Filter content using the resolved model_id from upstream response.
+    /// No-op when the model has no `thinking_tags` configured.
+    fn filter_thinking_for(&self, model_id: &str, content: &str) -> String {
+        let tags = self
+            .config
+            .models
+            .iter()
+            .find(|m| m.id == model_id)
+            .and_then(|m| m.thinking_tags.as_ref());
+        match tags {
+            Some(t) => thinking_filter::strip_with_strings(content, t),
+            None => content.to_string(),
+        }
     }
 
     pub fn to_provider_request(&self, gw: &ChatCompletionRequest) -> AnthropicRequest {
@@ -179,6 +195,8 @@ impl Mapper {
             total_tokens: u.input_tokens + u.output_tokens + u.cache_creation_input_tokens + u.cache_read_input_tokens,
         });
 
+        let content = self.filter_thinking_for(&resp.model, &content);
+
         ChatCompletionResponse {
             id: resp.id.clone(),
             object: "chat.completion".into(),
@@ -295,7 +313,10 @@ impl Mapper {
             AnthropicStreamEvent::ContentBlockDelta(e) => {
                 match &e.delta {
                     ContentDelta::TextDelta { text } => {
-                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(text.clone()), reasoning_content: None, tool_calls: None }, None));
+                        let filtered = self.filter_thinking_for(&state.model, text);
+                        if !filtered.is_empty() {
+                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(filtered), reasoning_content: None, tool_calls: None }, None));
+                        }
                     }
                     ContentDelta::InputJsonDelta { partial_json } => {
                         if let Some(tc_idx) = state.pending_tool_calls.get(&e.index) {

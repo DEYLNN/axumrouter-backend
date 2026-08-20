@@ -32,6 +32,11 @@ pub struct ModelDef {
     pub reasoning: bool,
     /// Suppress reasoning_content downstream (model still thinks internally).
     pub hide_reasoning: bool,
+    /// If set, strip `<tag>…</tag>` blocks (plus `<|tag|>…<|/tag|>` chatml
+    /// variant) from response content. Used by providers whose upstream
+    /// emits chain-of-thought as literal text instead of a separate field.
+    /// Empty slice → no stripping. See `services::thinking_filter`.
+    pub thinking_tags: Option<Vec<String>>,
 }
 
 impl ModelDef {
@@ -45,6 +50,7 @@ impl ModelDef {
             supports_tools,
             reasoning: false,
             hide_reasoning: false,
+            thinking_tags: None,
         }
     }
 }

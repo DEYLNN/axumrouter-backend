@@ -42,20 +42,12 @@ impl ClProvider {
     }
 
     fn models_static(&self) -> Vec<Model> {
-        vec![
-            Model {
-                id: "cl/tencent/hy3".to_string(),
-                object: "model".to_string(),
-                owned_by: constants::PROVIDER_ID.to_string(),
-                context_length: Some(128000),
-            },
-            Model {
-                id: "cl/cline-pass/deepseek-v4-flash".to_string(),
-                object: "model".to_string(),
-                owned_by: constants::PROVIDER_ID.to_string(),
-                context_length: Some(1000000),
-            },
-        ]
+        constants::MODELS.iter().map(|m| Model {
+            id: format!("{}/{}", constants::PROVIDER_ID, m.id),
+            object: "model".to_string(),
+            owned_by: constants::PROVIDER_ID.to_string(),
+            context_length: Some(m.context_length),
+        }).collect()
     }
 
     fn exhausted(&self) -> GatewayError {

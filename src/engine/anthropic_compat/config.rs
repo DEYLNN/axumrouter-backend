@@ -24,6 +24,11 @@ pub struct ModelDef {
     pub supports_vision: bool,
     pub supports_tools: bool,
     pub reasoning: bool,
+    /// If set, strip `<tag>…</tag>` blocks (plus `<|tag|>…<|/tag|>` chatml
+    /// variant) from response content. Used by providers whose upstream
+    /// emits chain-of-thought as literal text instead of a separate field.
+    /// Empty slice → no stripping. See `services::thinking_filter`.
+    pub thinking_tags: Option<Vec<String>>,
 }
 
 impl ModelDef {
@@ -36,6 +41,7 @@ impl ModelDef {
             supports_vision,
             supports_tools,
             reasoning: false,
+            thinking_tags: None,
         }
     }
 }
