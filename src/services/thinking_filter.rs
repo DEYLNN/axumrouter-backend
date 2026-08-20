@@ -64,7 +64,7 @@ pub fn strip_thinking_tags(content: &str, patterns: &[&str]) -> String {
         out = re.replace_all(&out, "\n\n").to_string();
     }
 
-    out.trim().to_string()
+    out
 }
 
 /// Returns the default tag patterns. Callers should prefer these when the

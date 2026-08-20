@@ -146,6 +146,7 @@ impl ClClient {
 
         let parsed = async_stream::try_stream! {
             let mut buffer = String::new();
+            let mut content_buffer = String::new();
             let mut collected_usage: Option<Usage> = None;
             let first_chunk_timeout = std::time::Duration::from_secs(constants::STREAM_FIRST_CHUNK_TIMEOUT_SECS);
             let stall_timeout = std::time::Duration::from_secs(constants::STREAM_STALL_TIMEOUT_SECS);
@@ -168,7 +169,7 @@ impl ClClient {
                         if data.is_empty() || data == "[DONE]" { continue; }
                         if let Ok(v) = serde_json::from_str::<Value>(data) {
                             let body_obj = if let Some(d) = v.get("data") { d } else { &v };
-                            if let Some(chunk) = Self::parse_chunk(body_obj, &model, &mut collected_usage) {
+                            if let Some(chunk) = Self::parse_chunk(body_obj, &model, &mut collected_usage, &mut content_buffer) {
                                 yield chunk;
                             }
                         }
@@ -179,7 +180,7 @@ impl ClClient {
         Ok(parsed.boxed())
     }
 
-    fn parse_chunk(v: &Value, model: &str, usage: &mut Option<Usage>) -> Option<ChatCompletionChunk> {
+    fn parse_chunk(v: &Value, model: &str, usage: &mut Option<Usage>, content_buffer: &mut String) -> Option<ChatCompletionChunk> {
         let choices = v.get("choices").and_then(|c| c.as_array()).cloned().unwrap_or_default();
         if choices.is_empty() {
             if let Some(u) = v.get("usage") {
@@ -196,8 +197,9 @@ impl ClClient {
         let delta = choice.get("delta").cloned().unwrap_or_default();
         // Strip leaked agent thinking/tool-call tags from streaming content too.
         let tags = constants::thinking_tags_for(model);
-        let raw_content = delta.get("content").and_then(|c| c.as_str()).map(|s| s.to_string());
-        let content = raw_content.map(|s| thinking_filter::strip_thinking_tags_const(&s, tags));
+        if let Some(raw) = delta.get("content").and_then(|c| c.as_str()) {
+            content_buffer.push_str(raw);
+        }
         let reasoning_content = if model.contains(constants::HIDE_REASONING_MODEL) {
             None
         } else {
@@ -234,6 +236,13 @@ impl ClClient {
         }
 
         // Always yield if we have content, reasoning, finish_reason, or tool_calls
+        let content = if finish.is_some() {
+            let full = std::mem::take(content_buffer);
+            let filtered = thinking_filter::strip_thinking_tags_const(&full, tags);
+            (!filtered.is_empty()).then_some(filtered)
+        } else {
+            None
+        };
         let has_content = content.is_some();
         let has_reasoning = reasoning_content.is_some();
         let has_finish = finish.is_some();

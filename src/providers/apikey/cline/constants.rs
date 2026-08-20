@@ -27,12 +27,12 @@ pub const MODELS: &[ModelDef] = &[
         id: "tencent/hy3",
         context_length: 128000,
         // Strip Hermes agent internal thinking blocks that leak through cline.
-        thinking_tags: &["tool_calls", "tool", "DSML", "function_calls"],
+        thinking_tags: &["ant_thinking", "thinking", "reasoning", "tool_calls", "tool", "DSML", "function_calls"],
     },
     ModelDef {
         id: "cline-pass/deepseek-v4-flash",
         context_length: 1000000,
-        thinking_tags: &["tool_calls", "tool", "DSML", "function_calls"],
+        thinking_tags: &["ant_thinking", "thinking", "reasoning", "tool_calls", "tool", "DSML", "function_calls"],
     },
 ];
 

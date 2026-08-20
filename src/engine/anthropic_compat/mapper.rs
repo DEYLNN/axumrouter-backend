@@ -287,9 +287,7 @@ impl Mapper {
                 match &e.content_block {
                     ResponseContentBlock::Text { text } => {
                         state.text_block_index = Some(e.index);
-                        if !text.is_empty() {
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(text.clone()), reasoning_content: None, tool_calls: None }, None));
-                        }
+                        state.text_buffer.push_str(text);
                     }
                     ResponseContentBlock::ToolUse { id, name, .. } => {
                         let idx = state.tool_call_index;
@@ -313,10 +311,7 @@ impl Mapper {
             AnthropicStreamEvent::ContentBlockDelta(e) => {
                 match &e.delta {
                     ContentDelta::TextDelta { text } => {
-                        let filtered = self.filter_thinking_for(&state.model, text);
-                        if !filtered.is_empty() {
-                            chunks.push(self._make_chunk(state, Delta { role: None, content: Some(filtered), reasoning_content: None, tool_calls: None }, None));
-                        }
+                        state.text_buffer.push_str(text);
                     }
                     ContentDelta::InputJsonDelta { partial_json } => {
                         if let Some(tc_idx) = state.pending_tool_calls.get(&e.index) {
@@ -340,6 +335,11 @@ impl Mapper {
             }
             AnthropicStreamEvent::ContentBlockStop(e) => {
                 if state.text_block_index == Some(e.index) {
+                    let filtered = self.filter_thinking_for(&state.model, &state.text_buffer);
+                    if !filtered.is_empty() {
+                        chunks.push(self._make_chunk(state, Delta { role: None, content: Some(filtered), reasoning_content: None, tool_calls: None }, None));
+                    }
+                    state.text_buffer.clear();
                     state.text_block_index = None;
                 }
             }
@@ -411,6 +411,7 @@ pub struct StreamState {
     pub model: String,
     pub tool_call_index: u32,
     pub text_block_index: Option<u32>,
+    pub text_buffer: String,
     pub pending_tool_calls: std::collections::HashMap<u32, u32>,
     pub finish_sent: bool,
 }
@@ -422,6 +423,7 @@ impl StreamState {
             model: String::new(),
             tool_call_index: 0,
             text_block_index: None,
+            text_buffer: String::new(),
             pending_tool_calls: std::collections::HashMap::new(),
             finish_sent: false,
         }
