@@ -8,3 +8,4 @@ pub mod custom_providers;
 pub mod settings;
 pub mod usage;
 pub mod sources;
+pub mod quota;

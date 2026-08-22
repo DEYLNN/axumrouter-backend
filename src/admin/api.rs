@@ -15,6 +15,7 @@ pub fn admin_routes(state: Arc<AppState>) -> Router {
         .merge(keys_routes(state.clone()))
         .merge(models_routes(state.clone()))
         .merge(usage_routes(state.clone()))
+        .merge(quota_routes(state.clone()))
         .merge(sources_routes(state))
 }
 
@@ -94,10 +95,18 @@ fn models_routes(state: Arc<AppState>) -> Router {
 fn usage_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/admin/api/usage/stats", get(routes::usage::api_usage_stats))
-        .route("/admin/api/usage/keys", get(routes::usage::api_usage_keys))
+        .route("/admin/api/usage/stats/keys", get(routes::usage::api_usage_keys))
         .route("/admin/api/logs", get(routes::usage::api_usage_logs))
         .route("/admin/api/logs/clear", post(routes::usage::api_clear_logs))
         .route("/admin/api/usage/stream", get(routes::usage::api_usage_stream))
+        .with_state(state)
+}
+
+fn quota_routes(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/admin/api/quota/keys", get(routes::quota::api_oauth_keys))
+        .route("/admin/api/quota/:key_id", get(routes::quota::api_usage_quota))
+        .route("/admin/api/quota/refresh/:key_id", post(routes::quota::api_refresh_token))
         .with_state(state)
 }
 

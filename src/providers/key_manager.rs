@@ -120,7 +120,7 @@ impl KeyManager {
             states: Mutex::new(states),
             cursor: AtomicUsize::new(0),
             config: KeyLockConfig::default(),
-            strategy: strategy_from_config("fill-first", 3),
+            strategy: strategy_from_config("round-robin", 1),
             provider_id: provider_id.to_string(),
             db_pool: pool,
         }
@@ -174,20 +174,36 @@ impl KeyManager {
         let now = Instant::now();
         self.gc(now);
 
-        let states = self.states.lock().unwrap();
-        let ctx = StrategyCtx {
-            keys: &states,
-            exclude_ids,
-            model,
-            now,
+        let selected_id = {
+            let states = self.states.lock().unwrap();
+            let ctx = StrategyCtx {
+                keys: &states,
+                exclude_ids,
+                model,
+                now,
+            };
+            self.strategy.select(&ctx).map(|ks| ks.key.id.clone())
         };
 
-        match self.strategy.select(&ctx) {
-            Some(ks) => Ok(ks.key.clone()),
-            None => Err(GatewayError::NoAvailableKeys(
+        let Some(selected_id) = selected_id else {
+            return Err(GatewayError::NoAvailableKeys(
                 "All keys locked or unavailable".into(),
-            )),
+            ));
+        };
+
+        let mut states = self.states.lock().unwrap();
+        let selected = states
+            .iter_mut()
+            .find(|ks| ks.key.id == selected_id)
+            .ok_or_else(|| GatewayError::NoAvailableKeys("Selected key disappeared".into()))?;
+        selected.last_used_at = Some(now);
+        selected.consecutive_use_count += 1;
+        let key = selected.key.clone();
+        drop(selected);
+        for ks in states.iter_mut().filter(|ks| ks.key.id != selected_id) {
+            ks.consecutive_use_count = 0;
         }
+        Ok(key)
     }
 
     /// Mark success on a key: unlock, reset backoff, reset consecutive count.
