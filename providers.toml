@@ -2853,3 +2853,58 @@ ctx = 1000000
 vision = false
 tools = true
 reasoning = true
+
+[[providers]]
+id = "gnrt"
+name = "GNRT Dev"
+category = "apikey"
+color = "#0EA5E9"
+icon = "gnrt.svg"
+base_url = "https://api.gnrt.dev"
+validate_url = "https://api.gnrt.dev/v1/models"
+api_type = "openai"
+docs_url = "https://gnrt.dev"
+api_key_url = "https://gnrt.dev"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "moonshotai/Kimi-K3"
+name = "Kimi K3"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true
+
+[[providers.models]]
+id = "deepseek-ai/DeepSeek-V4-Flash-0731"
+name = "DeepSeek V4 Flash 0731"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true
+
+[[providers.models]]
+id = "deepseek-ai/DeepSeek-V4-Pro-0813"
+name = "DeepSeek V4 Pro 0813"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true
+
+[[providers.models]]
+id = "zai-org/GLM-5.2"
+name = "GLM 5.2"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true
+
+[[providers.models]]
+id = "Qwen/Qwen3.8-2.4T-A95B"
+name = "Qwen 3.8 2.4T A95B"
+ctx = 1000000
+vision = false
+tools = true
+reasoning = true
