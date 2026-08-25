@@ -5,6 +5,7 @@ use crate::state::AppState;
 
 mod gb;
 mod kc;
+mod cbai;
 mod cx;
 
 pub fn routes(state: Arc<AppState>) -> Router {
@@ -12,6 +13,9 @@ pub fn routes(state: Arc<AppState>) -> Router {
         // KiloCode OAuth
         .route("/admin/api/oauth/kc/start", get(kc::start))
         .route("/admin/api/oauth/kc/poll", post(kc::poll))
+        .route("/admin/api/oauth/cbai/start", get(cbai::start))
+        .route("/admin/api/oauth/cbai/poll", post(cbai::poll))
+        .route("/admin/api/oauth/cbai/refresh/:key_id", post(cbai::refresh))
         // Grok Build OAuth
         .route("/admin/api/oauth/gb/start", get(gb::start))
         .route("/admin/api/oauth/gb/poll", post(gb::poll))

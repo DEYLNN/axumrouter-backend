@@ -58,6 +58,7 @@ impl ProviderRegistry {
 
         // --- Custom providers (manual) ---
         register_provider!(registry, "kc", crate::providers::oauth::kilocode::provider::KlProvider::new_with_keys, db);
+        register_provider!(registry, "cbai", crate::providers::oauth::codebuddy_intl::provider::CbaiProvider::new_with_keys, db);
         register_provider!(registry, "gb", crate::providers::oauth::grok_build::provider::GbProvider::new_with_keys, db);
         register_provider!(registry, "cx", crate::providers::oauth::codex::provider::CxProvider::new_with_keys, db);
         register_provider!(registry, "cl", crate::providers::apikey::cline::provider::ClProvider::new_with_keys, db);

@@ -321,7 +321,6 @@ impl KeyManager {
             deactivate
         };
 
-        let _reason_preview = &readable[..readable.len().min(80)];
         let target = model.unwrap_or("<account>");
         tracing::warn!(
             "Key '{}' locked for {} on '{}' for {}s (backoff={}){}",
