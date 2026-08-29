@@ -66,6 +66,9 @@ impl FsnProvider {
         if let Some(v) = request.top_p { body["top_p"] = serde_json::json!(v); }
         if let Some(ref v) = request.tools { body["tools"] = serde_json::to_value(v).unwrap_or_default(); }
         if let Some(ref v) = request.tool_choice { body["tool_choice"] = v.clone(); }
+        // Forward stream_options (include_usage) — required for upstream to send
+        // the terminal usage chunk; without it usage tracking sees 0 tokens.
+        if let Some(ref v) = request.stream_options { body["stream_options"] = v.clone(); }
         body
     }
 

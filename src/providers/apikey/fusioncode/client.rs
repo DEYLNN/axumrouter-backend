@@ -138,6 +138,19 @@ impl FsnClient {
                     }
                 }
             }
+            // Upstream sends usage in a terminal choices:[] chunk (captured by
+            // parse_chunk but not yielded). Flush it as the final chunk so the
+            // dispatcher's usage-tracking can persist token counts.
+            if let Some(u) = collected_usage.take() {
+                yield ChatCompletionChunk {
+                    id: format!("chatcmpl-fusioncode-{}", chrono::Utc::now().timestamp()),
+                    object: "chat.completion.chunk".to_string(),
+                    created: chrono::Utc::now().timestamp() as u64,
+                    model: model.to_string(),
+                    choices: vec![],
+                    usage: Some(u),
+                };
+            }
         };
         Ok(parsed.boxed())
     }
