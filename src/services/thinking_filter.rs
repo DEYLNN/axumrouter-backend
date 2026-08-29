@@ -64,6 +64,23 @@ pub fn strip_thinking_tags(content: &str, patterns: &[&str]) -> String {
         out = re.replace_all(&out, "\n\n").to_string();
     }
 
+    // Unclosed trailing think block — model emitted <think> but no </think>
+    // (stream cut, Kimi/DeepSeek quirk). The closer-less block never matches
+    // the paired regex above, leaking a literal `<think>` into client output.
+    // Strip from the last unclosed `<think>` to end-of-string; if that eats
+    // everything, keep the original (never return empty — clients show
+    // "No reply" on empty content).
+    for tag in patterns {
+        let escaped = regex::escape(tag);
+        if let Ok(re) = Regex::new(&format!(r"(?s)<{escaped}>.*$", escaped = escaped)) {
+            let stripped = re.replace(&out, "").to_string();
+            let trimmed = stripped.trim().to_string();
+            if !trimmed.is_empty() {
+                out = stripped;
+            }
+        }
+    }
+
     out
 }
 
@@ -97,6 +114,23 @@ mod tests {
         let input = "<ant_thinking>internal reasoning here</ant_thinking>\n\nvisible answer";
         let out = strip_thinking_tags(input, default_patterns());
         assert_eq!(out, "visible answer");
+    }
+
+    #[test]
+    fn strips_unclosed_trailing_think() {
+        // Kimi/DeepSeek quirk: unclosed acea-open block at end must be stripped,
+        // leaving the earlier visible text.
+        let input = " Hi <think>thinking without closer Hi there!";
+        let out = strip_thinking_tags(input, &["think"]);
+        assert_eq!(out.trim(), "Hi");
+    }
+
+    #[test]
+    fn never_returns_empty_from_unclosed_block() {
+        // Whole content is an unclosed block → keep original, never empty.
+        let input = "<think>only reasoning, no visible text";
+        let out = strip_thinking_tags(input, &["think"]);
+        assert!(!out.trim().is_empty());
     }
 
     #[test]

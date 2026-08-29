@@ -60,7 +60,19 @@ impl FsnClient {
             .unwrap_or_default()
             .to_string();
         let content = thinking_filter::strip_thinking_tags_const(&raw_content, constants::THINKING_TAGS);
-        let content = if content.is_empty() { None } else { Some(content) };
+        // Kimi-via-fusioncode quirk: with injected system prompts it sometimes
+        // emits the entire answer in reasoning_content and leaves content="". : with injected system prompts it sometimes
+        // emits the entire answer in reasoning_content and leaves content="".
+        // Dropping reasoning then yields an empty reply ("No reply" on clients).
+        // Fallback: if content is empty but reasoning exists, promote reasoning.
+        let content = if content.trim().is_empty() {
+            let reasoning = message.get("reasoning_content").or_else(|| message.get("reasoning"))
+                .and_then(|v| v.as_str()).unwrap_or_default();
+            let r = thinking_filter::strip_thinking_tags_const(reasoning, constants::THINKING_TAGS);
+            (!r.trim().is_empty()).then_some(r)
+        } else {
+            (!content.is_empty()).then_some(content)
+        };
 
         let usage = json.get("usage").map(|u| Usage {
             prompt_tokens: u.get("prompt_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
@@ -110,6 +122,7 @@ impl FsnClient {
         let parsed = async_stream::try_stream! {
             let mut buffer = String::new();
             let mut content_buffer = String::new();
+            let mut content_buffer_reasoning = String::new();
             let mut collected_usage: Option<Usage> = None;
             let first_chunk_timeout = std::time::Duration::from_secs(constants::STREAM_FIRST_CHUNK_TIMEOUT_SECS);
             let stall_timeout = std::time::Duration::from_secs(constants::STREAM_STALL_TIMEOUT_SECS);
@@ -131,7 +144,7 @@ impl FsnClient {
                         let data = data.trim();
                         if data.is_empty() || data == "[DONE]" { continue; }
                         if let Ok(v) = serde_json::from_str::<Value>(data) {
-                            if let Some(chunk) = Self::parse_chunk(&v, &model, &mut collected_usage, &mut content_buffer) {
+                            if let Some(chunk) = Self::parse_chunk(&v, &model, &mut collected_usage, &mut content_buffer, &mut content_buffer_reasoning) {
                                 yield chunk;
                             }
                         }
@@ -155,7 +168,7 @@ impl FsnClient {
         Ok(parsed.boxed())
     }
 
-    fn parse_chunk(v: &Value, model: &str, usage: &mut Option<Usage>, content_buffer: &mut String) -> Option<ChatCompletionChunk> {
+    fn parse_chunk(v: &Value, model: &str, usage: &mut Option<Usage>, content_buffer: &mut String, content_buffer_reasoning: &mut String) -> Option<ChatCompletionChunk> {
         let choices = v.get("choices").and_then(|c| c.as_array()).cloned().unwrap_or_default();
         if choices.is_empty() {
             if let Some(u) = v.get("usage") {
@@ -170,8 +183,11 @@ impl FsnClient {
         let choice = &choices[0];
         let idx = choice.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
         let delta = choice.get("delta").cloned().unwrap_or_default();
-        // reasoning_content / reasoning chunks dropped entirely — thinking hidden downstream.
-        let _ = delta.get("reasoning_content").or_else(|| delta.get("reasoning"));
+        // Reasoning chunks buffered as fallback — promoted only if content
+        // stays empty (Kimi-fsn quirk). Thinking stays hidden by default.
+        if let Some(raw) = delta.get("reasoning_content").or_else(|| delta.get("reasoning")).and_then(|c| c.as_str()) {
+            content_buffer_reasoning.push_str(raw);
+        }
         if let Some(raw) = delta.get("content").and_then(|c| c.as_str()) {
             content_buffer.push_str(raw);
         }
@@ -194,7 +210,15 @@ impl FsnClient {
         let content = if finish.is_some() {
             let full = std::mem::take(content_buffer);
             let filtered = thinking_filter::strip_thinking_tags_const(&full, constants::THINKING_TAGS);
-            (!filtered.is_empty()).then_some(filtered)
+            if !filtered.trim().is_empty() {
+                Some(filtered)
+            } else {
+                // content empty → promote buffered reasoning (Kimi-fsn quirk:
+                // whole answer emitted in reasoning_content, content="")
+                let reasoning = std::mem::take(content_buffer_reasoning);
+                let r = thinking_filter::strip_thinking_tags_const(&reasoning, constants::THINKING_TAGS);
+                (!r.trim().is_empty()).then_some(r)
+            }
         } else {
             None
         };
