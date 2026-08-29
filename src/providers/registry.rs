@@ -64,6 +64,7 @@ impl ProviderRegistry {
         register_provider!(registry, "cl", crate::providers::apikey::cline::provider::ClProvider::new_with_keys, db);
         register_provider!(registry, "cf", crate::providers::apikey::cloudflare::provider::CfProvider::new_with_keys, db);
         register_provider!(registry, "infx", crate::providers::apikey::inferx::provider::IxProvider::new_with_keys, db);
+        register_provider!(registry, "fsn", crate::providers::apikey::fusioncode::provider::FsnProvider::new_with_keys, db);
 
         registry
     }
