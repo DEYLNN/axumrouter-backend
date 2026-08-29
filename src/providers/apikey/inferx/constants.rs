@@ -19,8 +19,8 @@ pub struct ModelDef { pub id: &'static str, pub context_length: u32 }
 // ponytail: context_length are estimates — correct after first /v1/models probe
 pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "deepseek-v4-flash-0731", context_length: 1000000 },
-    ModelDef { id: "glm-5.3-flash", context_length: 1000000 },
-    ModelDef { id: "Qwen3.8-27B-FP8", context_length: 262144 },
+    ModelDef { id: "glm-5.3-flash", context_length: 262144 },
+    ModelDef { id: "Qwen3.8-27B-FP8", context_length: 262000 },
 ];
 
 pub fn provider_spec() -> crate::providers::spec::ProviderSpec {
