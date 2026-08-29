@@ -41,7 +41,7 @@ impl IxClient {
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let text = response.text().await.unwrap_or_default();
-            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "inferx".into(), key_id: None });
+            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "infx".into(), key_id: None });
         }
 
         let json: Value = response.json().await
@@ -69,10 +69,10 @@ impl IxClient {
         });
 
         Ok(ChatCompletionResponse {
-            id: json.get("id").and_then(|v| v.as_str()).unwrap_or("inferx-unknown").to_string(),
+            id: json.get("id").and_then(|v| v.as_str()).unwrap_or("infx-unknown").to_string(),
             object: "chat.completion".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
-            model: json.get("model").and_then(|v| v.as_str()).unwrap_or("inferx").to_string(),
+            model: json.get("model").and_then(|v| v.as_str()).unwrap_or("infx").to_string(),
             choices: vec![Choice {
                 index: 0,
                 message: Message {
@@ -101,10 +101,10 @@ impl IxClient {
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let text = response.text().await.unwrap_or_default();
-            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "inferx".into(), key_id: None });
+            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "infx".into(), key_id: None });
         }
 
-        let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("inferx").to_string();
+        let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("infx").to_string();
         let upstream = response.bytes_stream();
 
         let parsed = async_stream::try_stream! {

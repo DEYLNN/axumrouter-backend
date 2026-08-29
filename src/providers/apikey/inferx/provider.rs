@@ -55,7 +55,7 @@ impl IxProvider {
     }
 
     fn build_body(&self, request: &ChatCompletionRequest, stream: bool) -> serde_json::Value {
-        let model_name = request.model.strip_prefix("inferx/").unwrap_or(&request.model);
+        let model_name = request.model.strip_prefix("infx/").unwrap_or(&request.model);
         let mut body = serde_json::json!({
             "model": model_name,
             "messages": request.messages.iter().filter_map(|m| serde_json::to_value(m).ok()).collect::<Vec<_>>(),
