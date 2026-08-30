@@ -16,11 +16,11 @@ use super::auth::FsnCredential;
 use super::client::FsnClient;
 use super::constants;
 
-/// InferX provider — custom key handling:
-/// errors NEVER lock or deactivate a key (upstream 429s are transient,
-/// server allows immediate retry). On error the key is simply skipped for
-/// THIS request via `excluded`; `mark_success`/DB state stay untouched.
-/// KeyManager still owns round-robin selection — untouched for other providers.
+/// FusionCode provider — endless-retry key handling:
+/// errors NEVER lock or deactivate a key (upstream 429s are transient).
+/// On error: record it, rotate to the next key (round-robin), and keep
+/// hitting — after a full round of all keys, the round restarts. The loop
+/// only exits on success (or zero keys configured).
 pub struct FsnProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
@@ -78,6 +78,17 @@ impl FsnProvider {
             self.keys.total_count()
         ))
     }
+
+    /// Endless rotation: next key, restarting the round when all keys were tried.
+    fn next_key(&self, excluded: &mut Vec<String>) -> Result<ApiKey, GatewayError> {
+        match self.keys.next_excluding(None, excluded) {
+            Ok(k) => Ok(k),
+            Err(_) => {
+                excluded.clear();
+                self.keys.next_excluding(None, excluded).map_err(|_| self.exhausted())
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -85,46 +96,51 @@ impl Provider for FsnProvider {
     fn metadata(&self) -> ProviderMetadata { self.metadata.clone() }
 
     async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatResult, GatewayError> {
-        let total = self.keys.total_count();
-        let mut failed = Vec::new();
-        let mut excluded: Vec<String> = Vec::new();
         let body = self.build_body(&request, false);
-        for _attempt in 0..total.max(1) {
-            // Errors don't lock → next_excluding sees the same key as available;
-            // excluded list is what forces rotation to the next key.
-            let key = match self.keys.next_excluding(None, &excluded) { Ok(k) => k, Err(_) => break };
+        let mut failed: Vec<FailedKeyAttempt> = Vec::new();
+        let mut excluded: Vec<String> = Vec::new();
+        loop {
+            let key = self.next_key(&mut excluded)?;
             let key_id = key.id.clone();
             let cred = match FsnCredential::parse(&key.key_value) {
                 Ok(c) => c,
-                Err(e) => { excluded.push(key_id.clone()); failed.push(FailedKeyAttempt { key_id, error: GatewayError::ProviderError(e) }); continue; }
+                Err(e) => {
+                    excluded.push(key_id.clone());
+                    failed.push(FailedKeyAttempt { key_id, error: GatewayError::ProviderError(e) });
+                    continue;
+                }
             };
             match self.client.send_collect(body.clone(), &cred).await {
                 Ok(response) => { self.keys.mark_success(&key_id); return Ok(ChatResult { response, used_key_id: Some(key_id), failed_keys: failed }); }
                 Err(e) => {
-                    // NO lock_key / NO cooldown / NO auto-deactivate — key stays usable.
+                    // NO lock_key / NO cooldown / NO auto-deactivate — record, rotate, hit again.
                     excluded.push(key_id.clone());
                     failed.push(FailedKeyAttempt { key_id, error: e });
                     continue;
                 }
             }
         }
-        Err(self.exhausted())
     }
 
     async fn chat_completion_stream(&self, request: ChatCompletionRequest) -> Result<ChatStreamResult, GatewayError> {
-        let total = self.keys.total_count();
-        let mut failed = Vec::new();
-        let mut excluded: Vec<String> = Vec::new();
         let body = self.build_body(&request, true);
-        for _attempt in 0..total.max(1) {
-            let key = match self.keys.next_excluding(None, &excluded) { Ok(k) => k, Err(_) => break };
+        let mut failed: Vec<FailedKeyAttempt> = Vec::new();
+        let mut excluded: Vec<String> = Vec::new();
+        let mut last_attempted_key_id: Option<String> = None;
+        loop {
+            let key = self.next_key(&mut excluded)?;
             let key_id = key.id.clone();
+            last_attempted_key_id = Some(key_id.clone());
             let cred = match FsnCredential::parse(&key.key_value) {
                 Ok(c) => c,
-                Err(e) => { excluded.push(key_id.clone()); failed.push(FailedKeyAttempt { key_id, error: GatewayError::ProviderError(e) }); continue; }
+                Err(e) => {
+                    excluded.push(key_id.clone());
+                    failed.push(FailedKeyAttempt { key_id, error: GatewayError::ProviderError(e) });
+                    continue;
+                }
             };
             match self.client.send_stream(body.clone(), &cred).await {
-                Ok(stream) => { self.keys.mark_success(&key_id); return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed, last_attempted_key_id: None }); }
+                Ok(stream) => { self.keys.mark_success(&key_id); return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed, last_attempted_key_id }); }
                 Err(e) => {
                     excluded.push(key_id.clone());
                     failed.push(FailedKeyAttempt { key_id, error: e });
@@ -132,7 +148,6 @@ impl Provider for FsnProvider {
                 }
             }
         }
-        Err(self.exhausted())
     }
 
     async fn list_models(&self) -> Result<Vec<Model>, GatewayError> { Ok(self.models_static()) }

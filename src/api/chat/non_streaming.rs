@@ -80,11 +80,13 @@ pub(crate) async fn handle_non_streaming(
                 &gateway_key_id_owned,
                 e.provider_api_key_id(),
                 &endpoint,
-                500,
+                e.http_status().unwrap_or(500) as i32,
                 &e.to_string(),
             )
             .await;
-            Err(GatewayError::ProviderError(e.to_string()))
+            // Pass through as-is — GatewayError::into_response already emits
+            // the real upstream status + cleaned body (no double-wrap to 500).
+            Err(e.clone())
         }
     }
 }
