@@ -16,6 +16,7 @@ use crate::services::rtk;
 use crate::services::tool_normalizer::normalize_tool_messages;
 use crate::state::AppState;
 use crate::types::chat::ChatCompletionRequest;
+use crate::types::model::Model;
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
@@ -85,7 +86,20 @@ async fn chat_completions(
         }
     };
 
-    let all_models = provider.list_models().await.map_err(|_| GatewayError::Internal("Failed to list models".into()))?;
+    let mut all_models = provider.list_models().await.map_err(|_| GatewayError::Internal("Failed to list models".into()))?;
+    // Merge user-added custom models so they pass the model check —
+    // mirrors manager.list_all_models and the admin detail endpoint.
+    for cm in crate::db::list_custom_models(&state.db, &provider_id).await {
+        let id = format!("{}/{}", provider_id, cm.model_id);
+        if !all_models.iter().any(|m| m.id == id) {
+            all_models.push(Model {
+                id,
+                object: "model".to_string(),
+                owned_by: provider_id.clone(),
+                context_length: Some(cm.ctx as u32),
+            });
+        }
+    }
     // Match either by full id (e.g. `nx/foo`) or by suffix (e.g. `foo`) since
     // the caller's `model` may use either the provider's UI prefix or its DB
     // row id as the leading segment.
