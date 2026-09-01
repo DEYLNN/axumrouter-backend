@@ -123,6 +123,33 @@ pub(crate) async fn handle_streaming(
                             Ok::<_, Infallible>(Event::default().data(json))
                         }
                         Err(e) => {
+                            // Record the mid-stream failure exactly once —
+                            // CAS against saved_flag so a request that already
+                            // flushed a success row doesn't get a second one.
+                            if !saved_flag_w.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                                let state_e = state_w.clone();
+                                let provider_e = provider_id_w.clone();
+                                let model_e = model_w.clone();
+                                let gw_e = gateway_key_id_w.clone();
+                                let ep_e = endpoint_w.clone();
+                                let key_e = key_id_w.clone();
+                                let status_e = e.http_status().unwrap_or(502) as i32;
+                                let msg_e = e.to_string();
+                                tokio::spawn(async move {
+                                    record_error(
+                                        &state_e.usage_tracker,
+                                        started_w,
+                                        &provider_e,
+                                        &model_e,
+                                        &gw_e,
+                                        key_e.as_deref(),
+                                        &ep_e,
+                                        status_e,
+                                        &msg_e,
+                                    )
+                                    .await;
+                                });
+                            }
                             let err_json = serde_json::json!({
                                 "error": {
                                     "message": e.to_string(),
@@ -173,7 +200,7 @@ pub(crate) async fn handle_streaming(
                 &gateway_key_id,
                 e.provider_api_key_id(),
                 &endpoint,
-                500,
+                e.http_status().unwrap_or(500) as i32,
                 &e.to_string(),
             )
             .await;

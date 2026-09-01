@@ -25,7 +25,7 @@ pub async fn api_provider_detail(
         let locked_keys = total_keys - active_keys;
         let key_type: String = meta.category.clone();
 
-        let models: Vec<serde_json::Value> = match p.list_models().await {
+        let mut models: Vec<serde_json::Value> = match p.list_models().await {
             Ok(list) => {
                 let blocked: std::collections::HashSet<String> = sqlx::query_scalar(
                     "SELECT model_id FROM blocked_models WHERE provider_id = ?",
@@ -52,6 +52,21 @@ pub async fn api_provider_detail(
             }
             _ => vec![],
         };
+        // Merge user-added custom models (same pattern as manager.list_all_models)
+        // so they appear in the UI model list with a delete button.
+        for cm in crate::db::list_custom_models(&state.db, &provider_id).await {
+            let id = format!("{}/{}", provider_id, cm.model_id);
+            if models.iter().any(|m| m["id"] == serde_json::Value::String(id.clone())) {
+                continue;
+            }
+            models.push(serde_json::json!({
+                "id": id,
+                "name": cm.model_id,
+                "available": true,
+                "blocked": false,
+                "context_length": cm.ctx as u32,
+            }));
+        }
 
         let keys: Vec<serde_json::Value> = sqlx::query_as::<_, (String, String, Option<String>, String, bool)>(
             "SELECT id, key_value, label, key_type, is_active FROM api_keys WHERE provider_id = ? ORDER BY created_at DESC",
