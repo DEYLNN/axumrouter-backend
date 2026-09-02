@@ -16,15 +16,31 @@ use super::auth::FsnCredential;
 use super::client::FsnClient;
 use super::constants;
 
-/// FusionCode provider — endless-retry key handling:
-/// errors NEVER lock or deactivate a key (upstream 429s are transient).
+/// FusionCode provider — retry key handling:
+/// errors NEVER lock or deactivate a key (upstream 429s/502s are transient).
 /// On error: record it, rotate to the next key (round-robin), and keep
-/// hitting — after a full round of all keys, the round restarts. The loop
-/// only exits on success (or zero keys configured).
+/// hitting — after a full round of all keys, the round restarts.
+/// Two guards keep the endless loop sane (2026-09-02 502-storm finding):
+/// - per-attempt backoff: 0.5s growing ×1.5, capped at 10s
+/// - total retry budget: 120s — after that the last upstream error is
+///   returned to the client so it sees the real status instead of hanging.
 pub struct FsnProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
     client: FsnClient,
+}
+
+/// Total wall-clock budget for the retry loop before giving the client
+/// the last upstream error.
+const RETRY_BUDGET_SECS: u64 = 120;
+/// Backoff between attempts: starts here, ×1.5 each failure, capped.
+const BACKOFF_INITIAL_MS: u64 = 500;
+const BACKOFF_CAP_MS: u64 = 10_000;
+
+fn sleep_backoff(attempt: usize) {
+    let ms = (BACKOFF_INITIAL_MS as f64 * 1.5f64.powi(attempt as i32)) as u64;
+    let capped = ms.min(BACKOFF_CAP_MS);
+    std::thread::sleep(std::time::Duration::from_millis(capped));
 }
 
 impl FsnProvider {
@@ -99,7 +115,14 @@ impl Provider for FsnProvider {
         let body = self.build_body(&request, false);
         let mut failed: Vec<FailedKeyAttempt> = Vec::new();
         let mut excluded: Vec<String> = Vec::new();
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(RETRY_BUDGET_SECS);
+        let mut last_error: Option<GatewayError> = None;
         loop {
+            // Retry budget exceeded → surface the last upstream error to the
+            // client instead of hanging until it times out on its own.
+            if tokio::time::Instant::now() >= deadline {
+                return Err(last_error.unwrap_or_else(|| self.exhausted()));
+            }
             let key = self.next_key(&mut excluded)?;
             let key_id = key.id.clone();
             let cred = match FsnCredential::parse(&key.key_value) {
@@ -113,9 +136,11 @@ impl Provider for FsnProvider {
             match self.client.send_collect(body.clone(), &cred).await {
                 Ok(response) => { self.keys.mark_success(&key_id); return Ok(ChatResult { response, used_key_id: Some(key_id), failed_keys: failed }); }
                 Err(e) => {
-                    // NO lock_key / NO cooldown / NO auto-deactivate — record, rotate, hit again.
+                    // NO lock_key / NO cooldown / NO auto-deactivate — record, backoff, rotate, hit again.
                     excluded.push(key_id.clone());
                     failed.push(FailedKeyAttempt { key_id, error: e });
+                    last_error = failed.last().map(|f| f.error.clone());
+                    sleep_backoff(failed.len().saturating_sub(1));
                     continue;
                 }
             }
@@ -127,7 +152,14 @@ impl Provider for FsnProvider {
         let mut failed: Vec<FailedKeyAttempt> = Vec::new();
         let mut excluded: Vec<String> = Vec::new();
         let mut last_attempted_key_id: Option<String> = None;
+        let mut last_error: Option<GatewayError> = None;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(RETRY_BUDGET_SECS);
+        let mut attempt: usize = 0;
         loop {
+            if tokio::time::Instant::now() >= deadline {
+                return Err(last_error.unwrap_or_else(|| self.exhausted()));
+            }
+            attempt += 1;
             let key = self.next_key(&mut excluded)?;
             let key_id = key.id.clone();
             last_attempted_key_id = Some(key_id.clone());
@@ -143,7 +175,9 @@ impl Provider for FsnProvider {
                 Ok(stream) => { self.keys.mark_success(&key_id); return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed, last_attempted_key_id }); }
                 Err(e) => {
                     excluded.push(key_id.clone());
-                    failed.push(FailedKeyAttempt { key_id, error: e });
+                    failed.push(FailedKeyAttempt { key_id, error: e.clone() });
+                    last_error = Some(e);
+                    sleep_backoff(attempt.saturating_sub(1));
                     continue;
                 }
             }
