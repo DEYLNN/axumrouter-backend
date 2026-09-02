@@ -54,9 +54,22 @@ pub async fn api_provider_detail(
         };
         // Merge user-added custom models (same pattern as manager.list_all_models)
         // so they appear in the UI model list with a delete button.
+        // Dedup guard: engine list_models() may already emit the model under the
+        // UI prefix (e.g. `nx/mimo-v2.5`); a custom provider's DB id is
+        // `custom_nx`, so matching on the raw provider_id misses it and the
+        // model shows twice (`nx/x` + `custom_nx/x`). Compare by model NAME
+        // (suffix after `/`) too.
+        let custom_prefix = meta
+            .model_prefix
+            .clone()
+            .unwrap_or_else(|| provider_id.clone());
         for cm in crate::db::list_custom_models(&state.db, &provider_id).await {
-            let id = format!("{}/{}", provider_id, cm.model_id);
-            if models.iter().any(|m| m["id"] == serde_json::Value::String(id.clone())) {
+            let id = format!("{}/{}", custom_prefix, cm.model_id);
+            let already = models.iter().any(|m| {
+                m["id"] == serde_json::Value::String(id.clone())
+                    || m["name"] == serde_json::Value::String(cm.model_id.clone())
+            });
+            if already {
                 continue;
             }
             models.push(serde_json::json!({
