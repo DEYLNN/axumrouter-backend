@@ -16,23 +16,12 @@ use super::auth::FsnCredential;
 use super::client::FsnClient;
 use super::constants;
 
-/// FusionCode provider — endless-retry key handling:
-/// errors NEVER lock or deactivate a key (upstream 429s are transient).
-/// On error: record it, rotate to the next key (round-robin), and keep
-/// hitting — after a full round of all keys, the round restarts. The loop
-/// only exits on success (or zero keys configured).
+/// FusionCode provider — errors do not lock or deactivate keys. Each request
+/// tries every key at most once, then returns the last upstream error.
 pub struct FsnProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
     client: FsnClient,
-}
-
-/// ponytail: keep only the last 50 failures — an endless loop must not grow
-/// memory unbounded, and only recent attempts matter in the usage log.
-/// Raise when per-attempt audit history is needed.
-fn push_failed(failed: &mut Vec<FailedKeyAttempt>, attempt: FailedKeyAttempt) {
-    if failed.len() >= 50 { failed.remove(0); }
-    failed.push(attempt);
 }
 
 impl FsnProvider {
@@ -41,7 +30,11 @@ impl FsnProvider {
             name: constants::PROVIDER_ID.to_string(),
             display_name: constants::PROVIDER_NAME.to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            capabilities: vec!["chat".to_string(), "models".to_string(), "streaming".to_string()],
+            capabilities: vec![
+                "chat".to_string(),
+                "models".to_string(),
+                "streaming".to_string(),
+            ],
             icon_path: String::new(),
             category: constants::CATEGORY.to_string(),
             icon_name: constants::ICON_NAME.to_string(),
@@ -50,16 +43,23 @@ impl FsnProvider {
             model_prefix: None,
             validate_url: constants::provider_spec().validate_url.to_string(),
         };
-        Self { metadata, keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())), client: FsnClient::new() }
+        Self {
+            metadata,
+            keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())),
+            client: FsnClient::new(),
+        }
     }
 
     fn models_static(&self) -> Vec<Model> {
-        constants::MODELS.iter().map(|m| Model {
-            id: format!("{}/{}", constants::PROVIDER_ID, m.id),
-            object: "model".to_string(),
-            owned_by: constants::PROVIDER_ID.to_string(),
-            context_length: Some(m.context_length),
-        }).collect()
+        constants::MODELS
+            .iter()
+            .map(|m| Model {
+                id: format!("{}/{}", constants::PROVIDER_ID, m.id),
+                object: "model".to_string(),
+                owned_by: constants::PROVIDER_ID.to_string(),
+                context_length: Some(m.context_length),
+            })
+            .collect()
     }
 
     fn build_body(&self, request: &ChatCompletionRequest, stream: bool) -> serde_json::Value {
@@ -70,98 +70,175 @@ impl FsnProvider {
             "stream": stream,
             "max_tokens": request.max_tokens.unwrap_or(2048),
         });
-        if let Some(v) = request.temperature { body["temperature"] = serde_json::json!(v); }
-        if let Some(v) = request.top_p { body["top_p"] = serde_json::json!(v); }
-        if let Some(ref v) = request.tools { body["tools"] = serde_json::to_value(v).unwrap_or_default(); }
-        if let Some(ref v) = request.tool_choice { body["tool_choice"] = v.clone(); }
+        if let Some(v) = request.temperature {
+            body["temperature"] = serde_json::json!(v);
+        }
+        if let Some(v) = request.top_p {
+            body["top_p"] = serde_json::json!(v);
+        }
+        if let Some(ref v) = request.tools {
+            body["tools"] = serde_json::to_value(v).unwrap_or_default();
+        }
+        if let Some(ref v) = request.tool_choice {
+            body["tool_choice"] = v.clone();
+        }
         // Forward stream_options (include_usage) — required for upstream to send
         // the terminal usage chunk; without it usage tracking sees 0 tokens.
-        if let Some(ref v) = request.stream_options { body["stream_options"] = v.clone(); }
-        body
-    }
-
-    fn exhausted(&self) -> GatewayError {
-        GatewayError::NoAvailableKeys(format!(
-            "All FusionCode keys exhausted ({} key(s) tried, none locked — errors are non-locking for this provider)",
-            self.keys.total_count()
-        ))
-    }
-
-    /// Endless rotation: next key, restarting the round when all keys were tried.
-    fn next_key(&self, excluded: &mut Vec<String>) -> Result<ApiKey, GatewayError> {
-        match self.keys.next_excluding(None, excluded) {
-            Ok(k) => Ok(k),
-            Err(_) => {
-                excluded.clear();
-                self.keys.next_excluding(None, excluded).map_err(|_| self.exhausted())
-            }
+        if let Some(ref v) = request.stream_options {
+            body["stream_options"] = v.clone();
         }
+        body
     }
 }
 
 #[async_trait]
 impl Provider for FsnProvider {
-    fn metadata(&self) -> ProviderMetadata { self.metadata.clone() }
+    fn metadata(&self) -> ProviderMetadata {
+        self.metadata.clone()
+    }
 
-    async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatResult, GatewayError> {
+    async fn chat_completion(
+        &self,
+        request: ChatCompletionRequest,
+    ) -> Result<ChatResult, GatewayError> {
         let body = self.build_body(&request, false);
         let mut failed: Vec<FailedKeyAttempt> = Vec::new();
         let mut excluded: Vec<String> = Vec::new();
-        loop {
-            let key = self.next_key(&mut excluded)?;
-            let key_id = key.id.clone();
-            let cred = match FsnCredential::parse(&key.key_value) {
-                Ok(c) => c,
-                Err(e) => {
-                    excluded.push(key_id.clone());
-                    push_failed(&mut failed, FailedKeyAttempt { key_id, error: GatewayError::ProviderError(e) });
-                    continue;
-                }
-            };
-            match self.client.send_collect(body.clone(), &cred).await {
-                Ok(response) => { self.keys.mark_success(&key_id); return Ok(ChatResult { response, used_key_id: Some(key_id), failed_keys: failed }); }
-                Err(e) => {
-                    // NO lock_key / NO cooldown / NO auto-deactivate — record, rotate, hit again.
-                    excluded.push(key_id.clone());
-                    push_failed(&mut failed, FailedKeyAttempt { key_id, error: e });
-                    continue;
-                }
-            }
-        }
-    }
-
-    async fn chat_completion_stream(&self, request: ChatCompletionRequest) -> Result<ChatStreamResult, GatewayError> {
-        let body = self.build_body(&request, true);
-        let mut failed: Vec<FailedKeyAttempt> = Vec::new();
-        let mut excluded: Vec<String> = Vec::new();
+        let mut last_error: Option<String> = None;
+        let mut last_status: Option<u16> = None;
+        let total = self.keys.total_count();
         let mut last_attempted_key_id: Option<String> = None;
-        loop {
-            let key = self.next_key(&mut excluded)?;
+        for _ in 0..total {
+            let key = match self.keys.next_excluding(None, &excluded) {
+                Ok(key) => key,
+                Err(_) => break,
+            };
             let key_id = key.id.clone();
             last_attempted_key_id = Some(key_id.clone());
             let cred = match FsnCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     excluded.push(key_id.clone());
-                    push_failed(&mut failed, FailedKeyAttempt { key_id, error: GatewayError::ProviderError(e) });
+                    last_status = Some(400);
+                    last_error = Some(e.clone());
+                    failed.push(FailedKeyAttempt {
+                        key_id,
+                        error: GatewayError::ProviderError(e),
+                    });
                     continue;
                 }
             };
-            match self.client.send_stream(body.clone(), &cred).await {
-                Ok(stream) => { self.keys.mark_success(&key_id); return Ok(ChatStreamResult { stream, used_key_id: Some(key_id), failed_keys: failed, last_attempted_key_id }); }
+            match self.client.send_collect(body.clone(), &cred).await {
+                Ok(response) => {
+                    self.keys.mark_success(&key_id);
+                    return Ok(ChatResult {
+                        response,
+                        used_key_id: Some(key_id),
+                        failed_keys: failed,
+                    });
+                }
                 Err(e) => {
                     excluded.push(key_id.clone());
-                    push_failed(&mut failed, FailedKeyAttempt { key_id, error: e });
+                    last_status = e.http_status();
+                    last_error = Some(e.to_string());
+                    failed.push(FailedKeyAttempt { key_id, error: e });
                     continue;
                 }
             }
         }
+        if let Some(key_id) = last_attempted_key_id {
+            return Err(GatewayError::ProviderHttpError {
+                status: last_status.unwrap_or(503),
+                body: last_error.unwrap_or_default(),
+                provider: constants::PROVIDER_ID.to_string(),
+                key_id: Some(key_id),
+            });
+        }
+        Err(GatewayError::NoAvailableKeys(
+            "No FusionCode keys configured".into(),
+        ))
     }
 
-    async fn list_models(&self) -> Result<Vec<Model>, GatewayError> { Ok(self.models_static()) }
-    async fn health_check(&self) -> Result<bool, GatewayError> { Ok(self.keys.total_count() > 0) }
-    async fn authenticate(&self) -> Result<(), GatewayError> { self.keys.next()?; Ok(()) }
-    fn locked_keys(&self) -> Vec<(String, u64, String)> { self.keys.locked_keys() }
-    fn total_keys(&self) -> usize { self.keys.total_count() }
-    fn active_keys(&self) -> usize { self.keys.active_count() }
+    async fn chat_completion_stream(
+        &self,
+        request: ChatCompletionRequest,
+    ) -> Result<ChatStreamResult, GatewayError> {
+        let body = self.build_body(&request, true);
+        let mut failed: Vec<FailedKeyAttempt> = Vec::new();
+        let mut excluded: Vec<String> = Vec::new();
+        let mut last_attempted_key_id: Option<String> = None;
+        let mut last_error: Option<String> = None;
+        let mut last_status: Option<u16> = None;
+        let total = self.keys.total_count();
+        if total == 0 {
+            return Err(GatewayError::NoAvailableKeys(
+                "No FusionCode keys configured".into(),
+            ));
+        }
+        for _ in 0..total {
+            let key = match self.keys.next_excluding(None, &excluded) {
+                Ok(key) => key,
+                Err(_) => break,
+            };
+            let key_id = key.id.clone();
+            last_attempted_key_id = Some(key_id.clone());
+            let cred = match FsnCredential::parse(&key.key_value) {
+                Ok(c) => c,
+                Err(e) => {
+                    excluded.push(key_id.clone());
+                    last_status = Some(400);
+                    last_error = Some(e.clone());
+                    failed.push(FailedKeyAttempt {
+                        key_id,
+                        error: GatewayError::ProviderError(e),
+                    });
+                    continue;
+                }
+            };
+            match self.client.send_stream(body.clone(), &cred).await {
+                Ok(stream) => {
+                    self.keys.mark_success(&key_id);
+                    return Ok(ChatStreamResult {
+                        stream,
+                        used_key_id: Some(key_id),
+                        failed_keys: failed,
+                        last_attempted_key_id,
+                    });
+                }
+                Err(e) => {
+                    excluded.push(key_id.clone());
+                    last_status = e.http_status();
+                    last_error = Some(e.to_string());
+                    failed.push(FailedKeyAttempt { key_id, error: e });
+                    continue;
+                }
+            }
+        }
+        Err(GatewayError::ProviderHttpError {
+            status: last_status.unwrap_or(503),
+            body: last_error.unwrap_or_default(),
+            provider: constants::PROVIDER_ID.to_string(),
+            key_id: last_attempted_key_id,
+        })
+    }
+
+    async fn list_models(&self) -> Result<Vec<Model>, GatewayError> {
+        Ok(self.models_static())
+    }
+    async fn health_check(&self) -> Result<bool, GatewayError> {
+        Ok(self.keys.total_count() > 0)
+    }
+    async fn authenticate(&self) -> Result<(), GatewayError> {
+        self.keys.next()?;
+        Ok(())
+    }
+    fn locked_keys(&self) -> Vec<(String, u64, String)> {
+        self.keys.locked_keys()
+    }
+    fn total_keys(&self) -> usize {
+        self.keys.total_count()
+    }
+    fn active_keys(&self) -> usize {
+        self.keys.active_count()
+    }
 }
