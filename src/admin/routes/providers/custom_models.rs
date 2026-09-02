@@ -16,6 +16,21 @@ pub async fn api_list_custom_models(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Json<Vec<crate::db::CustomModelRow>> {
+    // Custom providers store models in custom_provider_models; legacy providers
+    // keep using custom_models.
+    if crate::db::get_custom_provider(&state.db, &id).await.map(|p| p.is_some()).unwrap_or(false) {
+        let rows = crate::db::list_custom_provider_models(&state.db, &id).await.unwrap_or_default();
+        return Json(rows.into_iter().map(|m| crate::db::CustomModelRow {
+            id: format!("{}_{}", id, m.model_id.replace('/', "_")),
+            provider_id: m.provider_id,
+            model_id: m.model_id,
+            display_name: String::new(),
+            ctx: m.ctx,
+            vision: m.vision,
+            tools: m.tools,
+            created_at: String::new(),
+        }).collect());
+    }
     let rows = crate::db::list_custom_models(&state.db, &id).await;
     Json(rows)
 }

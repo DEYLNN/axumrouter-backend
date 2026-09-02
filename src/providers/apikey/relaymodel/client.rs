@@ -6,14 +6,14 @@ use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
 
-use super::auth::FsnCredential;
+use super::auth::RelmCredential;
 use super::constants;
 
-pub struct FsnClient {
+pub struct RelmClient {
     http: Client,
 }
 
-impl FsnClient {
+impl RelmClient {
     pub fn new() -> Self {
         Self {
             http: Client::builder()
@@ -23,29 +23,29 @@ impl FsnClient {
         }
     }
 
-    fn headers(&self, builder: reqwest::RequestBuilder, cred: &FsnCredential) -> reqwest::RequestBuilder {
+    fn headers(&self, builder: reqwest::RequestBuilder, cred: &RelmCredential) -> reqwest::RequestBuilder {
         builder
             .header("Authorization", format!("Bearer {}", cred.api_key))
             .header("Content-Type", "application/json")
             .header("User-Agent", constants::USER_AGENT)
     }
 
-    pub async fn send_collect(&self, body: Value, cred: &FsnCredential) -> Result<ChatCompletionResponse, GatewayError> {
+    pub async fn send_collect(&self, body: Value, cred: &RelmCredential) -> Result<ChatCompletionResponse, GatewayError> {
         let url = format!("{}/chat/completions", constants::BASE_URL);
         let response = self.headers(self.http.post(&url), cred)
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Fsn HTTP: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Relm HTTP: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let text = response.text().await.unwrap_or_default();
-            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "fsn".into(), key_id: None });
+            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "relm".into(), key_id: None });
         }
 
         let json: Value = response.json().await
-            .map_err(|e| GatewayError::ProviderError(format!("Fsn parse: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Relm parse: {}", e)))?;
 
         let choice = json.get("choices")
             .and_then(|c| c.as_array())
@@ -54,7 +54,7 @@ impl FsnClient {
             .unwrap_or_default();
 
         let message = choice.get("message").cloned().unwrap_or_default();
-        // FusionCode models always think — drop reasoning_content, strip think-block tags.
+        // RelayModel models always think — drop reasoning_content, strip think-block tags.
         let raw_content = message.get("content")
             .and_then(|v| v.as_str())
             .unwrap_or_default()
@@ -69,10 +69,10 @@ impl FsnClient {
         });
 
         Ok(ChatCompletionResponse {
-            id: json.get("id").and_then(|v| v.as_str()).unwrap_or("infx-unknown").to_string(),
+            id: json.get("id").and_then(|v| v.as_str()).unwrap_or("relm-unknown").to_string(),
             object: "chat.completion".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
-            model: json.get("model").and_then(|v| v.as_str()).unwrap_or("fsn").to_string(),
+            model: json.get("model").and_then(|v| v.as_str()).unwrap_or("relm").to_string(),
             choices: vec![Choice {
                 index: 0,
                 message: Message {
@@ -90,21 +90,21 @@ impl FsnClient {
         })
     }
 
-    pub async fn send_stream(&self, body: Value, cred: &FsnCredential) -> Result<BoxStream<'static, Result<ChatCompletionChunk, GatewayError>>, GatewayError> {
+    pub async fn send_stream(&self, body: Value, cred: &RelmCredential) -> Result<BoxStream<'static, Result<ChatCompletionChunk, GatewayError>>, GatewayError> {
         let url = format!("{}/chat/completions", constants::BASE_URL);
         let response = self.headers(self.http.post(&url), cred)
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Fsn HTTP: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Relm HTTP: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let text = response.text().await.unwrap_or_default();
-            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "fsn".into(), key_id: None });
+            return Err(GatewayError::ProviderHttpError { status, body: text, provider: "relm".into(), key_id: None });
         }
 
-        let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("fsn").to_string();
+        let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("relm").to_string();
         let upstream = response.bytes_stream();
 
         let parsed = async_stream::try_stream! {
@@ -143,7 +143,7 @@ impl FsnClient {
             // dispatcher's usage-tracking can persist token counts.
             if let Some(u) = collected_usage.take() {
                 yield ChatCompletionChunk {
-                    id: format!("chatcmpl-fsn-{}", chrono::Utc::now().timestamp()),
+                    id: format!("chatcmpl-relm-{}", chrono::Utc::now().timestamp()),
                     object: "chat.completion.chunk".to_string(),
                     created: chrono::Utc::now().timestamp() as u64,
                     model: model.to_string(),
@@ -204,7 +204,7 @@ impl FsnClient {
         if !has_content && !has_finish && !has_tool_calls { return None; }
 
         Some(ChatCompletionChunk {
-            id: format!("chatcmpl-fsn-{}", chrono::Utc::now().timestamp()),
+            id: format!("chatcmpl-relm-{}", chrono::Utc::now().timestamp()),
             object: "chat.completion.chunk".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
             model: model.to_string(),

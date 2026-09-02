@@ -12,19 +12,19 @@ use crate::types::chat::ChatCompletionRequest;
 use crate::types::model::Model;
 use crate::types::provider::ProviderMetadata;
 
-use super::auth::FsnCredential;
-use super::client::FsnClient;
+use super::auth::RelmCredential;
+use super::client::RelmClient;
 use super::constants;
 
-/// FusionCode provider — endless-retry key handling:
+/// RelayModel provider — endless-retry key handling:
 /// errors NEVER lock or deactivate a key (upstream 429s are transient).
 /// On error: record it, rotate to the next key (round-robin), and keep
 /// hitting — after a full round of all keys, the round restarts. The loop
 /// only exits on success (or zero keys configured).
-pub struct FsnProvider {
+pub struct RelmProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
-    client: FsnClient,
+    client: RelmClient,
 }
 
 /// ponytail: keep only the last 50 failures — an endless loop must not grow
@@ -35,7 +35,7 @@ fn push_failed(failed: &mut Vec<FailedKeyAttempt>, attempt: FailedKeyAttempt) {
     failed.push(attempt);
 }
 
-impl FsnProvider {
+impl RelmProvider {
     pub fn new_with_keys(keys: Vec<ApiKey>, db: Arc<SqlitePool>) -> Self {
         let metadata = ProviderMetadata {
             name: constants::PROVIDER_ID.to_string(),
@@ -50,7 +50,7 @@ impl FsnProvider {
             model_prefix: None,
             validate_url: constants::provider_spec().validate_url.to_string(),
         };
-        Self { metadata, keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())), client: FsnClient::new() }
+        Self { metadata, keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())), client: RelmClient::new() }
     }
 
     fn models_static(&self) -> Vec<Model> {
@@ -63,7 +63,7 @@ impl FsnProvider {
     }
 
     fn build_body(&self, request: &ChatCompletionRequest, stream: bool) -> serde_json::Value {
-        let model_name = request.model.strip_prefix("fsn/").unwrap_or(&request.model);
+        let model_name = request.model.strip_prefix("relm/").unwrap_or(&request.model);
         let mut body = serde_json::json!({
             "model": model_name,
             "messages": request.messages.iter().filter_map(|m| serde_json::to_value(m).ok()).collect::<Vec<_>>(),
@@ -82,7 +82,7 @@ impl FsnProvider {
 
     fn exhausted(&self) -> GatewayError {
         GatewayError::NoAvailableKeys(format!(
-            "All FusionCode keys exhausted ({} key(s) tried, none locked — errors are non-locking for this provider)",
+            "All RelayModel keys exhausted ({} key(s) tried, none locked — errors are non-locking for this provider)",
             self.keys.total_count()
         ))
     }
@@ -100,7 +100,7 @@ impl FsnProvider {
 }
 
 #[async_trait]
-impl Provider for FsnProvider {
+impl Provider for RelmProvider {
     fn metadata(&self) -> ProviderMetadata { self.metadata.clone() }
 
     async fn chat_completion(&self, request: ChatCompletionRequest) -> Result<ChatResult, GatewayError> {
@@ -110,7 +110,7 @@ impl Provider for FsnProvider {
         loop {
             let key = self.next_key(&mut excluded)?;
             let key_id = key.id.clone();
-            let cred = match FsnCredential::parse(&key.key_value) {
+            let cred = match RelmCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     excluded.push(key_id.clone());
@@ -139,7 +139,7 @@ impl Provider for FsnProvider {
             let key = self.next_key(&mut excluded)?;
             let key_id = key.id.clone();
             last_attempted_key_id = Some(key_id.clone());
-            let cred = match FsnCredential::parse(&key.key_value) {
+            let cred = match RelmCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     excluded.push(key_id.clone());
