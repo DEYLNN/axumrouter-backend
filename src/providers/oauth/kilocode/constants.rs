@@ -21,8 +21,5 @@ pub const COLOR: &str = "#FF6B35";
 pub const ICON_NAME: &str = "kc.png";
 
 pub const MODELS: &[ModelDef] = &[
-    ModelDef { id: "nvidia-nemotron-3-ultra-550b-a55b-free", backend_model: "nvidia/nemotron-3-ultra-550b-a55b:free", max_tokens: None, context_length: 1000000 },
     ModelDef { id: "stepfun-step-3-7-flash-free", backend_model: "stepfun/step-3.7-flash:free", max_tokens: None, context_length: 256000 },
-    ModelDef { id: "inclusionai-ling-3-0-flash-free", backend_model: "inclusionai/ling-3.0-flash:free", max_tokens: None, context_length: 262144 },
-    ModelDef { id: "poolside-laguna-s-2-1-free", backend_model: "poolside/laguna-s-2.1:free", max_tokens: None, context_length: 262144 },
 ];

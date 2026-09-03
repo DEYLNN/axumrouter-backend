@@ -9,14 +9,14 @@ use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
 
-use super::auth::RelmCredential;
+use super::auth::BaiCredential;
 use super::constants;
 
-pub struct RelmClient {
+pub struct BaiClient {
     http: Client,
 }
 
-impl RelmClient {
+impl BaiClient {
     pub fn new() -> Self {
         Self {
             http: Client::builder()
@@ -31,7 +31,7 @@ impl RelmClient {
     fn headers(
         &self,
         builder: reqwest::RequestBuilder,
-        cred: &RelmCredential,
+        cred: &BaiCredential,
     ) -> reqwest::RequestBuilder {
         builder
             .header("Authorization", format!("Bearer {}", cred.api_key))
@@ -42,7 +42,7 @@ impl RelmClient {
     pub async fn send_collect(
         &self,
         body: Value,
-        cred: &RelmCredential,
+        cred: &BaiCredential,
     ) -> Result<ChatCompletionResponse, GatewayError> {
         let url = format!("{}/chat/completions", constants::BASE_URL);
         let response = self
@@ -50,7 +50,7 @@ impl RelmClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Relm HTTP: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Bai HTTP: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -58,7 +58,7 @@ impl RelmClient {
             return Err(GatewayError::ProviderHttpError {
                 status,
                 body: text,
-                provider: "relm".into(),
+                provider: "bai".into(),
                 key_id: None,
             });
         }
@@ -103,14 +103,14 @@ impl RelmClient {
             id: json
                 .get("id")
                 .and_then(|v| v.as_str())
-                .unwrap_or("relm-unknown")
+                .unwrap_or("bai-unknown")
                 .to_string(),
             object: "chat.completion".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
             model: json
                 .get("model")
                 .and_then(|v| v.as_str())
-                .unwrap_or("relm")
+                .unwrap_or("bai")
                 .to_string(),
             choices: vec![Choice {
                 index: 0,
@@ -141,7 +141,7 @@ impl RelmClient {
     pub async fn send_stream(
         &self,
         body: Value,
-        cred: &RelmCredential,
+        cred: &BaiCredential,
     ) -> Result<BoxStream<'static, Result<ChatCompletionChunk, GatewayError>>, GatewayError> {
         let url = format!("{}/chat/completions", constants::BASE_URL);
         let response = self
@@ -149,7 +149,7 @@ impl RelmClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Relm HTTP: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Bai HTTP: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -157,7 +157,7 @@ impl RelmClient {
             return Err(GatewayError::ProviderHttpError {
                 status,
                 body: text,
-                provider: "relm".into(),
+                provider: "bai".into(),
                 key_id: None,
             });
         }
@@ -165,7 +165,7 @@ impl RelmClient {
         let model = body
             .get("model")
             .and_then(|v| v.as_str())
-            .unwrap_or("relm")
+            .unwrap_or("bai")
             .to_string();
         let upstream = response.bytes_stream();
 
@@ -205,7 +205,7 @@ impl RelmClient {
             // dispatcher's usage-tracking can persist token counts.
             if let Some(u) = collected_usage.take() {
                 yield ChatCompletionChunk {
-                    id: format!("chatcmpl-relm-{}", chrono::Utc::now().timestamp()),
+                    id: format!("chatcmpl-bai-{}", chrono::Utc::now().timestamp()),
                     object: "chat.completion.chunk".to_string(),
                     created: chrono::Utc::now().timestamp() as u64,
                     model: model.to_string(),
@@ -298,7 +298,7 @@ impl RelmClient {
         }
 
         Some(ChatCompletionChunk {
-            id: format!("chatcmpl-relm-{}", chrono::Utc::now().timestamp()),
+            id: format!("chatcmpl-bai-{}", chrono::Utc::now().timestamp()),
             object: "chat.completion.chunk".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
             model: model.to_string(),

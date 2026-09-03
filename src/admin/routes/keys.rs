@@ -492,6 +492,141 @@ pub async fn api_toggle_key(
 }
 
 #[derive(Deserialize)]
+pub struct BulkAddKeysRequest {
+    pub provider_id: String,
+    pub keys: Vec<String>,
+    pub label: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct BulkAddKeysResponse {
+    pub added: usize,
+    pub duplicates: usize,
+    pub total: usize,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Bulk-add API keys for a single provider. Skips duplicates silently.
+/// Guards: provider must exist, category must be apikey, keys must be non-empty strings.
+pub async fn api_bulk_add_keys(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BulkAddKeysRequest>,
+) -> Json<BulkAddKeysResponse> {
+    // Guard 1: keys must be non-empty
+    let keys: Vec<&str> = req.keys.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    if keys.is_empty() {
+        return Json(BulkAddKeysResponse {
+            added: 0, duplicates: 0, total: 0,
+            message: "No valid keys provided".into(),
+            error: Some("keys array is empty or contains only whitespace".into()),
+        });
+    }
+
+    // Guard 2: provider must exist and be apikey
+    let pm_check = state.provider_manager.read().await;
+    let category = pm_check
+        .get(&req.provider_id)
+        .map(|p| p.metadata().category.clone());
+    drop(pm_check);
+
+    match &category {
+        None => {
+            return Json(BulkAddKeysResponse {
+                added: 0, duplicates: 0, total: 0,
+                message: format!("Provider '{}' not found", req.provider_id),
+                error: Some("unknown provider_id".into()),
+            });
+        }
+        Some(cat) if cat != "apikey" => {
+            return Json(BulkAddKeysResponse {
+                added: 0, duplicates: 0, total: 0,
+                message: format!("Provider '{}' is not apikey (category: {})", req.provider_id, cat),
+                error: Some("only apikey providers allowed".into()),
+            });
+        }
+        _ => {}
+    }
+
+    let label = req.label.unwrap_or_default();
+    let mut added = 0usize;
+    let mut duplicates = 0usize;
+
+    for key_value in &keys {
+
+        // Check duplicate
+        let dup: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM api_keys \
+             WHERE provider_id = ? AND key_value = ? \
+               AND COALESCE(key_type, 'apikey') != 'oauth' LIMIT 1"
+        )
+        .bind(&req.provider_id)
+        .bind(*key_value)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None);
+
+        if dup.is_some() {
+            duplicates += 1;
+            continue;
+        }
+
+        let id = format!("key_{}", &Uuid::new_v4().to_string()[..8]);
+        let r = sqlx::query(
+            "INSERT INTO api_keys (id, provider_id, key_value, label, is_active, key_type) VALUES (?, ?, ?, ?, 1, ?)",
+        )
+        .bind(&id)
+        .bind(&req.provider_id)
+        .bind(*key_value)
+        .bind(&label)
+        .bind("apikey")
+        .execute(&state.db)
+        .await;
+
+        if r.is_ok() {
+            added += 1;
+        }
+    }
+
+    // Reload provider to pick up new keys
+    if added > 0 {
+        let mut pm = state.provider_manager.write().await;
+        let _ = pm.reload_provider(&req.provider_id).await;
+
+        // Auto-disable models on first key (0 → N transition)
+        let existing_key_count = crate::db::count_provider_keys(&state.db, &req.provider_id, true).await;
+        let was_zero = existing_key_count as usize <= added; // only new keys added this batch
+        if was_zero {
+            let models = pm.list_all_models_unfiltered().await;
+            let prefix = pm.get(&req.provider_id)
+                .and_then(|p| p.metadata().model_prefix)
+                .map(|pf| format!("{}/", pf))
+                .unwrap_or_else(|| format!("{}/", req.provider_id));
+            drop(pm);
+            for m in models {
+                if m.id.starts_with(&prefix) {
+                    let _ = sqlx::query(
+                        "INSERT OR IGNORE INTO disabled_models (model_id) VALUES (?)",
+                    )
+                    .bind(&m.id)
+                    .execute(&state.db)
+                    .await;
+                }
+            }
+        }
+    }
+
+    Json(BulkAddKeysResponse {
+        added,
+        duplicates,
+        total: added + duplicates,
+        message: format!("{} added, {} duplicates skipped", added, duplicates),
+        error: None,
+    })
+}
+
+#[derive(Deserialize)]
 pub struct BulkEnableRequest {
     pub key_ids: Vec<String>,
 }
@@ -542,5 +677,162 @@ pub async fn api_bulk_enable_keys(
         "enabled": enabled,
         "failed": failed,
         "message": format!("Enabled {enabled} key(s){}{}", if failed > 0 { format!(", {failed} already active/failed") } else { String::new() }, if failed > 0 { "" } else { "" }),
+    }))
+}
+
+// --- Key count per provider (apikey only) ---
+
+#[derive(Deserialize)]
+pub struct CountQuery {
+    pub provider_id: String,
+}
+
+#[derive(Serialize)]
+pub struct CountResponse {
+    pub provider_id: String,
+    pub total: i64,
+    pub active: i64,
+    pub disabled: i64,
+}
+
+pub async fn api_count_keys(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<CountQuery>,
+) -> Json<CountResponse> {
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys WHERE provider_id = ?")
+        .bind(&q.provider_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    let active: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys WHERE provider_id = ? AND is_active = 1")
+        .bind(&q.provider_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    Json(CountResponse {
+        provider_id: q.provider_id,
+        total,
+        active,
+        disabled: total - active,
+    })
+}
+
+// --- Bulk delete keys ---
+
+#[derive(Deserialize)]
+pub struct BulkDeleteRequest {
+    pub provider_id: String,
+    /// "all" = delete all keys, otherwise delete by key_value match
+    pub action: String,
+    #[serde(default)]
+    pub key_value: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct BulkDeleteResponse {
+    pub deleted: usize,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+pub async fn api_bulk_delete_keys(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<BulkDeleteRequest>,
+) -> Json<BulkDeleteResponse> {
+    // Guard: apikey provider only
+    let pm_check = state.provider_manager.read().await;
+    let category = pm_check
+        .get(&req.provider_id)
+        .map(|p| p.metadata().category.clone());
+    drop(pm_check);
+
+    match &category {
+        None => {
+            return Json(BulkDeleteResponse {
+                deleted: 0,
+                message: format!("Provider '{}' not found", req.provider_id),
+                error: Some("unknown provider_id".into()),
+            });
+        }
+        Some(cat) if cat != "apikey" => {
+            return Json(BulkDeleteResponse {
+                deleted: 0,
+                message: format!("Provider '{}' is not apikey", req.provider_id),
+                error: Some("only apikey providers allowed".into()),
+            });
+        }
+        _ => {}
+    }
+
+    let result = if req.action == "all" {
+        sqlx::query("DELETE FROM api_keys WHERE provider_id = ?")
+            .bind(&req.provider_id)
+            .execute(&state.db)
+            .await
+    } else if let Some(kv) = &req.key_value {
+        sqlx::query("DELETE FROM api_keys WHERE provider_id = ? AND key_value = ?")
+            .bind(&req.provider_id)
+            .bind(kv)
+            .execute(&state.db)
+            .await
+    } else {
+        return Json(BulkDeleteResponse {
+            deleted: 0,
+            message: "action must be 'all' or provide key_value".into(),
+            error: Some("invalid action".into()),
+        });
+    };
+
+    match result {
+        Ok(r) => {
+            let deleted = r.rows_affected() as usize;
+            if deleted > 0 {
+                let mut pm = state.provider_manager.write().await;
+                let _ = pm.reload_provider(&req.provider_id).await;
+            }
+            Json(BulkDeleteResponse {
+                deleted,
+                message: format!("Deleted {} key(s) from {}", deleted, req.provider_id),
+                error: None,
+            })
+        }
+        Err(e) => Json(BulkDeleteResponse {
+            deleted: 0,
+            message: format!("Failed: {}", e),
+            error: Some("db error".into()),
+        }),
+    }
+}
+
+// --- Serve docs ---
+
+pub async fn serve_key_injection_docs() -> impl axum::response::IntoResponse {
+    axum::response::Json(serde_json::json!({
+        "endpoints": {
+            "bulk_add": {
+                "method": "POST",
+                "path": "/admin/api/keys/bulk-add",
+                "body": {"provider_id": "sop", "keys": ["sk-xxx"], "label": "optional"},
+                "response": {"added": 2, "duplicates": 0, "total": 2, "message": "2 added, 0 duplicates skipped"}
+            },
+            "count": {
+                "method": "GET",
+                "path": "/admin/api/keys/count?provider_id=sop",
+                "response": {"provider_id": "sop", "total": 5, "active": 5, "disabled": 0}
+            },
+            "delete": {
+                "method": "POST",
+                "path": "/admin/api/keys/bulk-delete",
+                "body_all": {"provider_id": "sop", "action": "all"},
+                "body_by_key": {"provider_id": "sop", "action": "by_key", "key_value": "sk-xxx"},
+                "response": {"deleted": 2, "message": "Deleted 2 key(s) from sop"}
+            }
+        },
+        "guards": [
+            "provider_id must exist and be category apikey",
+            "keys array must be non-empty for bulk-add",
+            "action must be 'all' or 'by_key' for delete"
+        ]
     }))
 }

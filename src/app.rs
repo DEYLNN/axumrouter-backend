@@ -15,6 +15,12 @@ pub fn build(state: AppState) -> Router {
         axum::routing::get(|| async { r#"{"status":"ok"}"# }),
     );
 
+    // Public docs — no auth
+    let docs = Router::new().route(
+        "/admin/api/docs/key-injection",
+        axum::routing::get(crate::admin::routes::keys::serve_key_injection_docs),
+    );
+
     // Public OpenAI-compatible API  (/v1/*)
     let api = crate::api::routes(shared.clone());
 
@@ -41,6 +47,7 @@ pub fn build(state: AppState) -> Router {
             .fallback(ServeFile::new("public/admin/index.html")));
 
     health
+        .merge(docs)
         .merge(api)
         .merge(admin)
         .merge(static_assets)

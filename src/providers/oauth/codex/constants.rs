@@ -51,7 +51,4 @@ pub const MODELS: &[ModelDef] = &[
     ModelDef { id: "gpt-5.6-sol", backend_model: "gpt-5.6-sol", max_tokens: None, context_length: 1000000 },
     ModelDef { id: "gpt-5.6-terra", backend_model: "gpt-5.6-terra", max_tokens: None, context_length: 1000000 },
     ModelDef { id: "gpt-5.6-luna", backend_model: "gpt-5.6-luna", max_tokens: None, context_length: 1000000 },
-    ModelDef { id: "gpt-5.5", backend_model: "gpt-5.5", max_tokens: None, context_length: 1000000 },
-    ModelDef { id: "gpt-5.4", backend_model: "gpt-5.4", max_tokens: None, context_length: 1000000 },
-    ModelDef { id: "gpt-5.4-mini", backend_model: "gpt-5.4-mini", max_tokens: None, context_length: 400000 },
 ];

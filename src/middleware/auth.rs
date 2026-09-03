@@ -36,6 +36,10 @@ pub async fn auth_middleware(
         if path.starts_with("/admin/api/login") {
             return next.run(request).await;
         }
+        // Docs are public
+        if path.starts_with("/admin/api/docs/") {
+            return next.run(request).await;
+        }
 
         let admin_password_set = state.config.auth.admin_password
             .as_ref()
