@@ -808,31 +808,9 @@ pub async fn api_bulk_delete_keys(
 // --- Serve docs ---
 
 pub async fn serve_key_injection_docs() -> impl axum::response::IntoResponse {
-    axum::response::Json(serde_json::json!({
-        "endpoints": {
-            "bulk_add": {
-                "method": "POST",
-                "path": "/admin/api/keys/bulk-add",
-                "body": {"provider_id": "sop", "keys": ["sk-xxx"], "label": "optional"},
-                "response": {"added": 2, "duplicates": 0, "total": 2, "message": "2 added, 0 duplicates skipped"}
-            },
-            "count": {
-                "method": "GET",
-                "path": "/admin/api/keys/count?provider_id=sop",
-                "response": {"provider_id": "sop", "total": 5, "active": 5, "disabled": 0}
-            },
-            "delete": {
-                "method": "POST",
-                "path": "/admin/api/keys/bulk-delete",
-                "body_all": {"provider_id": "sop", "action": "all"},
-                "body_by_key": {"provider_id": "sop", "action": "by_key", "key_value": "sk-xxx"},
-                "response": {"deleted": 2, "message": "Deleted 2 key(s) from sop"}
-            }
-        },
-        "guards": [
-            "provider_id must exist and be category apikey",
-            "keys array must be non-empty for bulk-add",
-            "action must be 'all' or 'by_key' for delete"
-        ]
-    }))
+    let content = include_str!("../../../docs/KEY_INJECTION.md");
+    axum::response::Response::builder()
+        .header("content-type", "text/markdown; charset=utf-8")
+        .body(axum::body::Body::from(content.to_string()))
+        .unwrap()
 }
