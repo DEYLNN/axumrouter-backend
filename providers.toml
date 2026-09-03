@@ -2583,3 +2583,66 @@ ctx = 1000000
 vision = false
 tools = true
 reasoning = true
+
+
+[[providers]]
+id = "inf"
+name = "InferHub"
+category = "apikey"
+color = "#EF4444"
+icon = "inf.png"
+base_url = "https://api.inferhub.dev"
+validate_url = "https://api.inferhub.dev/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "gpt-5.6-luna"
+name = "GPT 5.6 Luna"
+ctx = 1000000
+vision = false
+tools = true
+
+
+[[providers]]
+id = "inc"
+name = "InceptionLabs AI"
+category = "apikey"
+color = "#10B981"
+icon = "inc.png"
+base_url = "https://api.inceptionlabs.ai"
+validate_url = "https://api.inceptionlabs.ai/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "mercury-2"
+name = "Mercury 2"
+ctx = 1000000
+vision = false
+tools = true
+
+
+[[providers]]
+id = "cae"
+name = "Caedral"
+category = "apikey"
+color = "#8B5CF6"
+icon = "cae.jpg"
+base_url = "https://api.caedral.com"
+validate_url = "https://api.caedral.com/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "minimax/minimax-m3:free"
+name = "MiniMax M3 Free"
+ctx = 1000000
+vision = false
+tools = true
