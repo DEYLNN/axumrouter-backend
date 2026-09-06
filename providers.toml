@@ -565,26 +565,6 @@ vision = false
 tools = true
 
 
-[[providers]]
-id = "relm"
-name = "RelayModel"
-category = "apikey"
-color = "#18181B"
-icon = "relm.jpg"
-base_url = "https://api.relaymodels.com/v1"
-validate_url = "https://api.relaymodels.com/v1/models"
-api_type = "openai"
-timeout = 120
-first_chunk_timeout = 200
-stall_timeout = 360
-
-[[providers.models]]
-id = "deepseek-v4-flash"
-name = "DeepSeek V4 Flash"
-ctx = 1000000
-vision = false
-tools = true
-
 
 [[providers]]
 id = "bmc"

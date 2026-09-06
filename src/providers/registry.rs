@@ -67,6 +67,7 @@ impl ProviderRegistry {
         register_provider!(registry, "fsn", crate::providers::apikey::fusioncode::provider::FsnProvider::new_with_keys, db);
         register_provider!(registry, "bai", crate::providers::apikey::bai::provider::BaiProvider::new_with_keys, db);
         register_provider!(registry, "kio", crate::providers::apikey::kio::provider::KioProvider::new_with_keys, db);
+        register_provider!(registry, "relm", crate::providers::apikey::relaymodel::provider::RelmProvider::new_with_keys, db);
 
         registry
     }

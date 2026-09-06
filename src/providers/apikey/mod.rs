@@ -4,3 +4,4 @@ pub mod cloudflare;
 pub mod fusioncode;
 pub mod inferx;
 pub mod kio;
+pub mod relaymodel;
