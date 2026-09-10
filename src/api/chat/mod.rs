@@ -1,4 +1,5 @@
 // Chat completions module — split for maintainability.
+pub mod combo;
 pub mod non_streaming;
 pub mod streaming;
 
@@ -53,6 +54,22 @@ async fn chat_completions(
         None => return Err(GatewayError::InvalidModelFormat(model.clone())),
     };
     let is_streaming = request.stream.unwrap_or(false);
+
+    // ── Combo routing ──
+    // If model starts with "combo/", resolve via combos table and dispatch
+    // to the real provider. Usage is tracked under the real provider, not combo.
+    if raw_prefix == "combo" {
+        let combo_name = model_name.to_string();
+        if is_streaming {
+            return combo::handle_combo_request_stream(
+                state, gw_key, request, combo_name, start,
+            ).await;
+        } else {
+            return combo::handle_combo_request(
+                state, gw_key, request, combo_name, start,
+            ).await;
+        }
+    }
 
     // Blocked model check — uses the raw prefix as the provider column for now;
     // admin UI enters blocked_models with the user-facing prefix (e.g. `nx`).

@@ -1,4 +1,5 @@
 // Admin routes — split from api.rs for maintainability
+pub mod combos;
 pub mod database;
 pub mod gateway_keys;
 pub mod keys;

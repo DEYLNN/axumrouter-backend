@@ -219,6 +219,23 @@ impl ProviderManager {
                 });
             }
         }
+
+        // Inject active combos as virtual models (combo/<name>)
+        let combos = sqlx::query_as::<_, (String, i64)>(
+            "SELECT name, min_context FROM combos WHERE is_active = 1"
+        )
+        .fetch_all(&self.db)
+        .await
+        .unwrap_or_default();
+        for (name, min_ctx) in combos {
+            all.push(Model {
+                id: format!("combo/{}", name),
+                object: "model".to_string(),
+                owned_by: "combo".to_string(),
+                context_length: if min_ctx > 0 { Some(min_ctx as u32) } else { None },
+            });
+        }
+
         all
     }
 
@@ -247,6 +264,23 @@ impl ProviderManager {
                 });
             }
         }
+
+        // Inject active combos as virtual models (combo/<name>)
+        let combos = sqlx::query_as::<_, (String, i64)>(
+            "SELECT name, min_context FROM combos WHERE is_active = 1"
+        )
+        .fetch_all(&self.db)
+        .await
+        .unwrap_or_default();
+        for (name, min_ctx) in combos {
+            all.push(Model {
+                id: format!("combo/{}", name),
+                object: "model".to_string(),
+                owned_by: "combo".to_string(),
+                context_length: if min_ctx > 0 { Some(min_ctx as u32) } else { None },
+            });
+        }
+
         all
     }
 

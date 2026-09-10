@@ -2626,3 +2626,23 @@ name = "MiniMax M3 Free"
 ctx = 1000000
 vision = false
 tools = true
+
+[[providers]]
+id = "verb"
+name = "Verboo AI"
+category = "apikey"
+color = "#6366F1"
+icon = "verb.png"
+base_url = "https://code.verboo.ai/router"
+validate_url = "https://code.verboo.ai/router/v1/models"
+api_type = "openai"
+timeout = 64
+first_chunk_timeout = 120
+stall_timeout = 120
+
+[[providers.models]]
+id = "deepseek-v4-flash-0731"
+name = "DeepSeek V4 Flash 0731"
+ctx = 1000000
+vision = false
+tools = true

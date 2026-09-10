@@ -218,6 +218,22 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
     // Counts consecutive retryable errors; reset to 0 on mark_success.
     let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN consecutive_error_count INTEGER NOT NULL DEFAULT 0").execute(pool).await;
 
+    // Migration v12: combos — virtual model alias that reroutes to real provider models.
+    // tiers is a JSON array of "provider_id/model_id" strings (ordered fallback).
+    // Combo itself never tracks usage — the resolved real provider does.
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS combos (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            strategy TEXT NOT NULL DEFAULT 'fallback',
+            tiers TEXT NOT NULL DEFAULT '[]',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            min_context INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    "#).execute(pool).await?;
+
     tracing::info!("Database migrations complete");
     Ok(())
 }
