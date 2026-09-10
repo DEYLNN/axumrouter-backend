@@ -74,17 +74,32 @@ pub(crate) async fn handle_combo_request(
             None => continue,
         };
 
+        tracing::info!(
+            "COMBO DEBUG: tier[{}] raw_prefix={:?} model_name={:?} tier_model={:?}",
+            idx, raw_prefix, model_name, tier_model
+        );
+
         let provider_id = match pm.resolve_provider_id(raw_prefix) {
-            Some(id) => id,
-            None => continue,
+            Some(id) => {
+                tracing::info!("COMBO DEBUG: resolved provider_id={:?} from raw_prefix={:?}", id, raw_prefix);
+                id
+            }
+            None => {
+                tracing::warn!("COMBO DEBUG: resolve_provider_id failed for raw_prefix={:?}", raw_prefix);
+                continue;
+            }
         };
         let provider = match pm.get(&provider_id) {
             Some(p) => p,
-            None => continue,
+            None => {
+                tracing::warn!("COMBO DEBUG: provider not found in active map: {:?}", provider_id);
+                continue;
+            }
         };
 
         let mut tier_req = request.clone();
         tier_req.model = model_name.to_string();
+        tracing::info!("COMBO DEBUG: sending to provider={} model={}", provider_id, tier_req.model);
 
         // Clamp max_tokens to min_context
         if cfg.min_context > 0 {
@@ -97,6 +112,7 @@ pub(crate) async fn handle_combo_request(
 
         match provider.chat_completion(tier_req).await {
             Ok(result) => {
+                tracing::info!("COMBO DEBUG: tier[{}] OK from provider={}", idx, provider_id);
                 let usage = match &result.response.usage {
                     Some(u) => CanonicalUsage {
                         prompt_tokens: u.prompt_tokens as i64,
@@ -118,6 +134,7 @@ pub(crate) async fn handle_combo_request(
                 return Ok(Json(result.response).into_response());
             }
             Err(e) => {
+                tracing::warn!("COMBO DEBUG: tier[{}] FAILED provider={} model={} error={}", idx, provider_id, model_name, e);
                 let status = e.http_status().unwrap_or(502);
                 record_error(
                     &state.usage_tracker,
@@ -194,29 +211,20 @@ pub(crate) async fn handle_combo_request_stream(
             }
         }
 
-        match provider.chat_completion_stream(tier_req).await {
-            Ok(result) => {
-                // Delegate to the standard streaming handler — it handles
-                // SSE wrapping, usage tracking, and response formatting.
-                // pm stays borrowed; handle_streaming takes a reference.
-                return crate::api::chat::streaming::handle_streaming(
-                    &state, &gw_key, provider, &provider_id, tier_model, &request, start,
-                ).await;
+        // Delegate to the standard streaming handler — it calls
+        // provider.chat_completion_stream internally and handles SSE + usage.
+        // Pass tier_req (model already set to upstream ID), NOT original request.
+        match crate::api::chat::streaming::handle_streaming(
+            &state, &gw_key, provider, &provider_id, tier_model, &tier_req, start,
+        ).await {
+            Ok(resp) => {
+                drop(pm);
+                return Ok(resp);
             }
             Err(e) => {
-                let status = e.http_status().unwrap_or(502);
-                record_error(
-                    &state.usage_tracker,
-                    start,
-                    &provider_id,
-                    tier_model,
-                    &gw_key.key_id,
-                    None,
-                    "/v1/chat/completions",
-                    status as i32,
-                    &e.to_string(),
-                ).await;
+                tracing::warn!("COMBO DEBUG: tier[{}] STREAM FAILED provider={} model={} error={}", idx, provider_id, model_name, e);
                 last_error = Some(e);
+                // try next tier
             }
         }
     }
