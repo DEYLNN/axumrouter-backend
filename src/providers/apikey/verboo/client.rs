@@ -9,14 +9,14 @@ use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
 
-use super::auth::RelmCredential;
+use super::auth::VerbCredential;
 use super::constants;
 
-pub struct RelmClient {
+pub struct VerbClient {
     http: Client,
 }
 
-impl RelmClient {
+impl VerbClient {
     pub fn new() -> Self {
         Self {
             http: Client::builder()
@@ -31,7 +31,7 @@ impl RelmClient {
     fn headers(
         &self,
         builder: reqwest::RequestBuilder,
-        cred: &RelmCredential,
+        cred: &VerbCredential,
     ) -> reqwest::RequestBuilder {
         builder
             .header("Authorization", format!("Bearer {}", cred.api_key))
@@ -42,7 +42,7 @@ impl RelmClient {
     pub async fn send_collect(
         &self,
         body: Value,
-        cred: &RelmCredential,
+        cred: &VerbCredential,
     ) -> Result<ChatCompletionResponse, GatewayError> {
         let url = format!("{}/chat/completions", constants::BASE_URL);
         let response = self
@@ -50,7 +50,7 @@ impl RelmClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Relm HTTP: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Verb HTTP: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -58,7 +58,7 @@ impl RelmClient {
             return Err(GatewayError::ProviderHttpError {
                 status,
                 body: text,
-                provider: "relm".into(),
+                provider: "verb".into(),
                 key_id: None,
             });
         }
@@ -66,7 +66,7 @@ impl RelmClient {
         let json: Value = response
             .json()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Relm parse: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Verb parse: {}", e)))?;
 
         let choice = json
             .get("choices")
@@ -76,7 +76,7 @@ impl RelmClient {
             .unwrap_or_default();
 
         let message = choice.get("message").cloned().unwrap_or_default();
-        // RelayModel models always think — drop reasoning_content, strip think-block tags.
+        // Verboo models always think — drop reasoning_content, strip think-block tags.
         let raw_content = message
             .get("content")
             .and_then(|v| v.as_str())
@@ -103,14 +103,14 @@ impl RelmClient {
             id: json
                 .get("id")
                 .and_then(|v| v.as_str())
-                .unwrap_or("relm-unknown")
+                .unwrap_or("verb-unknown")
                 .to_string(),
             object: "chat.completion".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
             model: json
                 .get("model")
                 .and_then(|v| v.as_str())
-                .unwrap_or("relm")
+                .unwrap_or("verb")
                 .to_string(),
             choices: vec![Choice {
                 index: 0,
@@ -141,7 +141,7 @@ impl RelmClient {
     pub async fn send_stream(
         &self,
         body: Value,
-        cred: &RelmCredential,
+        cred: &VerbCredential,
     ) -> Result<BoxStream<'static, Result<ChatCompletionChunk, GatewayError>>, GatewayError> {
         let url = format!("{}/chat/completions", constants::BASE_URL);
         let response = self
@@ -149,7 +149,7 @@ impl RelmClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Relm HTTP: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Verb HTTP: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -157,7 +157,7 @@ impl RelmClient {
             return Err(GatewayError::ProviderHttpError {
                 status,
                 body: text,
-                provider: "relm".into(),
+                provider: "verb".into(),
                 key_id: None,
             });
         }
@@ -165,7 +165,7 @@ impl RelmClient {
         let model = body
             .get("model")
             .and_then(|v| v.as_str())
-            .unwrap_or("relm")
+            .unwrap_or("verb")
             .to_string();
         let upstream = response.bytes_stream();
 
@@ -181,9 +181,9 @@ impl RelmClient {
                 let wait = if first { first_chunk_timeout } else { stall_timeout };
                 first = false;
                 let next = tokio::time::timeout(wait, upstream.next()).await
-                    .map_err(|_| GatewayError::ProviderError(format!("Relm stream timeout: {}s", wait.as_secs())))?;
+                    .map_err(|_| GatewayError::ProviderError(format!("Verb stream timeout: {}s", wait.as_secs())))?;
                 let Some(maybe_bytes) = next else { break };
-                let bytes = maybe_bytes.map_err(|e| GatewayError::ProviderError(format!("Relm stream read: {}", e)))?;
+                let bytes = maybe_bytes.map_err(|e| GatewayError::ProviderError(format!("Verb stream read: {}", e)))?;
                 buffer.push_str(&String::from_utf8_lossy(&bytes));
                 while let Some(frame_end) = buffer.find("\n\n") {
                     let frame = buffer[..frame_end].to_string();
@@ -205,7 +205,7 @@ impl RelmClient {
             // dispatcher's usage-tracking can persist token counts.
             if let Some(u) = collected_usage.take() {
                 yield ChatCompletionChunk {
-                    id: format!("chatcmpl-relm-{}", chrono::Utc::now().timestamp()),
+                    id: format!("chatcmpl-verb-{}", chrono::Utc::now().timestamp()),
                     object: "chat.completion.chunk".to_string(),
                     created: chrono::Utc::now().timestamp() as u64,
                     model: model.to_string(),
@@ -294,7 +294,7 @@ impl RelmClient {
         }
 
         Some(ChatCompletionChunk {
-            id: format!("chatcmpl-relm-{}", chrono::Utc::now().timestamp()),
+            id: format!("chatcmpl-verb-{}", chrono::Utc::now().timestamp()),
             object: "chat.completion.chunk".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
             model: model.to_string(),

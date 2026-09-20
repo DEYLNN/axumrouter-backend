@@ -12,19 +12,19 @@ use crate::types::chat::ChatCompletionRequest;
 use crate::types::model::Model;
 use crate::types::provider::ProviderMetadata;
 
-use super::auth::RelmCredential;
-use super::client::RelmClient;
+use super::auth::VerbCredential;
+use super::client::VerbClient;
 use super::constants;
 
-/// RelayModel provider — errors do not lock or deactivate keys. Each request
+/// Verboo AI provider — errors do not lock or deactivate keys. Each request
 /// tries every key at most once, then returns the last upstream error.
-pub struct RelmProvider {
+pub struct VerbProvider {
     metadata: ProviderMetadata,
     keys: KeyManager,
-    client: RelmClient,
+    client: VerbClient,
 }
 
-impl RelmProvider {
+impl VerbProvider {
     pub fn new_with_keys(keys: Vec<ApiKey>, db: Arc<SqlitePool>) -> Self {
         let metadata = ProviderMetadata {
             name: constants::PROVIDER_ID.to_string(),
@@ -46,7 +46,7 @@ impl RelmProvider {
         Self {
             metadata,
             keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())),
-            client: RelmClient::new(),
+            client: VerbClient::new(),
         }
     }
 
@@ -63,7 +63,7 @@ impl RelmProvider {
     }
 
     fn build_body(&self, request: &ChatCompletionRequest, stream: bool) -> serde_json::Value {
-        let model_name = request.model.strip_prefix("relm/").unwrap_or(&request.model);
+        let model_name = request.model.strip_prefix("verb/").unwrap_or(&request.model);
         let mut body = serde_json::json!({
             "model": model_name,
             "messages": request.messages.iter().filter_map(|m| serde_json::to_value(m).ok()).collect::<Vec<_>>(),
@@ -92,7 +92,7 @@ impl RelmProvider {
 }
 
 #[async_trait]
-impl Provider for RelmProvider {
+impl Provider for VerbProvider {
     fn metadata(&self) -> ProviderMetadata {
         self.metadata.clone()
     }
@@ -115,7 +115,7 @@ impl Provider for RelmProvider {
             };
             let key_id = key.id.clone();
             last_attempted_key_id = Some(key_id.clone());
-            let cred = match RelmCredential::parse(&key.key_value) {
+            let cred = match VerbCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     excluded.push(key_id.clone());
@@ -155,7 +155,7 @@ impl Provider for RelmProvider {
             });
         }
         Err(GatewayError::NoAvailableKeys(
-            "No RelayModel keys configured".into(),
+            "No Verboo AI keys configured".into(),
         ))
     }
 
@@ -172,7 +172,7 @@ impl Provider for RelmProvider {
         let total = self.keys.total_count();
         if total == 0 {
             return Err(GatewayError::NoAvailableKeys(
-                "No RelayModel keys configured".into(),
+                "No Verboo AI keys configured".into(),
             ));
         }
         for _ in 0..total {
@@ -182,7 +182,7 @@ impl Provider for RelmProvider {
             };
             let key_id = key.id.clone();
             last_attempted_key_id = Some(key_id.clone());
-            let cred = match RelmCredential::parse(&key.key_value) {
+            let cred = match VerbCredential::parse(&key.key_value) {
                 Ok(c) => c,
                 Err(e) => {
                     excluded.push(key_id.clone());
