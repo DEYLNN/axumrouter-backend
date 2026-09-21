@@ -234,6 +234,9 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
         )
     "#).execute(pool).await?;
 
+    // Migration v13: add key_type column to api_keys (for OAuth vs apikey distinction)
+    let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN key_type TEXT").execute(pool).await;
+
     tracing::info!("Database migrations complete");
     Ok(())
 }
