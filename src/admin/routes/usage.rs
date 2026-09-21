@@ -19,6 +19,38 @@ pub async fn api_usage_stats(
     Json(crate::db::usage_stats(&state.db).await)
 }
 
+/// All-time rollup per provider — Dashboard "Top Providers".
+/// GET /admin/api/usage/by-provider
+pub async fn api_usage_by_provider(
+    State(state): State<Arc<AppState>>,
+) -> Json<Vec<crate::db::UsagePerProviderRow>> {
+    Json(crate::db::usage_per_provider(&state.db).await)
+}
+
+/// All-time rollup per model — Dashboard "Top Models".
+/// GET /admin/api/usage/by-model
+pub async fn api_usage_by_model(
+    State(state): State<Arc<AppState>>,
+) -> Json<Vec<crate::db::UsagePerModelRow>> {
+    Json(crate::db::usage_per_model(&state.db).await)
+}
+
+/// Today's (UTC) rollup — Dashboard "Today:" lines.
+/// GET /admin/api/usage/today
+pub async fn api_usage_today(
+    State(state): State<Arc<AppState>>,
+) -> Json<crate::db::UsageTodayRow> {
+    Json(crate::db::usage_today(&state.db).await)
+}
+
+/// All-time latency percentiles — Dashboard "Latency".
+/// GET /admin/api/usage/latency
+pub async fn api_usage_latency(
+    State(state): State<Arc<AppState>>,
+) -> Json<crate::db::UsageLatencyRow> {
+    Json(crate::db::usage_latency(&state.db).await)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct UsageKeysQuery {
     pub gateway_key_id: Option<String>,

@@ -267,6 +267,141 @@ pub async fn usage_per_key(pool: &SqlitePool) -> Vec<UsagePerKeyRow> {
     .unwrap_or_default()
 }
 
+/// All-time rollup per provider — powers the Dashboard "Top Providers" card.
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct UsagePerProviderRow {
+    pub provider_id: String,
+    pub requests: i64,
+    pub success: i64,
+    pub errors: i64,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_tokens: i64,
+    /// Mean latency in ms across rows that reported one; 0 when none did.
+    pub avg_latency_ms: i64,
+}
+
+pub async fn usage_per_provider(pool: &SqlitePool) -> Vec<UsagePerProviderRow> {
+    sqlx::query_as::<_, UsagePerProviderRow>(
+        "SELECT
+            COALESCE(u.provider_id, 'unknown') AS provider_id,
+            COUNT(*) AS requests,
+            COALESCE(SUM(CASE WHEN u.status = 'error' THEN 0 ELSE 1 END), 0) AS success,
+            COALESCE(SUM(CASE WHEN u.status = 'error' THEN 1 ELSE 0 END), 0) AS errors,
+            COALESCE(SUM(u.prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(u.completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(u.total_tokens), 0) AS total_tokens,
+            COALESCE(CAST(AVG(NULLIF(u.latency_ms, 0)) AS INTEGER), 0) AS avg_latency_ms
+         FROM usage u
+         GROUP BY COALESCE(u.provider_id, 'unknown')
+         ORDER BY requests DESC",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+}
+
+/// All-time rollup per model — powers the Dashboard "Top Models" card.
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct UsagePerModelRow {
+    pub model_id: String,
+    pub provider_id: String,
+    pub requests: i64,
+    pub success: i64,
+    pub errors: i64,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_tokens: i64,
+    pub avg_latency_ms: i64,
+}
+
+pub async fn usage_per_model(pool: &SqlitePool) -> Vec<UsagePerModelRow> {
+    sqlx::query_as::<_, UsagePerModelRow>(
+        "SELECT
+            COALESCE(u.model_id, 'unknown') AS model_id,
+            COALESCE(u.provider_id, 'unknown') AS provider_id,
+            COUNT(*) AS requests,
+            COALESCE(SUM(CASE WHEN u.status = 'error' THEN 0 ELSE 1 END), 0) AS success,
+            COALESCE(SUM(CASE WHEN u.status = 'error' THEN 1 ELSE 0 END), 0) AS errors,
+            COALESCE(SUM(u.prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(u.completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(u.total_tokens), 0) AS total_tokens,
+            COALESCE(CAST(AVG(NULLIF(u.latency_ms, 0)) AS INTEGER), 0) AS avg_latency_ms
+         FROM usage u
+         GROUP BY COALESCE(u.model_id, 'unknown'), COALESCE(u.provider_id, 'unknown')
+         ORDER BY total_tokens DESC",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+}
+
+/// Today's rollup (UTC) — powers the "Today:" lines on the stat cards.
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct UsageTodayRow {
+    pub requests: i64,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_tokens: i64,
+}
+
+pub async fn usage_today(pool: &SqlitePool) -> UsageTodayRow {
+    sqlx::query_as::<_, UsageTodayRow>(
+        "SELECT
+            COUNT(*) AS requests,
+            COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens
+         FROM usage
+         WHERE date(created_at) = date('now')",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(UsageTodayRow {
+        requests: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+    })
+}
+
+/// Overall latency percentiles (all-time) for the Latency card.
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct UsageLatencyRow {
+    pub samples: i64,
+    pub avg_ms: i64,
+    pub p95_ms: i64,
+    pub min_ms: i64,
+    pub max_ms: i64,
+}
+
+pub async fn usage_latency(pool: &SqlitePool) -> UsageLatencyRow {
+    // SQLite has no PERCENTILE_CONT — derive p95 by offsetting into the sorted set.
+    let row: Option<UsageLatencyRow> = sqlx::query_as::<_, UsageLatencyRow>(
+        "WITH l AS (
+            SELECT latency_ms FROM usage WHERE latency_ms > 0 ORDER BY latency_ms
+         )
+         SELECT
+            (SELECT COUNT(*) FROM l) AS samples,
+            COALESCE(CAST((SELECT AVG(latency_ms) FROM l) AS INTEGER), 0) AS avg_ms,
+            COALESCE((SELECT latency_ms FROM l LIMIT 1 OFFSET (SELECT MAX(0, (COUNT(*) * 95 / 100) - 1) FROM l)), 0) AS p95_ms,
+            COALESCE((SELECT MIN(latency_ms) FROM l), 0) AS min_ms,
+            COALESCE((SELECT MAX(latency_ms) FROM l), 0) AS max_ms",
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+
+    row.unwrap_or(UsageLatencyRow {
+        samples: 0,
+        avg_ms: 0,
+        p95_ms: 0,
+        min_ms: 0,
+        max_ms: 0,
+    })
+}
+
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct UsageLogRow {
     pub id: String,
