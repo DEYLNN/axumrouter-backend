@@ -2668,3 +2668,23 @@ name = "DeepSeek V4.1 Flash"
 ctx = 1000000
 vision = false
 tools = true
+
+[[providers]]
+id = "uno"
+name = "Unoblox"
+category = "apikey"
+color = "#6366F1"
+icon = "uno.jpg"
+base_url = "https://api.unoblox.ai"
+validate_url = "https://api.unoblox.ai/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "deepseek-ai/deepseek-v4-flash"
+name = "DeepSeek V4 Flash"
+ctx = 1000000
+vision = false
+tools = true
