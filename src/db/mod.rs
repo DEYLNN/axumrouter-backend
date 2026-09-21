@@ -307,7 +307,7 @@ pub async fn usage_logs_page(
          FROM usage u
          LEFT JOIN gateway_keys gk ON gk.id = u.gateway_key_id
          LEFT JOIN api_keys ak ON ak.id = u.provider_api_key_id
-         ORDER BY u.created_at DESC
+         ORDER BY u.created_at DESC, u.rowid DESC
          LIMIT ? OFFSET ?",
     )
     .bind(limit)
@@ -337,7 +337,7 @@ pub async fn fetch_latest_usage(pool: &SqlitePool) -> Option<UsageLogRow> {
          FROM usage u
          LEFT JOIN gateway_keys gk ON gk.id = u.gateway_key_id
          LEFT JOIN api_keys ak ON ak.id = u.provider_api_key_id
-         ORDER BY u.id DESC LIMIT 1",
+         ORDER BY u.rowid DESC LIMIT 1",
     )
     .fetch_optional(pool)
     .await
