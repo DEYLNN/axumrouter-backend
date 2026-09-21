@@ -13,7 +13,7 @@ name = "Xxx AI"                     # Display name di UI
 category = "apikey"                 # apikey | oauth
 color = "#6366F1"                   # Warna card UI
 icon = "xxx.png"                    # Icon file di frontend/public/providers/
-base_url = "https://api.xxx.com"    # Base URL API
+base_url = "https://api.xxx.com"    # Base URL API — TANPA path version
 validate_url = "https://api.xxx.com/v1/models"  # Endpoint validasi auth
 api_type = "openai"                 # openai | anthropic — pilih engine
 docs_url = "https://xxx.com"        # Optional: link docs
@@ -53,6 +53,22 @@ tools = true
 4. Restart BE
 
 **Gak perlu edit Rust code. Gak perlu register manual. Gak perlu tambah folder.**
+
+### ⚠️ `base_url` — TANPA `/v1`
+
+Engine bikin URL chat via `{base_url}{chat_path}` dan `chat_path` default
+sudah `/v1/chat/completions`.
+
+```
+✅ base_url = "https://api.xxx.com"          → https://api.xxx.com/v1/chat/completions
+❌ base_url = "https://api.xxx.com/v1"       → https://api.xxx.com/v1/v1/chat/completions (404)
+```
+
+Kalau upstream pakai path non-standar (mis. `/openai/v1`), taruh di
+`base_url` TANPA `/v1` di ujung, atau set `chat_path` eksplisit.
+
+Model ID boleh mengandung `/` — contoh `key/deepseek-v4.1-flash`. Prefix
+gateway (`edu/`) di-strip sekali saja, sisa ID dikirim apa adanya.
 
 ## Cara Hapus Provider
 
