@@ -66,10 +66,14 @@ const TEXT_RULES: &[TextRule] = &[
             "service unavailable",
             "bad gateway",
             "gateway timeout",
+            "stream read error",
+            "error decoding response body",
+            "upstream connection error",
+            "upstream connection",
         ],
         kind: ProviderErrorKind::Transient,
         retryable: true,
-        lock_status: Some(503),
+        lock_status: None, // Transient errors are upstream issues — don't lock the key
     },
 ];
 
@@ -94,9 +98,14 @@ pub fn classify_http_error(status: u16, body: &str) -> ClassifiedError {
         }
         // 404/410/422 → permanent (invalid request, jangan failover)
         404 | 410 | 422 => ClassifiedError::permanent(Some(status)),
-        // 5xx + transient → retryable
+        // 5xx + transient → retryable, but don't lock (upstream issue, not key problem)
         408 | 425 | 500 | 502 | 503 | 504 | 507 | 509 => {
-            ClassifiedError::retryable(ProviderErrorKind::Transient, Some(status), Some(status))
+            ClassifiedError {
+                kind: ProviderErrorKind::Transient,
+                status: Some(status),
+                retryable: true,
+                lock_status: None, // Don't lock on upstream errors
+            }
         }
         // default 4xx lainnya → treat as auth (failover)
         s if (400..500).contains(&s) => {

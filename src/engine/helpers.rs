@@ -33,7 +33,11 @@ pub fn lock_key_on_error(
     error: &GatewayError,
 ) -> ClassifiedError {
     let classified = classify_provider_error(error);
-    let status = classified.lock_status.unwrap_or(classified.status.unwrap_or(503));
-    keys.lock_key(key_id, status, error.to_string());
+    // Only lock if classifier says to lock (lock_status = Some).
+    // Transient/upstream errors (502, 503, overloaded, stream errors) have
+    // lock_status = None — key stays available, just skip for this request.
+    if let Some(status) = classified.lock_status {
+        keys.lock_key(key_id, status, error.to_string());
+    }
     classified
 }
