@@ -112,6 +112,7 @@ fn usage_routes(state: Arc<AppState>) -> Router {
 
 fn quota_routes(state: Arc<AppState>) -> Router {
     Router::new()
+        .route("/admin/api/quota/providers", get(routes::quota::api_quota_providers))
         .route("/admin/api/quota/keys", get(routes::quota::api_oauth_keys))
         .route("/admin/api/quota/:key_id", get(routes::quota::api_usage_quota))
         .route("/admin/api/quota/refresh/:key_id", post(routes::quota::api_refresh_token))

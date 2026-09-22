@@ -5,6 +5,114 @@ use serde::Serialize;
 
 use crate::state::AppState;
 
+/// ── Extra apikey providers that expose a quota/usage endpoint ───────────────
+///
+/// The Quota page is OAuth-first. Some apikey providers nonetheless expose a
+/// live usage endpoint worth surfacing. Their keys are ordinary `apikey` rows
+/// (NOTE: never flip `key_type` to `'oauth'` — that column is the gateway
+/// *routing pool* filter in `db/mod.rs`, and marking a key `oauth` removes it
+/// from routing). Instead the quota queries match OAuth **or** one of these ids.
+///
+/// **Add a provider:** append its id here (and wire a branch in
+/// `api_usage_quota` + `api_refresh_token` if it needs a bespoke fetcher).
+static QUOTA_EXTRA_PROVIDERS: &[&str] = &["nut"];
+
+/// SQL fragment: `key_type = 'oauth' OR provider_id IN (<extras>)`.
+/// Extends the OAuth-only scope of the quota queries without touching key_type.
+fn quota_scope_sql() -> String {
+    if QUOTA_EXTRA_PROVIDERS.is_empty() {
+        return "COALESCE(key_type, 'apikey') = 'oauth'".to_string();
+    }
+    let quoted = QUOTA_EXTRA_PROVIDERS
+        .iter()
+        .map(|p| format!("'{}'", p.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "(COALESCE(key_type, 'apikey') = 'oauth' OR provider_id IN ({}))",
+        quoted
+    )
+}
+
+/// Public helper so the FE (and other routes) can learn which providers the
+/// quota page actually supports, instead of hardcoding the list in the UI.
+pub fn quota_supported_providers() -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = vec!["cx", "cbai"];
+    for p in QUOTA_EXTRA_PROVIDERS {
+        if !out.contains(p) {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// Generic usage fetcher for providers that expose an OpenAI-flavoured
+/// `daily_free_tokens` balance object (nutaraline is the reference shape).
+/// Maps to the same `rate_limits[]` rows the OAuth handlers produce, so the FE
+/// renders it identically (name starting with "Daily" → labelled *credits*).
+async fn fetch_daily_free_balance(
+    url: &str,
+    api_key: &str,
+    label: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| format!("{label} client: {e}"))?;
+    let resp = client
+        .get(url)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("{label} balance request: {e}"))?;
+    let status = resp.status();
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("{label} balance parse: {e}"))?;
+    if !status.is_success() {
+        let msg = body
+            .pointer("/error/message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("request failed");
+        return Err(format!("{label} balance HTTP {status}: {msg}"));
+    }
+    let free = match body.get("daily_free_tokens") {
+        Some(v) => v,
+        None => return Ok(vec![]),
+    };
+    let num = |v: &serde_json::Value, k: &str| -> f64 { v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0) };
+    let limit = num(free, "limit");
+    let used = num(free, "used");
+    let remaining = free
+        .get("remaining")
+        .and_then(|v| v.as_f64())
+        .unwrap_or((limit - used).max(0.0));
+    let reset_at = free
+        .get("resets_at")
+        .and_then(|v| v.as_f64())
+        .and_then(|ts| chrono::DateTime::from_timestamp(ts as i64, 0))
+        .map(|d| d.to_rfc3339());
+    let name = free
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Daily Free");
+    Ok(vec![serde_json::json!({
+        "name": name,
+        "limit": limit,
+        "used": used,
+        "remaining": remaining,
+        "period_seconds": 86400,
+        "reset_at": reset_at,
+    })])
+}
+
+fn cb_time(v: &serde_json::Value) -> Option<chrono::DateTime<chrono::Utc>> {
+    if let Some(n) = v.as_i64() { return chrono::DateTime::from_timestamp(if n.abs() < 1_000_000_000_000 { n } else { n / 1000 }, 0); }
+    v.as_str().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|d| d.with_timezone(&chrono::Utc)).or_else(|| chrono::NaiveDateTime::parse_from_str(v.as_str()?, "%Y-%m-%d %H:%M:%S").ok().map(|d| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(d, chrono::Utc)))
+}
+
 #[derive(Serialize)]
 pub struct OAuthKey {
     pub id: String,
@@ -21,11 +129,6 @@ pub struct QuotaResponse {
     pub key_plan: Option<String>,
     pub rate_limits: Vec<serde_json::Value>,
     pub reset_credits: serde_json::Value,
-}
-
-fn cb_time(v: &serde_json::Value) -> Option<chrono::DateTime<chrono::Utc>> {
-    if let Some(n) = v.as_i64() { return chrono::DateTime::from_timestamp(if n.abs() < 1_000_000_000_000 { n } else { n / 1000 }, 0); }
-    v.as_str().and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map(|d| d.with_timezone(&chrono::Utc)).or_else(|| chrono::NaiveDateTime::parse_from_str(v.as_str()?, "%Y-%m-%d %H:%M:%S").ok().map(|d| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(d, chrono::Utc)))
 }
 
 async fn fetch_cbai_quota(token: &str) -> Result<(Vec<serde_json::Value>, Option<String>), String> {
@@ -51,21 +154,31 @@ async fn fetch_cbai_quota(token: &str) -> Result<(Vec<serde_json::Value>, Option
 }
 
 pub async fn api_oauth_keys(State(state): State<Arc<AppState>>) -> Json<Vec<OAuthKey>> {
-    let rows = sqlx::query_as::<_, (String, String, Option<String>)>(
-        "SELECT id, provider_id, label FROM api_keys WHERE COALESCE(key_type, 'apikey') = 'oauth' ORDER BY provider_id, created_at DESC",
-    )
+    let sql = format!(
+        "SELECT id, provider_id, label FROM api_keys WHERE {} ORDER BY provider_id, created_at DESC",
+        quota_scope_sql()
+    );
+    let rows = sqlx::query_as::<_, (String, String, Option<String>)>(&sql)
     .fetch_all(&state.db)
     .await
     .unwrap_or_default();
     Json(rows.into_iter().map(|(id, provider_id, label)| OAuthKey { id, provider_id, label }).collect())
 }
 
+/// Which providers the Quota page supports. Lets the FE stop hardcoding the
+/// list (`cx`, `cbai`, plus any apikey provider opted in via
+/// `QUOTA_EXTRA_PROVIDERS`), so `canRefresh` stays in sync with the backend.
+pub async fn api_quota_providers() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "providers": quota_supported_providers() }))
+}
+
 pub async fn api_usage_quota(
     State(state): State<Arc<AppState>>,
     Path(key_id): Path<String>,
 ) -> Json<QuotaResponse> {
+    let quota_where = quota_scope_sql();
     let row = sqlx::query_as::<_, (String, String, String)>(
-        "SELECT key_value, provider_id, created_at FROM api_keys WHERE id = ? AND COALESCE(key_type, 'apikey') = 'oauth'",
+        &format!("SELECT key_value, provider_id, created_at FROM api_keys WHERE id = ? AND {quota_where}"),
     )
     .bind(&key_id)
     .fetch_optional(&state.db)
@@ -87,6 +200,13 @@ pub async fn api_usage_quota(
         }
     } else if provider_id == "cbai" {
         match kv.get("access_token").and_then(|v| v.as_str()) { Some(token) => match fetch_cbai_quota(token).await { Ok((limits, plan)) => (limits, plan, serde_json::json!({"available_count":0,"applicable_available_count":0})), Err(e) => return Json(QuotaResponse { provider_id: Some(provider_id), error: Some(e), expires_at, last_refresh, key_plan, rate_limits: vec![], reset_credits: serde_json::json!({"available_count":0,"applicable_available_count":0}) }) }, None => (vec![],None,serde_json::json!({"available_count":0,"applicable_available_count":0})) }
+    } else if provider_id == "nut" {
+        // Nutaraline exposes a generic daily_free_tokens balance endpoint.
+        // The raw key_value column stores the API key directly (not a JSON blob).
+        match fetch_daily_free_balance("https://nutaraline.co.uk/v1/balance", &raw, "Nut").await {
+            Ok(limits) => (limits, None, serde_json::json!({"available_count": 0, "applicable_available_count": 0})),
+            Err(e) => return Json(QuotaResponse { provider_id: Some(provider_id), error: Some(e), expires_at, last_refresh, key_plan, rate_limits: vec![], reset_credits: serde_json::json!({"available_count":0,"applicable_available_count":0}) }),
+        }
     } else { (vec![], None, serde_json::json!({"available_count": 0, "applicable_available_count": 0})) };
 
     Json(QuotaResponse { provider_id: Some(provider_id), error: None, expires_at, last_refresh, key_plan: wham_plan.or(key_plan), rate_limits, reset_credits })
@@ -97,7 +217,7 @@ pub async fn api_refresh_token(
     Path(key_id): Path<String>,
 ) -> Json<serde_json::Value> {
     let row = sqlx::query_as::<_, (String, String)>(
-        "SELECT key_value, provider_id FROM api_keys WHERE id = ? AND COALESCE(key_type, 'apikey') = 'oauth'",
+        &format!("SELECT key_value, provider_id FROM api_keys WHERE id = ? AND {}", quota_scope_sql()),
     ).bind(&key_id).fetch_optional(&state.db).await.unwrap_or(None);
     let Some((raw, provider_id)) = row else { return Json(serde_json::json!({"ok": false, "success": false, "error": "OAuth key not found"})); };
     let mut kv: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
