@@ -17,7 +17,8 @@ pub fn admin_routes(state: Arc<AppState>) -> Router {
         .merge(usage_routes(state.clone()))
         .merge(combos_routes(state.clone()))
         .merge(quota_routes(state.clone()))
-        .merge(sources_routes(state))
+        .merge(sources_routes(state.clone()))
+        .merge(routes::unsloth::unsloth_routes(state))
 }
 
 use axum::routing::{get, post, patch, delete};

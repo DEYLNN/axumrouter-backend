@@ -69,6 +69,7 @@ impl ProviderRegistry {
         register_provider!(registry, "kio", crate::providers::apikey::kio::provider::KioProvider::new_with_keys, db);
         register_provider!(registry, "verb", crate::providers::apikey::verboo::provider::VerbProvider::new_with_keys, db);
         register_provider!(registry, "nut", crate::providers::apikey::nutaraline::provider::NutProvider::new_with_keys, db);
+        register_provider!(registry, "uns", crate::providers::manual::unsloth::provider::UnslothProvider::new_with_keys, db);
 
         registry
     }

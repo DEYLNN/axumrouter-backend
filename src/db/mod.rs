@@ -670,3 +670,92 @@ pub async fn remove_custom_model(pool: &SqlitePool, provider_id: &str, model_id:
     .await?;
     Ok(r.rows_affected() > 0)
 }
+
+// ===== Unsloth models — self-contained routing (base_url + api_key + upstream_model per row) =====
+
+#[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
+pub struct UnslothModelRow {
+    pub id: String,
+    pub label: String,
+    pub base_url: String,
+    pub api_key: String,
+    pub upstream_model: String,
+    pub context_length: i64,
+    pub supports_tools: i64,
+    pub supports_vision: i64,
+    pub is_active: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub async fn list_unsloth_models(pool: &SqlitePool) -> anyhow::Result<Vec<UnslothModelRow>> {
+    let rows = sqlx::query_as::<_, UnslothModelRow>(
+        r#"SELECT id, label, base_url, api_key, upstream_model,
+            context_length, supports_tools,
+            supports_vision,
+            is_active,
+            created_at, updated_at
+            FROM unsloth_models ORDER BY created_at DESC"#
+    ).fetch_all(pool).await?;
+    Ok(rows)
+}
+
+pub async fn get_unsloth_model(pool: &SqlitePool, id: &str) -> anyhow::Result<Option<UnslothModelRow>> {
+    let row = sqlx::query_as::<_, UnslothModelRow>(
+        r#"SELECT id, label, base_url, api_key, upstream_model,
+            context_length, supports_tools,
+            supports_vision,
+            is_active,
+            created_at, updated_at
+            FROM unsloth_models WHERE id = ?"#,
+    )
+    .bind(id)
+    .fetch_optional(pool).await?;
+    Ok(row)
+}
+
+pub async fn create_unsloth_model(
+    pool: &SqlitePool,
+    id: &str, label: &str, base_url: &str, api_key: &str,
+    upstream_model: &str, context_length: i64,
+    supports_tools: bool, supports_vision: bool,
+) -> anyhow::Result<()> {
+    sqlx::query(
+        r#"INSERT INTO unsloth_models (id, label, base_url, api_key, upstream_model,
+            context_length, supports_tools, supports_vision, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)"#
+    )
+    .bind(id).bind(label).bind(base_url).bind(api_key)
+    .bind(upstream_model).bind(context_length)
+    .bind(supports_tools).bind(supports_vision)
+    .execute(pool).await?;
+    Ok(())
+}
+
+pub async fn update_unsloth_model(
+    pool: &SqlitePool,
+    id: &str, label: &str, base_url: &str, api_key: &str,
+    upstream_model: &str, context_length: i64,
+    supports_tools: bool, supports_vision: bool, is_active: bool,
+) -> anyhow::Result<bool> {
+    let r = sqlx::query(
+        r#"UPDATE unsloth_models SET
+            label = ?, base_url = ?, api_key = ?, upstream_model = ?,
+            context_length = ?, supports_tools = ?, supports_vision = ?,
+            is_active = ?, updated_at = datetime('now')
+            WHERE id = ?"#
+    )
+    .bind(label).bind(base_url).bind(api_key)
+    .bind(upstream_model).bind(context_length)
+    .bind(supports_tools).bind(supports_vision)
+    .bind(is_active).bind(id)
+    .execute(pool).await?;
+    Ok(r.rows_affected() > 0)
+}
+
+pub async fn delete_unsloth_model(pool: &SqlitePool, id: &str) -> anyhow::Result<bool> {
+    let r = sqlx::query("DELETE FROM unsloth_models WHERE id = ?")
+        .bind(id)
+        .execute(pool).await?;
+    Ok(r.rows_affected() > 0)
+}

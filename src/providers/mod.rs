@@ -8,4 +8,5 @@ pub mod toml_provider;
 pub mod traits;
 
 pub mod apikey;
+pub mod manual;
 pub mod oauth;

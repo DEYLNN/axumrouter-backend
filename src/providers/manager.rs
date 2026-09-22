@@ -62,7 +62,7 @@ impl ProviderManager {
                     model_prefix: prefix.clone(),
                     base_url: cp.base_url.clone(),
                     validate_url: cp.validate_url.clone(),
-                    category: "custom".to_string(),
+                    category: "custom_openai".to_string(),
                     color: cp.color.clone(),
                     icon_name: "custom-provider.jpg".to_string(),
                     default_timeout_secs: cp.timeout_secs as u64,
@@ -176,7 +176,7 @@ impl ProviderManager {
 
         let config = OpenAIConfig {
             provider_id: cp.id.clone(), provider_name: cp.name.clone(), model_prefix: prefix,
-            base_url: cp.base_url, validate_url: cp.validate_url, category: "custom".into(),
+            base_url: cp.base_url, validate_url: cp.validate_url, category: "custom_openai".into(),
             color: cp.color, icon_name: "custom-provider.jpg".into(),
             default_timeout_secs: cp.timeout_secs as u64,
             stream_first_chunk_timeout_secs: cp.first_chunk_timeout_secs as u64,
@@ -195,7 +195,10 @@ impl ProviderManager {
     pub async fn list_all_models(&self) -> Vec<Model> {
         let mut all = Vec::new();
         for (_name, provider) in &self.active {
-            if provider.total_keys() == 0 {
+            let meta = provider.metadata();
+            // Skip providers with zero keys — except manual providers (e.g. Unsloth)
+            // which manage their own models in DB and don't use KeyManager.
+            if provider.total_keys() == 0 && meta.category != "manual" {
                 continue;
             }
             if let Ok(models) = provider.list_models().await {

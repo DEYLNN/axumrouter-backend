@@ -237,6 +237,25 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
     // Migration v13: add key_type column to api_keys (for OAuth vs apikey distinction)
     let _ = sqlx::query("ALTER TABLE api_keys ADD COLUMN key_type TEXT").execute(pool).await;
 
+    // Migration v14: unsloth_models — per-model self-contained routing (base_url + api_key + upstream_model_id).
+    // Each row is a complete endpoint definition; the Unsloth provider reads this
+    // table at request time to route unsloth/<model_id> → upstream.
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS unsloth_models (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            api_key TEXT NOT NULL,
+            upstream_model TEXT NOT NULL,
+            context_length INTEGER NOT NULL DEFAULT 128000,
+            supports_tools INTEGER NOT NULL DEFAULT 0,
+            supports_vision INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    "#).execute(pool).await?;
+
     tracing::info!("Database migrations complete");
     Ok(())
 }
