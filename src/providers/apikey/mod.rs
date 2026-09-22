@@ -4,7 +4,6 @@ pub mod cloudflare;
 pub mod fusioncode;
 pub mod hcnsec;
 pub mod inferx;
-pub mod justwoker;
 pub mod kio;
 pub mod nutaraline;
 pub mod verboo;
