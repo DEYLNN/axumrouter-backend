@@ -133,8 +133,9 @@ async fn compute_tier_order(
             }
         }
         "balanced" => {
-            // Sort by ctx ascending
-            order.sort_by_key(|&i| ctxs[i]);
+            // Estimate tokens, filter eligible, shuffle — don't force tier 1
+            use rand::seq::SliceRandom;
+            order.shuffle(&mut rand::thread_rng());
             // Skip tiers where ctx is known (>0) and smaller than estimated_tokens.
             if estimated_tokens > 0 {
                 order.retain(|&i| ctxs[i] == 0 || ctxs[i] as usize >= estimated_tokens);
