@@ -21,40 +21,8 @@ pub struct ModelDef {
 
 pub const MODELS: &[ModelDef] = &[
     ModelDef {
-        id: "north-mini-code-free",
-        context_length: 128000,
-    },
-    ModelDef {
-        id: "nemotron-3-ultra-free",
+        id: "space-bunny-free",
         context_length: 1000000,
-    },
-    ModelDef {
-        id: "mimo-v2.5-free",
-        context_length: 1000000,
-    },
-    ModelDef {
-        id: "deepseek-v4-flash-free",
-        context_length: 1000000,
-    },
-    ModelDef {
-        id: "ling-3.0-flash-free",
-        context_length: 262144,
-    },
-    ModelDef {
-        id: "muse-spark-1.2-contributor-free",
-        context_length: 128000,
-    },
-    ModelDef {
-        id: "muse-spark-1.3-contributor-free",
-        context_length: 128000,
-    },
-    ModelDef {
-        id: "union-alpha",
-        context_length: 128000,
-    },
-    ModelDef {
-        id: "jev-1.13-free",
-        context_length: 128000,
     },
 ];
 

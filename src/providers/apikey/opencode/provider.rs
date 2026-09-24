@@ -76,12 +76,55 @@ impl OcfProvider {
         if let Some(v) = request.top_p {
             body["top_p"] = serde_json::json!(v);
         }
-        if let Some(ref v) = request.tools {
+
+        let had_client_tools = if let Some(ref v) = request.tools {
             body["tools"] = serde_json::to_value(v).unwrap_or_default();
+            true
+        } else {
+            false
+        };
+
+        // OpenCode free tier fingerprint: upstream requires tools array containing
+        // the lowercase quartet (bash/glob/grep/read). Without them -> 403 FreeTierError.
+        let fingerprint_tools = serde_json::json!([
+            {"type":"function","function":{"name":"bash","description":"This tool is currently unavailable and must not be used.","parameters":{"type":"object","properties":{}}}},
+            {"type":"function","function":{"name":"glob","description":"This tool is currently unavailable and must not be used.","parameters":{"type":"object","properties":{}}}},
+            {"type":"function","function":{"name":"grep","description":"This tool is currently unavailable and must not be used.","parameters":{"type":"object","properties":{}}}},
+            {"type":"function","function":{"name":"read","description":"This tool is currently unavailable and must not be used.","parameters":{"type":"object","properties":{}}}},
+        ]);
+
+        let mut existing_names = std::collections::HashSet::new();
+        if let Some(arr) = body.get("tools").and_then(|t| t.as_array()) {
+            for tool in arr {
+                if let Some(name) = tool.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()) {
+                    existing_names.insert(name.to_lowercase());
+                }
+            }
         }
+        let need_fingerprint = !existing_names.contains("bash")
+            || !existing_names.contains("glob")
+            || !existing_names.contains("grep")
+            || !existing_names.contains("read");
+        if need_fingerprint {
+            let mut tools = body.get("tools").and_then(|t| t.as_array()).cloned().unwrap_or_default();
+            if let Some(fp_arr) = fingerprint_tools.as_array() {
+                for fp_tool in fp_arr {
+                    if let Some(name) = fp_tool.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()) {
+                        if !existing_names.contains(name) {
+                            tools.push(fp_tool.clone());
+                        }
+                    }
+                }
+            }
+            body["tools"] = serde_json::json!(tools);
+        }
+
         if let Some(ref v) = request.tool_choice {
             body["tool_choice"] = v.clone();
+        } else if !had_client_tools {
+            body["tool_choice"] = serde_json::json!("none");
         }
+
         // Force include_usage on stream — upstream always gets stream:true
         body["stream_options"] = serde_json::json!({"include_usage": true});
         body

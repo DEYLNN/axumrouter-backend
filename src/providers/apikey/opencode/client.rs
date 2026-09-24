@@ -93,71 +93,96 @@ impl OcfClient {
             });
         }
 
-        let json: Value = response
-            .json()
+        // Upstream always returns SSE (stream:true forced by build_body).
+        // Parse SSE text instead of JSON.
+        let raw = response
+            .text()
             .await
-            .map_err(|e| GatewayError::ProviderError(format!("Ocf parse: {}", e)))?;
+            .map_err(|e| GatewayError::ProviderError(format!("Ocf read: {}", e)))?;
 
-        let choice = json
-            .get("choices")
-            .and_then(|c| c.as_array())
-            .and_then(|arr| arr.first())
-            .cloned()
-            .unwrap_or_default();
+        let mut content = String::new();
+        let mut usage: Option<Usage> = None;
+        let mut id = String::new();
+        let mut finish_reason = "stop".to_string();
+        let mut tool_calls: Option<Vec<ToolCall>> = None;
 
-        let message = choice.get("message").cloned().unwrap_or_default();
-        let raw_content = message
-            .get("content")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
+        for line in raw.lines() {
+            let Some(data) = line.trim().strip_prefix("data:") else {
+                continue;
+            };
+            let data = data.trim();
+            if data.is_empty() || data == "[DONE]" {
+                continue;
+            }
+            let Ok(v) = serde_json::from_str::<Value>(data) else {
+                continue;
+            };
+
+            if id.is_empty() {
+                if let Some(chunk_id) = v.get("id").and_then(|i| i.as_str()) {
+                    id = chunk_id.to_string();
+                }
+            }
+
+            if let Some(u) = v.get("usage") {
+                usage = Some(Usage {
+                    prompt_tokens: u.get("prompt_tokens").and_then(|n| n.as_u64()).unwrap_or(0)
+                        as u32,
+                    completion_tokens: u
+                        .get("completion_tokens")
+                        .and_then(|n| n.as_u64())
+                        .unwrap_or(0) as u32,
+                    total_tokens: u.get("total_tokens").and_then(|n| n.as_u64()).unwrap_or(0)
+                        as u32,
+                });
+            }
+
+            let Some(choices) = v.get("choices").and_then(|c| c.as_array()) else {
+                continue;
+            };
+            if choices.is_empty() {
+                continue;
+            }
+            let Some(choice) = choices.first() else {
+                continue;
+            };
+            let delta = choice.get("delta").cloned().unwrap_or_default();
+
+            if let Some(c) = delta.get("content").and_then(|c| c.as_str()) {
+                content.push_str(c);
+            }
+            // reasoning_content dropped — thinking hidden downstream, same as
+            // send_stream's parse_chunk.
+            if let Some(tc) = delta.get("tool_calls") {
+                if let Ok(parsed) = serde_json::from_value::<Vec<ToolCall>>(tc.clone()) {
+                    tool_calls = Some(parsed);
+                }
+            }
+            if let Some(fr) = choice.get("finish_reason").and_then(|f| f.as_str()) {
+                finish_reason = fr.to_string();
+            }
+        }
+
         let content =
-            thinking_filter::strip_thinking_tags_const(&raw_content, constants::THINKING_TAGS);
-        let content = if content.is_empty() {
-            None
-        } else {
-            Some(content)
-        };
-
-        let usage = json.get("usage").map(|u| Usage {
-            prompt_tokens: u.get("prompt_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-            completion_tokens: u
-                .get("completion_tokens")
-                .and_then(|n| n.as_u64())
-                .unwrap_or(0) as u32,
-            total_tokens: u.get("total_tokens").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-        });
+            thinking_filter::strip_thinking_tags_const(&content, constants::THINKING_TAGS);
+        let content = if content.is_empty() { None } else { Some(content) };
 
         Ok(ChatCompletionResponse {
-            id: json
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("ocf-unknown")
-                .to_string(),
+            id: if id.is_empty() { "ocf-unknown".to_string() } else { id },
             object: "chat.completion".to_string(),
             created: chrono::Utc::now().timestamp() as u64,
-            model: json
-                .get("model")
-                .and_then(|v| v.as_str())
-                .unwrap_or("ocf")
-                .to_string(),
+            model,
             choices: vec![Choice {
                 index: 0,
                 message: Message {
                     role: "assistant".to_string(),
                     content,
-                    tool_calls: message
-                        .get("tool_calls")
-                        .and_then(|v| serde_json::from_value::<Vec<ToolCall>>(v.clone()).ok()),
+                    tool_calls,
                     tool_call_id: None,
                     name: None,
                     reasoning_content: None,
                 },
-                finish_reason: choice
-                    .get("finish_reason")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .or(Some("stop".to_string())),
+                finish_reason: Some(finish_reason),
             }],
             usage: usage.or(Some(Usage {
                 prompt_tokens: 0,
