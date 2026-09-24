@@ -224,18 +224,21 @@ impl ProviderManager {
         }
 
         // Inject active combos as virtual models (combo/<name>)
-        let combos = sqlx::query_as::<_, (String, i64)>(
-            "SELECT name, min_context FROM combos WHERE is_active = 1"
+        // ctx = min(ctx tiers) for fallback/round_robin, max(ctx tiers) for balanced.
+        let combos = sqlx::query_as::<_, (String, String, String)>(
+            "SELECT name, tiers, strategy FROM combos WHERE is_active = 1"
         )
         .fetch_all(&self.db)
         .await
         .unwrap_or_default();
-        for (name, min_ctx) in combos {
+        for (name, tiers_str, strategy) in combos {
+            let tiers: Vec<String> = serde_json::from_str(&tiers_str).unwrap_or_default();
+            let ctx = compute_combo_ctx_from_models(&all, &tiers, &strategy);
             all.push(Model {
                 id: format!("combo/{}", name),
                 object: "model".to_string(),
                 owned_by: "combo".to_string(),
-                context_length: if min_ctx > 0 { Some(min_ctx as u32) } else { None },
+                context_length: ctx,
             });
         }
 
@@ -269,18 +272,20 @@ impl ProviderManager {
         }
 
         // Inject active combos as virtual models (combo/<name>)
-        let combos = sqlx::query_as::<_, (String, i64)>(
-            "SELECT name, min_context FROM combos WHERE is_active = 1"
+        let combos = sqlx::query_as::<_, (String, String, String)>(
+            "SELECT name, tiers, strategy FROM combos WHERE is_active = 1"
         )
         .fetch_all(&self.db)
         .await
         .unwrap_or_default();
-        for (name, min_ctx) in combos {
+        for (name, tiers_str, strategy) in combos {
+            let tiers: Vec<String> = serde_json::from_str(&tiers_str).unwrap_or_default();
+            let ctx = compute_combo_ctx_from_models(&all, &tiers, &strategy);
             all.push(Model {
                 id: format!("combo/{}", name),
                 object: "model".to_string(),
                 owned_by: "combo".to_string(),
-                context_length: if min_ctx > 0 { Some(min_ctx as u32) } else { None },
+                context_length: ctx,
             });
         }
 
@@ -303,5 +308,27 @@ impl ProviderManager {
     /// Number of active (non-locked) keys for a specific provider
     pub fn active_keys_for(&self, name: &str) -> Option<usize> {
         self.active.get(name).map(|p| p.active_keys())
+    }
+}
+
+/// Compute combo context_length from model list.
+/// fallback & round_robin → min(ctx tiers). balanced → max(ctx tiers).
+fn compute_combo_ctx_from_models(all: &[Model], tiers: &[String], strategy: &str) -> Option<u32> {
+    let ctxs: Vec<u32> = tiers
+        .iter()
+        .filter_map(|t| {
+            all.iter()
+                .find(|m| m.id == *t)
+                .and_then(|m| m.context_length)
+        })
+        .filter(|&c| c > 0)
+        .collect();
+    if ctxs.is_empty() {
+        return None;
+    }
+    if strategy == "balanced" {
+        ctxs.iter().copied().max()
+    } else {
+        ctxs.iter().copied().min()
     }
 }
