@@ -312,18 +312,22 @@ impl OcfClient {
             serde_json::from_value::<Vec<crate::types::chat::ChunkToolCall>>(tc.clone()).ok()
         });
 
-        if usage.is_none() {
-            if let Some(u) = v.get("usage") {
-                *usage = Some(Usage {
-                    prompt_tokens: u.get("prompt_tokens").and_then(|n| n.as_u64()).unwrap_or(0)
-                        as u32,
-                    completion_tokens: u
-                        .get("completion_tokens")
-                        .and_then(|n| n.as_u64())
-                        .unwrap_or(0) as u32,
-                    total_tokens: u.get("total_tokens").and_then(|n| n.as_u64()).unwrap_or(0)
-                        as u32,
-                });
+        // Only collect usage from chunks — don't attach to yielded chunk.
+        // The final chunk (choices empty) sets usage, then we yield it separately.
+        if let Some(u) = v.get("usage") {
+            let new_usage = Usage {
+                prompt_tokens: u.get("prompt_tokens").and_then(|n| n.as_u64()).unwrap_or(0)
+                    as u32,
+                completion_tokens: u
+                    .get("completion_tokens")
+                    .and_then(|n| n.as_u64())
+                    .unwrap_or(0) as u32,
+                total_tokens: u.get("total_tokens").and_then(|n| n.as_u64()).unwrap_or(0)
+                    as u32,
+            };
+            // Only overwrite if new usage has real values (non-zero)
+            if new_usage.total_tokens > 0 || usage.is_none() {
+                *usage = Some(new_usage);
             }
         }
 
@@ -357,7 +361,7 @@ impl OcfClient {
                 },
                 finish_reason: finish,
             }],
-            usage: usage.clone(),
+            usage: None, // Don't attach usage to content chunks — only final chunk gets usage
         })
     }
 }
