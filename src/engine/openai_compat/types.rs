@@ -33,6 +33,7 @@ pub struct ChatRequest {
 pub struct ChatResponse {
     pub id: String,
     pub object: String,
+    #[serde(deserialize_with = "crate::types::chat::deserialize_created_f64_to_u64")]
     pub created: u64,
     pub model: String,
     pub choices: Vec<ResponseChoice>,
@@ -63,6 +64,7 @@ pub struct ResponseMessage {
 pub struct StreamChunk {
     pub id: Option<String>,
     pub object: Option<String>,
+    #[serde(default, deserialize_with = "crate::types::chat::deserialize_created_option_f64_to_u64")]
     pub created: Option<u64>,
     pub model: Option<String>,
     pub choices: Vec<StreamChoice>,

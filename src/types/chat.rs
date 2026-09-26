@@ -119,6 +119,7 @@ pub struct ToolFunction {
 pub struct ChatCompletionResponse {
     pub id: String,
     pub object: String,
+    #[serde(deserialize_with = "deserialize_created_f64_to_u64")]
     pub created: u64,
     pub model: String,
     pub choices: Vec<Choice>,
@@ -146,6 +147,7 @@ pub struct Usage {
 pub struct ChatCompletionChunk {
     pub id: String,
     pub object: String,
+    #[serde(deserialize_with = "deserialize_created_f64_to_u64")]
     pub created: u64,
     pub model: String,
     pub choices: Vec<ChunkChoice>,
@@ -174,4 +176,50 @@ pub struct Delta {
     /// Tool calls in streaming chunks (index-based, incremental)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ChunkToolCall>>,
+}
+
+/// Deserialize `created` field — some providers send float (e.g. 1790385979.868)
+/// but we store as u64. Truncate to integer.
+pub fn deserialize_created_f64_to_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let v = serde_json::Value::deserialize(deserializer)?;
+    match v {
+        serde_json::Value::Number(n) => {
+            if let Some(u) = n.as_u64() {
+                Ok(u)
+            } else if let Some(f) = n.as_f64() {
+                Ok(f as u64)
+            } else {
+                Ok(0)
+            }
+        }
+        serde_json::Value::String(s) => Ok(s.parse::<u64>().unwrap_or(0)),
+        _ => Ok(0),
+    }
+}
+
+/// Deserialize `created` field as Option<u64> — handles float from some providers.
+pub fn deserialize_created_option_f64_to_u64<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let v = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match v {
+        None => Ok(None),
+        Some(serde_json::Value::Number(n)) => {
+            if let Some(u) = n.as_u64() {
+                Ok(Some(u))
+            } else if let Some(f) = n.as_f64() {
+                Ok(Some(f as u64))
+            } else {
+                Ok(Some(0))
+            }
+        }
+        Some(serde_json::Value::String(s)) => Ok(Some(s.parse::<u64>().unwrap_or(0))),
+        _ => Ok(Some(0)),
+    }
 }
