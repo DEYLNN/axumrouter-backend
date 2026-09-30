@@ -3,6 +3,7 @@ pub mod cline;
 pub mod cloudflare;
 pub mod fusioncode;
 pub mod hcnsec;
+pub mod inferhub;
 pub mod inferx;
 pub mod kio;
 pub mod nutaraline;
