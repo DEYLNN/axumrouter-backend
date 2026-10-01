@@ -19,6 +19,7 @@ pub struct ApiSettingsResponse {
     pub database_url: String,
     pub proxy_count: i64,
     pub keys_count: i64,
+    pub in_flight: i64,
 }
 
 pub async fn api_settings(State(state): State<Arc<AppState>>) -> Json<ApiSettingsResponse> {
@@ -50,6 +51,7 @@ pub async fn api_settings(State(state): State<Arc<AppState>>) -> Json<ApiSetting
         database_url: cfg.database.url.clone(),
         proxy_count,
         keys_count,
+        in_flight: state.in_flight.load(std::sync::atomic::Ordering::Relaxed),
     })
 }
 

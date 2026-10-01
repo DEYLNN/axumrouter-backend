@@ -1,4 +1,5 @@
 use sqlx::sqlite::SqlitePool;
+use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
@@ -23,6 +24,9 @@ pub struct AppState {
     pub usage_broadcast: UsageBroadcast,
     pub public_ip: String,
     pub public_url: String,
+    /// Real-time count of requests currently being processed (in-flight).
+    /// Incremented by logging middleware on entry, decremented on exit.
+    pub in_flight: AtomicI64,
 }
 
 impl AppState {
@@ -47,6 +51,7 @@ impl AppState {
             usage_broadcast,
             public_ip,
             public_url,
+            in_flight: AtomicI64::new(0),
         })
     }
 }
