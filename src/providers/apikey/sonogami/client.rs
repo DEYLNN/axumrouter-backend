@@ -310,7 +310,7 @@ impl SonoClient {
                 },
                 finish_reason: finish,
             }],
-            usage: usage.clone(),
+            usage: None, // Don't attach usage to content chunks — only final chunk gets usage
         })
     }
 
