@@ -93,14 +93,18 @@ impl ZbProvider {
         body
     }
 
-    /// Repair conversation history: inject dummy tool responses for any
-    /// assistant tool_calls that lack a matching tool message.
-    /// Upstream DeepSeek/Together rejects 400 if assistant has tool_calls
-    /// but no tool response follows.
+    /// Repair conversation history for DeepSeek/Together upstream.
+    /// DeepSeek via Zabio rejects:
+    /// 1. Assistant with tool_calls but missing tool response
+    /// 2. Parallel tool_calls (multiple tool_calls in 1 assistant message)
+    ///
+    /// Fix: split parallel tool_calls into sequential pairs
+    /// (assistant→tool→assistant→tool) and inject dummy responses for
+    /// any orphaned tool_call_id.
     fn repair_tool_messages(&self, messages: &[crate::types::chat::Message]) -> Vec<crate::types::chat::Message> {
         use std::collections::HashSet;
 
-        // Collect all tool_call_ids that have a tool response
+        // Collect all tool_call_ids that have a tool response anywhere
         let mut answered: HashSet<String> = HashSet::new();
         for m in messages {
             if m.role == "tool" {
@@ -110,30 +114,95 @@ impl ZbProvider {
             }
         }
 
+        // Build a lookup: tool_call_id → tool message content
+        use std::collections::HashMap;
+        let mut tool_responses: HashMap<String, crate::types::chat::Message> = HashMap::new();
+        for m in messages {
+            if m.role == "tool" {
+                if let Some(ref id) = m.tool_call_id {
+                    tool_responses.insert(id.clone(), m.clone());
+                }
+            }
+        }
+
         let mut repaired: Vec<crate::types::chat::Message> = Vec::new();
         for m in messages {
-            repaired.push(m.clone());
-            // If this is an assistant message with tool_calls, check each
-            // tool_call for missing responses. Inject dummy right after.
             if m.role == "assistant" {
                 if let Some(ref tcs) = m.tool_calls {
-                    for tc in tcs {
-                        if !answered.contains(&tc.id) {
-                            tracing::warn!(
-                                "zb: injecting dummy tool response for orphaned tool_call_id={}",
-                                tc.id
-                            );
+                    if tcs.len() <= 1 {
+                        // Single tool_call — push as-is, inject dummy if missing
+                        repaired.push(m.clone());
+                        for tc in tcs {
+                            if !answered.contains(&tc.id) {
+                                tracing::warn!(
+                                    "zb: injecting dummy tool response for orphaned tool_call_id={}",
+                                    tc.id
+                                );
+                                repaired.push(crate::types::chat::Message {
+                                    role: "tool".to_string(),
+                                    content: Some("{\"error\":\"no_tool_result\"}".to_string()),
+                                    reasoning_content: None,
+                                    tool_calls: None,
+                                    tool_call_id: Some(tc.id.clone()),
+                                    name: Some(tc.function.name.clone()),
+                                });
+                            }
+                        }
+                    } else {
+                        // Parallel tool_calls — split into sequential pairs
+                        tracing::warn!(
+                            "zb: splitting {} parallel tool_calls into sequential",
+                            tcs.len()
+                        );
+                        for tc in tcs {
+                            // Push assistant with single tool_call
                             repaired.push(crate::types::chat::Message {
-                                role: "tool".to_string(),
-                                content: Some("{\"error\":\"no_tool_result\"}".to_string()),
+                                role: "assistant".to_string(),
+                                content: None,
                                 reasoning_content: None,
-                                tool_calls: None,
-                                tool_call_id: Some(tc.id.clone()),
-                                name: Some(tc.function.name.clone()),
+                                tool_calls: Some(vec![tc.clone()]),
+                                tool_call_id: None,
+                                name: None,
                             });
+                            // Push tool response (real or dummy)
+                            if let Some(resp) = tool_responses.get(&tc.id) {
+                                repaired.push(resp.clone());
+                            } else {
+                                tracing::warn!(
+                                    "zb: injecting dummy tool response for orphaned tool_call_id={}",
+                                    tc.id
+                                );
+                                repaired.push(crate::types::chat::Message {
+                                    role: "tool".to_string(),
+                                    content: Some("{\"error\":\"no_tool_result\"}".to_string()),
+                                    reasoning_content: None,
+                                    tool_calls: None,
+                                    tool_call_id: Some(tc.id.clone()),
+                                    name: Some(tc.function.name.clone()),
+                                });
+                            }
                         }
                     }
+                } else {
+                    repaired.push(m.clone());
                 }
+            } else if m.role == "tool" {
+                // Skip — tool responses already injected above when processing
+                // the assistant message with parallel tool_calls.
+                // For single tool_call assistants, the real tool message stays.
+                // Only skip if we already handled it via split.
+                // Check: was this tool_call_id part of a parallel split?
+                let was_split = messages.iter().any(|msg| {
+                    msg.role == "assistant"
+                        && msg.tool_calls.as_ref().map_or(false, |tcs| {
+                            tcs.len() > 1 && tcs.iter().any(|tc| tc.id == m.tool_call_id.as_deref().unwrap_or(""))
+                        })
+                });
+                if !was_split {
+                    repaired.push(m.clone());
+                }
+            } else {
+                repaired.push(m.clone());
             }
         }
         repaired
