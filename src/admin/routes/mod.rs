@@ -11,3 +11,4 @@ pub mod usage;
 pub mod sources;
 pub mod quota;
 pub mod unsloth;
+pub mod proxies;

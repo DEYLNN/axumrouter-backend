@@ -8,16 +8,22 @@ use crate::types::chat::{
 use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
+use sqlx::SqlitePool;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use super::auth::OcfCredential;
 use super::constants;
 
 pub struct OcfClient {
     http: Client,
+    db: Arc<SqlitePool>,
+    proxy_cache: RwLock<HashMap<String, Client>>,
 }
 
 impl OcfClient {
-    pub fn new() -> Self {
+    pub fn new(db: Arc<SqlitePool>) -> Self {
         Self {
             http: Client::builder()
                 .connect_timeout(std::time::Duration::from_secs(
@@ -25,6 +31,8 @@ impl OcfClient {
                 ))
                 .build()
                 .expect("Failed to build HTTP client"),
+            db,
+            proxy_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -36,6 +44,63 @@ impl OcfClient {
     /// Generate request ID: `msg_<12 hex><14 base62>`
     fn gen_request_id() -> String {
         format!("msg_{}{}", hex12(), base62_14())
+    }
+
+    /// Return a reqwest::Client for the given model. If model has an
+    /// active proxy assigned in `model_proxies`, build/cache a proxy
+    /// client; otherwise return the default client clone (cheap).
+    async fn get_http_for_model(&self, model: &str) -> Client {
+        let row = sqlx::query_as::<_, (String, String, i64, Option<String>, Option<String>)>(
+            "SELECT p.protocol, p.host, p.port, p.username, p.password \
+             FROM model_proxies mp JOIN proxies p ON mp.proxy_id = p.id \
+             WHERE mp.model_id = ? AND mp.enabled = 1 AND p.is_active = 1 LIMIT 1",
+        )
+        .bind(model)
+        .fetch_optional(&*self.db)
+        .await;
+
+        let (protocol, host, port, username, password) = match row {
+            Ok(Some(r)) => r,
+            _ => return self.http.clone(),
+        };
+
+        let proto = if protocol.is_empty() { "http".to_string() } else { protocol };
+        let auth = match (username.as_deref(), password.as_deref()) {
+            (Some(u), Some(pw)) if !u.is_empty() => format!("{}:{}@", u, pw),
+            _ => String::new(),
+        };
+        let proxy_url = format!("{}://{}{}:{}", proto, auth, host, port);
+
+        // Check cache
+        {
+            let cache = self.proxy_cache.read().await;
+            if let Some(client) = cache.get(&proxy_url) {
+                return client.clone();
+            }
+        }
+
+        // Build new proxy client
+        match reqwest::Proxy::all(&proxy_url) {
+            Ok(proxy) => match reqwest::Client::builder()
+                .proxy(proxy)
+                .connect_timeout(std::time::Duration::from_secs(constants::DEFAULT_TIMEOUT_SECS))
+                .build()
+            {
+                Ok(client) => {
+                    let mut cache = self.proxy_cache.write().await;
+                    cache.insert(proxy_url, client.clone());
+                    client
+                }
+                Err(e) => {
+                    tracing::warn!("Ocf proxy client build failed: {} — using default", e);
+                    self.http.clone()
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Ocf proxy URL invalid ({}): {} — using default", proxy_url, e);
+                self.http.clone()
+            }
+        }
     }
 
     fn headers(
@@ -75,8 +140,9 @@ impl OcfClient {
             .unwrap_or("")
             .to_string();
         let url = Self::endpoint_url(&model);
+        let http = self.get_http_for_model(&model).await;
         let response = self
-            .headers(self.http.post(&url), cred)
+            .headers(http.post(&url), cred)
             .json(&body)
             .send()
             .await
@@ -203,8 +269,9 @@ impl OcfClient {
             .unwrap_or("ocf")
             .to_string();
         let url = Self::endpoint_url(&model);
+        let http = self.get_http_for_model(&model).await;
         let response = self
-            .headers(self.http.post(&url), cred)
+            .headers(http.post(&url), cred)
             .json(&body)
             .send()
             .await

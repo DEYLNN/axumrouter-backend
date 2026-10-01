@@ -46,7 +46,7 @@ impl OcfProvider {
         Self {
             metadata,
             keys: KeyManager::new_with_pool(keys, constants::PROVIDER_ID, Some((*db).clone())),
-            client: OcfClient::new(),
+            client: OcfClient::new(db.clone()),
         }
     }
 

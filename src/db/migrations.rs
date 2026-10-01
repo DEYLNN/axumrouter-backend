@@ -256,6 +256,23 @@ pub async fn run(pool: &SqlitePool) -> anyhow::Result<()> {
         )
     "#).execute(pool).await?;
 
+    // Migration v14b: model_proxies — per-model proxy assignment.
+    // Maps a model_id to a proxy (from proxies table). Used by OCF provider
+    // to route specific model traffic through a proxy.
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS model_proxies (
+            model_id TEXT NOT NULL,
+            proxy_id TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (model_id, proxy_id)
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     tracing::info!("Database migrations complete");
     Ok(())
 }
