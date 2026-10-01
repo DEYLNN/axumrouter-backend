@@ -10,6 +10,7 @@ use std::time::Instant;
 use crate::state::AppState;
 
 /// Request/response logging middleware with in-flight tracking.
+/// Only counts /v1/ API requests as in-flight (excludes admin/health polling).
 pub async fn logging_middleware(
     State(state): State<Arc<AppState>>,
     request: Request<Body>,
@@ -19,11 +20,17 @@ pub async fn logging_middleware(
     let uri = request.uri().clone();
     let start = Instant::now();
 
-    state.in_flight.fetch_add(1, Ordering::Relaxed);
+    // Only track in-flight for actual API requests, not admin/health polling
+    let is_api = uri.path().starts_with("/v1/");
+    if is_api {
+        state.in_flight.fetch_add(1, Ordering::Relaxed);
+    }
 
     let response = next.run(request).await;
 
-    state.in_flight.fetch_sub(1, Ordering::Relaxed);
+    if is_api {
+        state.in_flight.fetch_sub(1, Ordering::Relaxed);
+    }
 
     tracing::info!(
         "{} {} → {} ({:.2?})",
