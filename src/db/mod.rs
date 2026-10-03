@@ -416,6 +416,7 @@ pub struct UsageLogRow {
     pub completion_tokens: i64,
     pub total_tokens: i64,
     pub latency_ms: i64,
+    pub ttft_ms: Option<i64>,
     pub status: Option<String>,
     pub status_code: Option<i32>,
     pub error_message: Option<String>,
@@ -434,7 +435,7 @@ pub async fn usage_logs_page(
 ) -> Vec<UsageLogRow> {
     sqlx::query_as::<_, UsageLogRow>(
         "SELECT u.id, u.created_at, u.provider_id, u.model_id, u.gateway_key_id, u.endpoint,
-                u.prompt_tokens, u.completion_tokens, u.total_tokens, u.latency_ms,
+                u.prompt_tokens, u.completion_tokens, u.total_tokens, u.latency_ms, u.ttft_ms,
                 u.status, u.status_code, u.error_message,
                 u.request_body, u.response_body,
                 COALESCE(gk.label, '') AS key_label,
@@ -464,7 +465,7 @@ pub async fn count_usage_logs(pool: &SqlitePool) -> i64 {
 pub async fn fetch_latest_usage(pool: &SqlitePool) -> Option<UsageLogRow> {
     sqlx::query_as::<_, UsageLogRow>(
         "SELECT u.id, u.created_at, u.provider_id, u.model_id, u.gateway_key_id, u.endpoint,
-                u.prompt_tokens, u.completion_tokens, u.total_tokens, u.latency_ms,
+                u.prompt_tokens, u.completion_tokens, u.total_tokens, u.latency_ms, u.ttft_ms,
                 u.status, u.status_code, u.error_message,
                 u.request_body, u.response_body,
                 COALESCE(gk.label, '') AS key_label,
