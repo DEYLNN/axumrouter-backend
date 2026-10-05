@@ -1,18 +1,6 @@
-# AxumRouter
+# NuvCode
 
 Lightweight AI Gateway — **Rust + Axum 0.7**. Multi-provider LLM router with admin dashboard.
-
-## Documentation
-
-| Doc | Location |
-|-----|----------|
-| **Full Guide** | `docs/GUIDE.md` — setup, config, run, deploy, troubleshooting |
-| **Project Rules** | `AGENTS.md` — arsitektur, conventions |
-| **Provider Architecture** | `docs/PROVIDER_ARCHITECTURE.md` — cooldown, strategy, lock, custom models, provider checklist |
-| **Usage Tracking** | `docs/USAGE_TRACKING.md` — wiring usage tracking, key lock persistence |
-| **Provider Guide** | `docs/API_KEY_PROVIDER_GUIDE.md` — cara tambah provider baru (TOML-based) |
-| **Import Schema** | `docs/IMPORT_SCHEMA.md` — JSON import key validation |
-| **Provider Templates** | `docs/provider_templates/apikey/` — template siap copy |
 
 ## Quick Start
 
@@ -40,21 +28,12 @@ backend/
 │   ├── error.rs             # GatewayError — OpenAI-compatible error format
 │   ├── config/              # Config loader (TOML + AXUM_ env vars)
 │   ├── db/                  # SQLite — migrations, models, queries
-│   │   ├── mod.rs            # init, backup, load/count keys, custom models CRUD
-│   │   ├── migrations.rs     # auto-schema: api_keys, custom_providers, custom_models, usage, …
-│   │   └── models.rs         # DB row structs
 │   ├── api/                 # /v1/* — chat completions, models, health
 │   ├── admin/               # /admin/api* — providers, keys, logs, usage, OAuth
 │   ├── providers/           # 69+ provider implementations
-│   │   ├── registry.rs      # Provider registration
-│   │   ├── manager.rs       # Provider lifecycle
-│   │   ├── traits.rs        # Provider trait
-│   │   ├── key_manager.rs   # Key failover, cooldown
-│   │   ├── error_classifier.rs
-│   │   └── <id>/            # Per-provider: constants, provider, auth, client
 │   ├── engine/              # Generic OpenAI-compat engine
 │   ├── services/            # Gateway, caveman, tool normalizer, RTK
-│   ├── middleware/           # Auth (bearer token), logging
+│   ├── middleware/          # Auth (bearer token), logging
 │   └── types/               # Shared: chat, model, provider structs
 ├── config/
 │   ├── config.example.toml
@@ -63,12 +42,6 @@ backend/
 │   ├── providers/           # Provider icons
 │   └── admin/               # Frontend SPA build
 └── docs/
-    ├── GUIDE.md
-    ├── PROVIDER_ARCHITECTURE.md
-    ├── USAGE_TRACKING.md
-    ├── API_KEY_PROVIDER_GUIDE.md
-    ├── IMPORT_SCHEMA.md
-    └── provider_templates/
 ```
 
 ## Tech Stack
@@ -79,7 +52,7 @@ backend/
 | Database | SQLite (sqlx 0.8) |
 | HTTP Client | reqwest 0.12 |
 | Auth | JWT + Bearer tokens |
-| Config | TOML + env vars (AXUM\_ prefix) |
+| Config | TOML + env vars |
 | Logging | tracing + env-filter |
 
 ## API
@@ -94,12 +67,11 @@ backend/
 - `POST /admin/api/keys` — add API key
 - `GET /admin/api/logs` — request logs
 - `GET /admin/api/usage/stats` — usage stats
-- *(full list di `docs/GUIDE.md`)*
 
 ## Providers
 
-69+ providers registered. 15 core (Mistral, OpenCode, Codex, xAI, FreeBuff, dll.) + ~54 OpenAI-compat API Key providers.
+69+ providers registered. 15 core + ~54 OpenAI-compatible API Key providers.
 
-## Related
+## License
 
-- Frontend: `../frontend/`
+MIT
