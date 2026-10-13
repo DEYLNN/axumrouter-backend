@@ -34,7 +34,8 @@ pub struct Message {
     pub role: String,
     /// Content can be null/missing when tool_calls is present.
     /// Serialized as absent (not "") when None — upstream rejects `content: ""` + tool_calls.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Accepts both string and array form (OpenAI multimodal). Array text parts are flattened to a single string.
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_content_string_or_array")]
     pub content: Option<String>,
     /// Reasoning content placeholder — injected for thinking-mode models (deepseek, kimi)
     /// Signals upstream API to separate thinking from visible content.
@@ -201,8 +202,46 @@ where
     }
 }
 
+/// Deserialize `content` field — accepts both string and array form.
+/// Array form: `[{"type":"text","text":"hello"},{"type":"text","text":" world"}]` → `"hello world"`
+/// Non-text parts (image_url, etc.) are ignored — only text parts are concatenated.
+/// String form: `"hello"` → `"hello"`
+/// Null/missing: `None`
+pub fn deserialize_content_string_or_array<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match v {
+        None => Ok(None),
+        Some(serde_json::Value::String(s)) => Ok(Some(s)),
+        Some(serde_json::Value::Array(arr)) => {
+            let mut parts = Vec::with_capacity(arr.len());
+            for item in arr {
+                if let Some(t) = item.get("type").and_then(|t| t.as_str()) {
+                    if t == "text" {
+                        if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                            parts.push(text.to_string());
+                        }
+                    }
+                    // Non-text parts (image_url, input_audio, etc.) silently dropped.
+                    // ponytail: multimodal forwarding not supported — add when upstream supports it.
+                }
+            }
+            if parts.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(parts.join("")))
+            }
+        }
+        Some(_) => Ok(None),
+    }
+}
+
 /// Deserialize `created` field as Option<u64> — handles float from some providers.
-pub fn deserialize_created_option_f64_to_u64<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+pub fn deserialize_created_option_f64_to_u64<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
