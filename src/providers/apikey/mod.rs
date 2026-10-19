@@ -6,6 +6,7 @@ pub mod hcnsec;
 pub mod inferhub;
 pub mod sonogami;
 pub mod sophnet;
+pub mod threerouter;
 pub mod zabio;
 pub mod inferx;
 pub mod kio;

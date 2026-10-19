@@ -74,6 +74,7 @@ impl ProviderRegistry {
         register_provider!(registry, "zb", crate::providers::apikey::zabio::provider::ZbProvider::new_with_keys, db);
         register_provider!(registry, "sono", crate::providers::apikey::sonogami::provider::SonoProvider::new_with_keys, db);
         register_provider!(registry, "sop", crate::providers::apikey::sophnet::provider::SopProvider::new_with_keys, db);
+        register_provider!(registry, "three", crate::providers::apikey::threerouter::provider::ThreeProvider::new_with_keys, db);
         register_provider!(registry, "ocf", crate::providers::apikey::opencode::provider::OcfProvider::new_with_keys, db);
         register_provider!(registry, "uns", crate::providers::manual::unsloth::provider::UnslothProvider::new_with_keys, db);
 
