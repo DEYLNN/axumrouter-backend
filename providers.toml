@@ -2670,3 +2670,23 @@ name = "GLM 5.3"
 ctx = 1000000
 vision = false
 tools = true
+
+[[providers]]
+id = "three"
+name = "Three Router"
+category = "apikey"
+color = "#10B981"
+icon = "three.webp"
+base_url = "https://api.threerouter.com/v1"
+validate_url = "https://api.threerouter.com/v1/models"
+api_type = "openai"
+timeout = 120
+first_chunk_timeout = 200
+stall_timeout = 360
+
+[[providers.models]]
+id = "Three/deepseek-v4-pro"
+name = "DeepSeek V4 Pro"
+ctx = 1000000
+vision = false
+tools = true
