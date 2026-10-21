@@ -23,11 +23,11 @@ pub const MODELS: &[ModelDef] = &[
     },
     ModelDef {
         id: "gpt-6-astra",
-        context_length: 262144,
+        context_length: 1000000,
     },
     ModelDef {
         id: "gpt-6.1-sol",
-        context_length: 262144,
+        context_length: 1000000,
     },
 ];
 

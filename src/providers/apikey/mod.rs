@@ -1,4 +1,5 @@
 pub mod agentrouter;
+pub mod antseed;
 pub mod bai;
 pub mod cline;
 pub mod cloudflare;
